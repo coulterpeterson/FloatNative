@@ -1,6 +1,6 @@
 # Floatplane Companion API
 
-A lightweight Node.js/Fastify API service that provides additional features (playlists, watch later) for the FloatNative iOS/tvOS app.
+A lightweight API service that provides additional features (playlists, watch later) for the FloatNative iOS/tvOS app.
 
 ## Features
 
