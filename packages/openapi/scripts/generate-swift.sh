@@ -1,15 +1,25 @@
 #!/bin/bash
 #
 # Generate Swift models from Floatplane OpenAPI specification
-# This script downloads the latest spec, regenerates models, and auto-copies them to the project
+# This script regenerates models from the centralized spec and auto-copies them to the iOS project
 # Uses a temporary staging folder that is automatically cleaned up
 #
 
 set -e  # Exit on error
 
+# Paths relative to packages/openapi/scripts/
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SPEC_FILE="$SCRIPT_DIR/floatplane-openapi-specification-trimmed.json"
-PROJECT_MODELS_DIR="$SCRIPT_DIR/FloatNative/Models/Generated"
+OPENAPI_DIR="$(dirname "$SCRIPT_DIR")"  # packages/openapi
+SPEC_FILE="$OPENAPI_DIR/floatplane-openapi-specification.json"
+IOS_PROJECT_DIR="$OPENAPI_DIR/../../apps/ios"
+PROJECT_MODELS_DIR="$IOS_PROJECT_DIR/FloatNative/Models/Generated"
+
+# Validate spec file exists
+if [ ! -f "$SPEC_FILE" ]; then
+    echo "❌ Error: OpenAPI spec not found at $SPEC_FILE"
+    echo "💡 Run 'pnpm openapi:update-spec' to download the latest spec"
+    exit 1
+fi
 
 # Use temporary directory for generation (auto-cleaned up)
 TEMP_OUTPUT_DIR=$(mktemp -d -t floatplane-openapi)
@@ -19,14 +29,8 @@ GENERATED_MODELS_DIR="$TEMP_OUTPUT_DIR/Sources/OpenAPIClient/Models"
 trap "rm -rf '$TEMP_OUTPUT_DIR'" EXIT
 
 echo "🔄 Generating Floatplane API models..."
+echo "📁 Using spec: $SPEC_FILE"
 echo "📁 Using temporary staging: $TEMP_OUTPUT_DIR"
-
-# Download latest spec if older than 7 days or missing
-if [ ! -f "$SPEC_FILE" ] || [ $(find "$SPEC_FILE" -mtime +7 2>/dev/null | wc -l) -gt 0 ]; then
-    echo "📥 Downloading latest OpenAPI specification..."
-    curl -s -o "$SPEC_FILE" https://jamamp.github.io/FloatplaneAPIDocs/floatplane-openapi-specification-trimmed.json
-    echo "✅ Spec downloaded"
-fi
 
 # Generate models to temporary directory
 echo "🏗️  Generating Swift5 models..."
@@ -61,11 +65,13 @@ REQUIRED_MODELS=(
 
     # Auth models
     "AuthLoginV2*.swift"
+    "AuthLoginV3*.swift"
     "CheckFor2faLoginRequest.swift"
 
     # User models
     "UserModel.swift"
     "UserSelfV3Response.swift"
+    "UserStatusV3Response.swift"
     "UserSubscriptionModel.swift"
     "SubscriptionsV3Response.swift"
 
@@ -103,7 +109,7 @@ REQUIRED_MODELS=(
 )
 
 echo ""
-echo "📦 Copying required models to project..."
+echo "📦 Copying required models to iOS project..."
 
 # Create project models directory if it doesn't exist
 mkdir -p "$PROJECT_MODELS_DIR"
@@ -155,7 +161,7 @@ for file in "${CUSTOM_FILES[@]}"; do
 done
 rm -rf "$TEMP_DIR"
 
-echo "✅ Copied $COPIED_COUNT OpenAPI models to FloatNative/Models/Generated/"
+echo "✅ Copied $COPIED_COUNT OpenAPI models to apps/ios/FloatNative/Models/Generated/"
 
 # Auto-detect and copy dependencies
 echo ""
@@ -200,7 +206,7 @@ while [ $ITERATIONS -lt $MAX_ITERATIONS ]; do
 done
 
 if [ $ITERATIONS -gt 0 ]; then
-    echo "✅ Resolved and copied $((COPIED_COUNT - $COPIED_COUNT + ADDED_THIS_ROUND)) dependency models"
+    echo "✅ Resolved and copied dependency models"
 fi
 
 # Post-processing: Fix known issues in generated models
@@ -229,7 +235,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "📊 Summary:"
 echo "   • Total generated: $TOTAL_GENERATED models"
 echo "   • Copied to project: $COPIED_COUNT models"
-echo "   • Location: FloatNative/Models/Generated/"
+echo "   • Location: apps/ios/FloatNative/Models/Generated/"
 echo ""
 echo "✅ Models are ready to use in your Xcode project!"
 echo ""

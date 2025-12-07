@@ -14,7 +14,6 @@ public struct BlogPostModelV3: Codable, JSONEncodable, Hashable {
 
     public enum ModelType: String, Codable, CaseIterable {
         case blogpost = "blogPost"
-        case livestream = "livestream"
     }
     public var id: String
     public var guid: String

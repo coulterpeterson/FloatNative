@@ -127,11 +127,49 @@ Run migrations on production:
 pnpm api:db:migrate:remote
 ```
 
+### OpenAPI Model Generation
+
+The monorepo uses a centralized OpenAPI specification in `packages/openapi/` to generate type-safe API models for iOS (and future Android).
+
+**Specification Source**: Community-maintained [FloatplaneAPI](https://github.com/jamamp/FloatplaneAPI)
+
+**Available Commands**:
+
+Generate Swift models for iOS:
+```bash
+pnpm openapi:generate:swift
+```
+
+Generate Kotlin models for Android (placeholder):
+```bash
+pnpm openapi:generate:kotlin
+```
+
+Generate all platform models:
+```bash
+pnpm openapi:generate:all
+```
+
+Update OpenAPI spec from upstream:
+```bash
+pnpm openapi:update-spec
+```
+
+**How it works**:
+- Spec stored in `packages/openapi/floatplane-openapi-specification.json`
+- Generation script in `packages/openapi/scripts/generate-swift.sh`
+- Models output to `apps/ios/FloatNative/Models/Generated/`
+- Selective copying: only includes models actually used by the app
+- Automatic dependency resolution
+- Post-processing fixes for known generator bugs
+
+For more details, see [`packages/openapi/README.md`](packages/openapi/README.md).
+
 ### iOS Development
 
 Open `apps/ios/FloatNative.xcodeproj` in Xcode and build/run the project.
 
-The iOS app auto-generates API models from the community FloatplaneAPI specification during build. See `apps/ios/generate-api-models.sh` for details.
+**Note**: API models are auto-generated from OpenAPI spec. See "OpenAPI Model Generation" section above to regenerate models when needed. The app also maintains custom model wrappers in `apps/ios/FloatNative/Models/` for fields not covered by the OpenAPI spec (e.g., `selfUserInteraction`).
 
 ## 🙏 Acknowledgments
 

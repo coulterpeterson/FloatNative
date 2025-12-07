@@ -2,6 +2,10 @@
   "name": "floatnative",
   "private": true,
   "scripts": {
+    "openapi:generate:swift": "pnpm --filter @floatnative/openapi generate:swift",
+    "openapi:generate:kotlin": "pnpm --filter @floatnative/openapi generate:kotlin",
+    "openapi:generate:all": "pnpm --filter @floatnative/openapi generate:all",
+    "openapi:update-spec": "pnpm --filter @floatnative/openapi update-spec",
     "api:dev": "pnpm --filter api dev",
     "api:deploy": "pnpm --filter api deploy",
     "api:tail": "pnpm --filter api tail",

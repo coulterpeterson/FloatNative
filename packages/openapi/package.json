@@ -1,0 +1,15 @@
+{
+  "name": "@floatnative/openapi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OpenAPI specification and client generation for Floatplane API",
+  "scripts": {
+    "generate:swift": "./scripts/generate-swift.sh",
+    "generate:kotlin": "./scripts/generate-kotlin.sh",
+    "generate:all": "pnpm generate:swift && pnpm generate:kotlin",
+    "update-spec": "curl -s -o floatplane-openapi-specification.json https://raw.githubusercontent.com/jamamp/FloatplaneAPI/main/src/floatplane-openapi-specification.json"
+  },
+  "devDependencies": {
+    "@openapitools/openapi-generator-cli": "^2.7.0"
+  }
+}
