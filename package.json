@@ -1,0 +1,12 @@
+{
+  "name": "floatnative",
+  "private": true,
+  "scripts": {
+    "api:dev": "pnpm --filter api dev",
+    "api:deploy": "pnpm --filter api deploy",
+    "api:tail": "pnpm --filter api tail",
+    "api:db:generate": "pnpm --filter api db:generate",
+    "api:db:migrate:local": "pnpm --filter api db:migrate:local",
+    "api:db:migrate:remote": "pnpm --filter api db:migrate:remote"
+  }
+}

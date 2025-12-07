@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Database
+*.db
+*.db.backup
+*.sqlite
+*.sqlite3
+dev.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+console.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+coverage/
+.nyc_output/
+
+# Wrangler
+.wrangler/

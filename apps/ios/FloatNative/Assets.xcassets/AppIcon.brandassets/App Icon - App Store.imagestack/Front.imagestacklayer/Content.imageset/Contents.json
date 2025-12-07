@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "FloatNative Logo  Main App Store Icon 1280 x 768.png",
+      "idiom" : "tv"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

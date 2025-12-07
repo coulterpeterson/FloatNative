@@ -1,0 +1,18 @@
+{
+  "images" : [
+    {
+      "filename" : "FloatNative Logo  Top Shelf Image 1x (400 x 240 px).png",
+      "idiom" : "tv",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "FloatNative Logo  Top Shelf Image 2x 800 x 480 px.png",
+      "idiom" : "tv",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
