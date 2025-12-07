@@ -42,6 +42,7 @@ This is a pnpm monorepo containing a native iOS application and a Cloudflare Wor
 floatnative/
 ├── packages/
 │   └── api/              # Companion API (Cloudflare Worker)
+│   └── openapi/          # Community-maintained OpenAPI spec for API file generation
 │
 └── apps/
     └── ios/              # Native iOS app (SwiftUI)
