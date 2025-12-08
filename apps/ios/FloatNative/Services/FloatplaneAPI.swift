@@ -97,7 +97,7 @@ class FloatplaneAPI: ObservableObject {
     @Published var autoReloginEnabled = true // User preference for auto re-login
 
     // OAuth State
-    private var accessToken: String?
+    @Published private(set) var accessToken: String?
     private var refreshToken: String?
     private var tokenExpiry: Date?
 

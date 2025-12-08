@@ -895,11 +895,10 @@ struct VideoPlayerTvosView: View {
             let deliveryInfo = try await api.getDeliveryInfo(
                 scenario: .onDemand,
                 entityId: videoId,
-                outputKind: .hlsFmp4
+                outputKind: .hlsMpegts
             )
 
             let qualities = deliveryInfo.availableVariants()
-
 
             // Load video into player
             try await playerManager.loadVideo(

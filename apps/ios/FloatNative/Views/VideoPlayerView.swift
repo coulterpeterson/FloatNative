@@ -436,17 +436,13 @@ struct VideoPlayerView: View {
             print("📱   Content: \(content)")
 
             // Get delivery info
-            print("📱 [VideoPlayerView.loadVideo] Fetching delivery info for ID: \(videoId)")
             let deliveryInfo = try await api.getDeliveryInfo(
                 scenario: .onDemand,
                 entityId: videoId,
-                outputKind: .hlsFmp4
+                outputKind: .hlsMpegts
             )
-            print("📱 [VideoPlayerView.loadVideo] Delivery info response:")
-            print("📱   Delivery info: \(deliveryInfo)")
 
             let qualities = deliveryInfo.availableVariants()
-            print("📱 [VideoPlayerView.loadVideo] Available qualities: \(qualities.count)")
 
             // Load video into player
             try await playerManager.loadVideo(

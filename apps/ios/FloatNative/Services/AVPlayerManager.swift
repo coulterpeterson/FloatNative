@@ -245,8 +245,12 @@ class AVPlayerManager: NSObject, ObservableObject {
         // Clean up old player
         cleanupPlayer()
 
-        // Create new player
-        let asset = AVURLAsset(url: streamURL)
+        // Create new player with headers
+        let headers: [String: String] = [
+            "User-Agent": "FloatNative/1.0 (iOS), CFNetwork",
+            "Authorization": "Bearer \(FloatplaneAPI.shared.accessToken ?? "")"
+        ]
+        let asset = AVURLAsset(url: streamURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
         let playerItem = AVPlayerItem(asset: asset)
 
         // Configure buffer limits for tvOS to prevent memory issues during long playback
