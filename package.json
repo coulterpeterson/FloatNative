@@ -8,6 +8,7 @@
     "openapi:update-spec": "pnpm --filter @floatnative/openapi update-spec",
     "api:dev": "pnpm --filter api dev",
     "api:deploy": "pnpm --filter api deploy",
+    "api:deploy:non-production": "pnpm --filter api deploy:non-production",
     "api:tail": "pnpm --filter api tail",
     "api:db:generate": "pnpm --filter api db:generate",
     "api:db:migrate:local": "pnpm --filter api db:migrate:local",
