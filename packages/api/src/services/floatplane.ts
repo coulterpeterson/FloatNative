@@ -131,6 +131,57 @@ export async function validateFloatplaneCookie(
 }
 
 /**
+ * Validates a Floatplane OAuth access token by calling the /user/self endpoint
+ * @param accessToken The OAuth access token
+ * @param floatplaneApiUrl The base URL for the Floatplane API
+ * @returns The Floatplane user ID if valid
+ * @throws FloatplaneAPIError if token is invalid or API call fails
+ */
+export async function validateFloatplaneToken(
+  accessToken: string,
+  floatplaneApiUrl: string
+): Promise<string> {
+  try {
+    const response = await fetch(`${floatplaneApiUrl}/user/self`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      // @ts-ignore - cf property exists in Workers but not in standard fetch types
+      cf: {
+        cacheTtl: 0,
+        cacheEverything: false,
+      },
+    });
+
+    if (!response.ok) {
+      const status = response.status;
+      if (status === 401 || status === 403) {
+        throw new FloatplaneAPIError('Invalid or expired Floatplane token', status);
+      }
+      throw new FloatplaneAPIError(`Floatplane API error: ${response.statusText}`, status);
+    }
+
+    const data = (await response.json()) as FloatplaneUserResponse;
+
+    if (!data || !data.id) {
+      throw new FloatplaneAPIError('Invalid response from Floatplane API: missing user ID');
+    }
+
+    return data.id;
+  } catch (error) {
+    if (error instanceof FloatplaneAPIError) {
+      throw error;
+    }
+
+    throw new FloatplaneAPIError(
+      'Failed to validate Floatplane token',
+      undefined,
+      error as Error
+    );
+  }
+}
+
+/**
  * Fetches posts from Floatplane for a specific creator with pagination
  * @param sailsSid The sails.sid cookie value for authentication
  * @param creatorId The creator ID to fetch posts for

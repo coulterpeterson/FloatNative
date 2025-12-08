@@ -203,7 +203,7 @@ Complete documentation of all available endpoints.
 
 ### Authentication
 
-#### POST /auth/register
+#### DEPRECATED POST /auth/register
 Register or login a user using their Floatplane session cookie.
 
 **Request:**
@@ -230,7 +230,7 @@ Register or login a user using their Floatplane session cookie.
 
 ---
 
-### QR Code Authentication
+### DEPRECATED QR Code Authentication
 
 QR code authentication provides a seamless way for users to authenticate their devices by scanning a QR code and entering their Floatplane token on their phone.
 
@@ -244,7 +244,7 @@ QR code authentication provides a seamless way for users to authenticate their d
 6. **Frontend polls** `GET /auth/qr/poll/:sessionId` until the session is completed
 7. **Poll returns the API key** when authentication is successful
 
-#### POST /auth/qr/generate
+#### DEPRECATED POST /auth/qr/generate
 Generate a new QR code session.
 
 **Request:**
@@ -273,7 +273,7 @@ Generate a new QR code session.
 
 ---
 
-#### POST /auth/qr/submit
+#### DEPRECATED POST /auth/qr/submit
 Submit a Floatplane token for a QR session. This endpoint is called from the web page that opens when scanning the QR code.
 
 **Request:**
@@ -302,7 +302,7 @@ Submit a Floatplane token for a QR session. This endpoint is called from the web
 
 ---
 
-#### GET /auth/qr/poll/:sessionId
+#### DEPRECATED GET /auth/qr/poll/:sessionId
 Poll for QR session completion. Frontend should call this endpoint repeatedly until status changes from "pending".
 
 **Response (200) - Pending:**
