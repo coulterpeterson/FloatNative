@@ -56,7 +56,7 @@ struct VideoPlayerView: View {
     }
 
     private var isLivestream: Bool {
-        post.type == .livestream
+        post.isLivestream
     }
 
     var body: some View {

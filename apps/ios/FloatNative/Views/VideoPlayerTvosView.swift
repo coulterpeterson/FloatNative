@@ -73,7 +73,7 @@ struct VideoPlayerTvosView: View {
     }
 
     var isLivestream: Bool {
-        post.type == .livestream
+        post.isLivestream
     }
 
 

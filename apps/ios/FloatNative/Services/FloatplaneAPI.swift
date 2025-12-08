@@ -68,6 +68,21 @@ class FloatplaneAPI: ObservableObject {
 
     private let baseURL = "https://www.floatplane.com"
     private let imageBaseURL = "https://pbs.floatplane.com"
+    private let authBaseURL = "https://auth.floatplane.com"
+
+    // OAuth Configuration
+    private let realm = "floatplane"
+    #if os(tvOS)
+    private let clientId = "wasserflug" // Using existing client ID for tvOS
+    #else
+    private let clientId = "wasserflug" // Using wasserflug temporarily for iOS as well until own client ID is registered
+    #endif
+    // private let redirectUri = "floatnative://auth" // For future implementation
+
+    // Endpoints
+    private var tokenEndpoint: String { "/realms/\(realm)/protocol/openid-connect/token" }
+    private var deviceAuthEndpoint: String { "/realms/\(realm)/protocol/openid-connect/auth/device" }
+    private var authEndpoint: String { "/realms/\(realm)/protocol/openid-connect/auth" }
 
     // MARK: - Session
 
@@ -81,9 +96,18 @@ class FloatplaneAPI: ObservableObject {
     @Published private(set) var currentUserDetails: UserSelfV3Response?
     @Published var autoReloginEnabled = true // User preference for auto re-login
 
+    // OAuth State
+    private var accessToken: String?
+    private var refreshToken: String?
+    private var tokenExpiry: Date?
+
+    // Legacy Cookie (for backward compatibility during migration)
     private var authCookie: String? {
         didSet {
-            isAuthenticated = authCookie != nil
+            // Only consider authenticated via cookie if no OAuth token
+            if accessToken == nil {
+                isAuthenticated = authCookie != nil
+            }
         }
     }
 
@@ -99,8 +123,28 @@ class FloatplaneAPI: ObservableObject {
         self.session = URLSession(configuration: config)
 
         // Load saved settings
-        loadAuthCookie()
+        loadOAuthTokens()
+        loadAuthCookie() // Keep for legacy migration
         loadAutoReloginPreference()
+
+        // Check authentication state
+        checkAuthState()
+    }
+
+    private func checkAuthState() {
+        if let expiry = tokenExpiry, expiry > Date() {
+            isAuthenticated = true
+        } else if authCookie != nil {
+            isAuthenticated = true
+        } else {
+            isAuthenticated = false
+        }
+    }
+
+    private func loadOAuthTokens() {
+        accessToken = KeychainManager.shared.getAccessToken()
+        refreshToken = KeychainManager.shared.getRefreshToken()
+        tokenExpiry = KeychainManager.shared.getTokenExpiry()
     }
 
     // MARK: - Cookie Management
@@ -162,6 +206,9 @@ class FloatplaneAPI: ObservableObject {
                 cookieStorage.deleteCookie(cookie)
             }
         }
+
+        // Clear OAuth state
+        clearOAuthState()
     }
 
     // MARK: - Auto Re-login Management
@@ -179,40 +226,7 @@ class FloatplaneAPI: ObservableObject {
         UserDefaults.standard.set(enabled, forKey: "autoReloginEnabled")
     }
 
-    /// Attempt automatic re-login using stored credentials
-    private func attemptAutoRelogin() async throws {
-        // Prevent multiple simultaneous re-login attempts
-        guard !isRelogging else { return }
 
-        // Check if auto re-login is enabled
-        guard autoReloginEnabled else {
-            throw FloatplaneAPIError.notAuthenticated
-        }
-
-        // Get stored credentials
-        guard let credentials = KeychainManager.shared.getCredentials() else {
-            throw FloatplaneAPIError.notAuthenticated
-        }
-
-        isRelogging = true
-        defer { isRelogging = false }
-
-        // Attempt login with stored credentials
-        do {
-            let response = try await login(username: credentials.username, password: credentials.password)
-
-            // Handle 2FA if needed
-            if response.needs2FA {
-                // Can't automatically handle 2FA, fail and require manual login
-                throw FloatplaneAPIError.notAuthenticated
-            }
-
-            print("✅ Auto re-login successful")
-        } catch {
-            print("❌ Auto re-login failed: \(error.localizedDescription)")
-            throw FloatplaneAPIError.notAuthenticated
-        }
-    }
 
     private func extractCookie(from response: HTTPURLResponse) {
         if let headerFields = response.allHeaderFields as? [String: String],
@@ -237,29 +251,30 @@ class FloatplaneAPI: ObservableObject {
             throw FloatplaneAPIError.invalidURL
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("FloatNative/1.0 (iOS), CFNetwork", forHTTPHeaderField: "User-Agent")
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = method
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("FloatNative/1.0 (iOS), CFNetwork", forHTTPHeaderField: "User-Agent")
 
-        // Add auth cookie if required
+        // Add auth headers
         if requiresAuth {
-            guard let authCookie = authCookie else {
+            if let accessToken = accessToken {
+                urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            } else if let authCookie = authCookie {
+                // Fallback to legacy cookie
+                urlRequest.setValue("sails.sid=\(authCookie)", forHTTPHeaderField: "Cookie")
+            } else {
                 throw FloatplaneAPIError.notAuthenticated
             }
-            request.setValue("sails.sid=\(authCookie)", forHTTPHeaderField: "Cookie")
-            #if DEBUG
-
-            #endif
         }
 
         // Encode body if present
         if let body = body {
-            request.httpBody = try JSONEncoder().encode(body)
+            urlRequest.httpBody = try JSONEncoder().encode(body)
         }
 
         // Perform request
-        let (_, response) = try await session.data(for: request)
+        let (_, response) = try await session.data(for: urlRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FloatplaneAPIError.invalidResponse
@@ -270,14 +285,15 @@ class FloatplaneAPI: ObservableObject {
 
         // Handle HTTP errors
         guard (200...299).contains(httpResponse.statusCode) else {
-            // Check for authentication errors (401 Unauthorized, 403 Forbidden)
-            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                // Try auto re-login if enabled and credentials are stored
-                if autoReloginEnabled && KeychainManager.shared.hasStoredCredentials() && !isRelogging {
+            // Check for authentication errors (401 Unauthorized)
+            if httpResponse.statusCode == 401 {
+                // Try OAuth Refresh first
+                if refreshToken != nil && !isRelogging {
+                    isRelogging = true
+                    defer { isRelogging = false }
+
                     do {
-                        try await attemptAutoRelogin()
-                        // Retry the original request after successful re-login
-                        // Note: This will recursively call this method, but with valid auth now
+                        try await refreshAccessToken()
                         return try await requestWithoutResponse(
                             endpoint: endpoint,
                             method: method,
@@ -285,12 +301,13 @@ class FloatplaneAPI: ObservableObject {
                             requiresAuth: requiresAuth
                         )
                     } catch {
-                        // Auto re-login failed, clear auth state
-                        clearAuthCookie()
+                        // Refresh failed, fall through to legacy or error
                     }
-                } else {
-                    // Auto re-login not available, clear auth state
-                    clearAuthCookie()
+                }
+
+                // OAUTH Refresh Failed
+                if refreshToken != nil {
+                     clearOAuthState()
                 }
             }
 
@@ -308,29 +325,30 @@ class FloatplaneAPI: ObservableObject {
             throw FloatplaneAPIError.invalidURL
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("FloatNative/1.0 (iOS), CFNetwork", forHTTPHeaderField: "User-Agent")
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = method
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("FloatNative/1.0 (iOS), CFNetwork", forHTTPHeaderField: "User-Agent")
 
-        // Add auth cookie if required
+        // Add auth headers
         if requiresAuth {
-            guard let authCookie = authCookie else {
+            if let accessToken = accessToken {
+                urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            } else if let authCookie = authCookie {
+                // Fallback to legacy cookie
+                urlRequest.setValue("sails.sid=\(authCookie)", forHTTPHeaderField: "Cookie")
+            } else {
                 throw FloatplaneAPIError.notAuthenticated
             }
-            request.setValue("sails.sid=\(authCookie)", forHTTPHeaderField: "Cookie")
-            #if DEBUG
-
-            #endif
         }
 
         // Encode body if present
         if let body = body {
-            request.httpBody = try JSONEncoder().encode(body)
+            urlRequest.httpBody = try JSONEncoder().encode(body)
         }
 
         // Perform request
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: urlRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FloatplaneAPIError.invalidResponse
@@ -341,28 +359,29 @@ class FloatplaneAPI: ObservableObject {
 
         // Handle HTTP errors
         guard (200...299).contains(httpResponse.statusCode) else {
-            // Check for authentication errors (401 Unauthorized, 403 Forbidden)
-            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+            // Check for authentication errors (401 Unauthorized)
+            if httpResponse.statusCode == 401 {
+                // Try OAuth Refresh first
+                if refreshToken != nil && !isRelogging {
+                    isRelogging = true
+                    defer { isRelogging = false }
 
-                // Try auto re-login if enabled and credentials are stored
-                if autoReloginEnabled && KeychainManager.shared.hasStoredCredentials() && !isRelogging {
                     do {
-                        try await attemptAutoRelogin()
-                        // Retry the original request after successful re-login
-                        // Note: This will recursively call this method, but with valid auth now
-                        return try await self.request(
+                        try await refreshAccessToken()
+                        return try await request(
                             endpoint: endpoint,
                             method: method,
                             body: body,
                             requiresAuth: requiresAuth
                         )
                     } catch {
-                        // Auto re-login failed, clear auth state
-                        clearAuthCookie()
+                        // Refresh failed, fall through to legacy or error
                     }
-                } else {
-                    // Auto re-login not available, clear auth state
-                    clearAuthCookie()
+                }
+
+                // OAUTH Refresh Failed
+                if refreshToken != nil {
+                     clearOAuthState()
                 }
             }
 
@@ -445,61 +464,142 @@ class FloatplaneAPI: ObservableObject {
         return prettyString
     }
 
+    // MARK: - OAuth Helpers
+
+    private func requestAuth<T: Decodable>(
+        endpoint: String,
+        method: String = "POST",
+        body: [String: String]
+    ) async throws -> T {
+        guard let url = URL(string: authBaseURL + endpoint) else {
+            throw FloatplaneAPIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.setValue("FloatNative/1.0 (iOS), CFNetwork", forHTTPHeaderField: "User-Agent")
+
+        // Encode body params
+        let bodyString = body.map { "\($0.key)=\($0.value)" }
+            .joined(separator: "&")
+        request.httpBody = bodyString.data(using: .utf8)
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw FloatplaneAPIError.invalidResponse
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            // Parse error response
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let error = json["error"] as? String {
+                // Return descriptive error for polling (e.g., authorization_pending)
+                throw FloatplaneAPIError.httpError(statusCode: httpResponse.statusCode, message: error)
+            }
+            throw FloatplaneAPIError.httpError(statusCode: httpResponse.statusCode, message: nil)
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode(T.self, from: data)
+    }
+
+    private func handleOAuthResponse(_ response: OAuthTokenResponse) {
+        self.accessToken = response.accessToken
+        self.refreshToken = response.refreshToken
+        self.tokenExpiry = Date().addingTimeInterval(TimeInterval(response.expiresIn))
+
+        // Save to Keychain
+        _ = KeychainManager.shared.saveOAuthTokens(
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken,
+            expiresIn: response.expiresIn
+        )
+
+        self.isAuthenticated = true
+        print("✅ OAuth login successful. Token expires in \(response.expiresIn)s")
+    }
+
     // MARK: - AUTHENTICATION
 
-    /// Login with username and password
-    func login(username: String, password: String, captchaToken: String? = nil) async throws -> LoginResponse {
-        let loginRequest = LoginRequest(
-            username: username,
-            password: password,
-            captchaToken: captchaToken
-        )
+    // MARK: OAuth Methods
 
-        let response: LoginResponse = try await request(
-            endpoint: "/api/v2/auth/login",
-            method: "POST",
-            body: loginRequest
-        )
+    /// Start Device Authorization Flow (TV)
+    func startDeviceAuth() async throws -> DeviceCodeResponse {
+        let body = [
+            "client_id": clientId,
+            "scope": "openid offline_access"
+        ]
 
-        if !response.needs2FA {
-            currentUser = response.user
-        }
+        return try await requestAuth(endpoint: deviceAuthEndpoint, body: body)
+    }
 
+    /// Poll for token during Device Flow
+    func pollDeviceToken(deviceCode: String) async throws -> OAuthTokenResponse {
+        let body = [
+            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+            "client_id": clientId,
+            "device_code": deviceCode
+        ]
+
+        let response: OAuthTokenResponse = try await requestAuth(endpoint: tokenEndpoint, body: body)
+        handleOAuthResponse(response)
         return response
     }
 
-    /// Login with auth token (sails.sid cookie)
-    func loginWithToken(_ token: String) async throws {
-        // Save token to Keychain and UserDefaults
-        _ = KeychainManager.shared.saveAuthToken(token)
-        saveAuthCookie(token)
+    /// Exchange Authorization Code for Token (iOS)
+    func exchangeAuthCode(code: String, verifier: String, redirectUri: String? = nil) async throws {
+        var body = [
+            "grant_type": "authorization_code",
+            "client_id": clientId,
+            "code": code,
+            "code_verifier": verifier
+        ]
+        
+        if let redirectUri = redirectUri {
+            body["redirect_uri"] = redirectUri
+        }
 
-        // Validate token by fetching user info
-        do {
-            _ = try await getCurrentUser()
-            print("✅ Token login successful")
-        } catch {
-            // Token is invalid, clear it
-            clearAuthCookie()
-            KeychainManager.shared.clearAuthToken()
+        let response: OAuthTokenResponse = try await requestAuth(endpoint: tokenEndpoint, body: body)
+        handleOAuthResponse(response)
+
+        // Fetch user info to populate currentUser
+        _ = try? await getCurrentUser()
+    }
+
+    /// Refresh Access Token
+    func refreshAccessToken() async throws {
+        guard let refreshToken = refreshToken else {
             throw FloatplaneAPIError.notAuthenticated
         }
+
+        let body = [
+            "grant_type": "refresh_token",
+            "client_id": clientId,
+            "refresh_token": refreshToken
+        ]
+
+        do {
+            let response: OAuthTokenResponse = try await requestAuth(endpoint: tokenEndpoint, body: body)
+            handleOAuthResponse(response)
+        } catch {
+            // If refresh fails, clear tokens
+            print("❌ Token refresh failed: \(error.localizedDescription)")
+            clearOAuthState()
+            throw error
+        }
     }
 
-    /// Complete 2FA login
-    func verify2FA(token: String) async throws -> LoginResponse {
-        let twoFactorRequest = TwoFactorRequest(token: token)
-
-        let response: LoginResponse = try await request(
-            endpoint: "/api/v2/auth/checkFor2faLogin",
-            method: "POST",
-            body: twoFactorRequest,
-            requiresAuth: true
-        )
-
-        currentUser = response.user
-        return response
+    private func clearOAuthState() {
+        self.accessToken = nil
+        self.refreshToken = nil
+        self.tokenExpiry = nil
+        KeychainManager.shared.clearOAuthTokens()
+        self.isAuthenticated = false
     }
+
+    // MARK: - LOGOUT
 
     /// Logout
     func logout() async throws {

@@ -15,7 +15,10 @@ class KeychainManager {
     private let usernameKey = "username"
     private let passwordKey = "password"
     private let apiKeyKey = "companion_api_key"
-    private let authTokenKey = "floatplane_auth_token"
+    private let authTokenKey = "floatplane_auth_token" // Legacy sails.sid
+    private let accessTokenKey = "oauth_access_token"
+    private let refreshTokenKey = "oauth_refresh_token"
+    private let tokenExpiryKey = "oauth_token_expiry"
 
     private init() {}
 
@@ -95,6 +98,41 @@ class KeychainManager {
     /// Clear stored auth token from Keychain
     func clearAuthToken() {
         deleteItem(key: authTokenKey)
+    }
+
+    // MARK: - OAuth Token Storage
+
+    func saveOAuthTokens(accessToken: String, refreshToken: String, expiresIn: Int) -> Bool {
+        let expiryDate = Date().addingTimeInterval(TimeInterval(expiresIn))
+        let expiryTimestamp = String(expiryDate.timeIntervalSince1970)
+
+        let accessSuccess = saveItem(key: accessTokenKey, value: accessToken)
+        let refreshSuccess = saveItem(key: refreshTokenKey, value: refreshToken)
+        let expirySuccess = saveItem(key: tokenExpiryKey, value: expiryTimestamp)
+
+        return accessSuccess && refreshSuccess && expirySuccess
+    }
+
+    func getAccessToken() -> String? {
+        return getItem(key: accessTokenKey)
+    }
+
+    func getRefreshToken() -> String? {
+        return getItem(key: refreshTokenKey)
+    }
+
+    func getTokenExpiry() -> Date? {
+        guard let timestampString = getItem(key: tokenExpiryKey),
+              let timestamp = TimeInterval(timestampString) else {
+            return nil
+        }
+        return Date(timeIntervalSince1970: timestamp)
+    }
+
+    func clearOAuthTokens() {
+        deleteItem(key: accessTokenKey)
+        deleteItem(key: refreshTokenKey)
+        deleteItem(key: tokenExpiryKey)
     }
 
     // MARK: - Private Keychain Operations

@@ -1488,7 +1488,7 @@ struct VideoCard: View {
 
     // Livestream detection
     private var isLivestream: Bool {
-        post.type == .livestream
+        post.isLivestream
     }
 
     var body: some View {
