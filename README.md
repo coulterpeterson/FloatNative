@@ -174,10 +174,10 @@ Open `apps/ios/FloatNative.xcodeproj` in Xcode and build/run the project.
 
 ## 🙏 Acknowledgments
 
-- The Community-maintained (FloatplaneAPI)[https://github.com/jamamp/FloatplaneAPI]
-- (Hydravion-AndroidTV)[https://github.com/bmlzootown/Hydravion-AndroidTV] for providing a great basis of code to draw inspiration and reverse-engineering from
-- (Wasserflug-tvOS)[https://github.com/jamamp/Wasserflug-tvOS] for providing a great basis of code to draw inspiration and reverse-engineering from (and for giving my wife and I a convenient tvOS app we use every day)
-- (The Apple Docs MCP server)[https://github.com/kimsungwhee/apple-docs-mcp]
+- The Community-maintained [FloatplaneAPI](https://github.com/jamamp/FloatplaneAPI)
+- [Hydravion-AndroidTV](https://github.com/bmlzootown/Hydravion-AndroidTV) for providing a great basis of code to draw inspiration and reverse-engineering from
+- [Wasserflug-tvOS](https://github.com/jamamp/Wasserflug-tvOS) for providing a great basis of code to draw inspiration and reverse-engineering from (and for giving my wife and I a convenient tvOS app we use every day)
+- [The Apple Docs MCP server](https://github.com/kimsungwhee/apple-docs-mcp)
 - Claude Code (why hide it)
 - The Floatplane team for all their incredible work building this great service and putting up with nerds like me 👏
 
