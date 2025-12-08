@@ -1,5 +1,5 @@
 {
-  "name": "FloatNative-API",
+  "name": "api",
   "version": "1.0.0",
   "description": "Companion API for Floatplane iOS/tvOS app - provides playlists and watch later functionality",
   "scripts": {

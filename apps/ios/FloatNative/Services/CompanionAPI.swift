@@ -216,13 +216,28 @@ class CompanionAPI: ObservableObject {
         }
 
         let includeParam = includeWatchLater ? "true" : "false"
-        let response: PlaylistResponse = try await request(
-            endpoint: "/playlists?include_watch_later=\(includeParam)",
-            method: "GET",
-            requiresAuth: true
-        )
-
-        return response.playlists
+        
+        do {
+            let response: PlaylistResponse = try await request(
+                endpoint: "/playlists?include_watch_later=\(includeParam)",
+                method: "GET",
+                requiresAuth: true
+            )
+            return response.playlists
+        } catch CompanionAPIError.httpError(let statusCode, _) where statusCode == 401 {
+            // If we get 401, try to re-login and retry once
+            do {
+                _ = try await ensureLoggedIn()
+                let response: PlaylistResponse = try await request(
+                    endpoint: "/playlists?include_watch_later=\(includeParam)",
+                    method: "GET",
+                    requiresAuth: true
+                )
+                return response.playlists
+            } catch {
+                throw CompanionAPIError.registrationFailed
+            }
+        }
     }
 
     /// Create a new playlist
