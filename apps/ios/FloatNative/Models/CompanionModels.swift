@@ -43,11 +43,11 @@ enum CompanionAPIError: LocalizedError {
 
 // MARK: - Registration Models
 
-struct CompanionRegisterRequest: Codable {
-    let sailsSid: String
+struct CompanionLoginRequest: Codable {
+    let accessToken: String
 
     enum CodingKeys: String, CodingKey {
-        case sailsSid = "sails_sid"
+        case accessToken = "access_token"
     }
 }
 

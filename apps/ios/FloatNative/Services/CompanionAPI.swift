@@ -137,41 +137,41 @@ class CompanionAPI: ObservableObject {
     }
 
     // MARK: - Authentication
-
-    /// Register with companion API using Floatplane session cookie
-    func register(sailsSid: String) async throws -> String {
-        let registerRequest = CompanionRegisterRequest(sailsSid: sailsSid)
-
+    
+    /// Login with companion API using Floatplane OAuth token
+    func login(accessToken: String) async throws -> String {
+        let loginRequest = CompanionLoginRequest(accessToken: accessToken)
+        
         let response: CompanionRegisterResponse = try await request(
-            endpoint: "/auth/register",
+            endpoint: "/auth/login",
             method: "POST",
-            body: registerRequest,
+            body: loginRequest,
             requiresAuth: false
         )
-
+        
         // Store API key
         apiKey = response.apiKey
         return response.apiKey
     }
-
-    /// Auto-register using FloatplaneAPI's session cookie
-    func autoRegister() async throws -> String {
-        // Get Floatplane session cookie
-        guard let sailsSid = UserDefaults.standard.string(forKey: "sails.sid") else {
+    
+    /// Ensure we are logged in using FloatplaneAPI's current token
+    func ensureLoggedIn() async throws -> String {
+        // Get Floatplane OAuth token
+        guard let accessToken = FloatplaneAPI.shared.accessToken else {
             throw CompanionAPIError.notAuthenticated
         }
-
-        return try await register(sailsSid: sailsSid)
+        
+        return try await login(accessToken: accessToken)
     }
 
     // MARK: - Watch Later
 
     /// Add a video to Watch Later
     func addToWatchLater(videoId: String) async throws -> WatchLaterResponse {
-        // Check if we have an API key, if not, try to register
+        // Check if we have an API key, if not, try to login
         if apiKey == nil {
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
             } catch {
                 throw CompanionAPIError.registrationFailed
             }
@@ -189,7 +189,7 @@ class CompanionAPI: ObservableObject {
         } catch CompanionAPIError.httpError(let statusCode, _) where statusCode == 401 {
             // If we get 401, try to re-register and retry once
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
                 return try await request(
                     endpoint: "/watch-later/add",
                     method: "PATCH",
@@ -209,7 +209,7 @@ class CompanionAPI: ObservableObject {
         // Check if we have an API key, if not, try to register
         if apiKey == nil {
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
             } catch {
                 throw CompanionAPIError.registrationFailed
             }
@@ -230,7 +230,7 @@ class CompanionAPI: ObservableObject {
         // Check if we have an API key, if not, try to register
         if apiKey == nil {
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
             } catch {
                 throw CompanionAPIError.registrationFailed
             }
@@ -248,7 +248,7 @@ class CompanionAPI: ObservableObject {
         } catch CompanionAPIError.httpError(let statusCode, _) where statusCode == 401 {
             // If we get 401, try to re-register and retry once
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
                 return try await request(
                     endpoint: "/playlists",
                     method: "POST",
@@ -266,7 +266,7 @@ class CompanionAPI: ObservableObject {
         // Check if we have an API key, if not, try to register
         if apiKey == nil {
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
             } catch {
                 throw CompanionAPIError.registrationFailed
             }
@@ -281,7 +281,7 @@ class CompanionAPI: ObservableObject {
         } catch CompanionAPIError.httpError(let statusCode, _) where statusCode == 401 {
             // If we get 401, try to re-register and retry once
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
                 let _: Empty = try await request(
                     endpoint: "/playlists/\(playlistId)",
                     method: "DELETE",
@@ -298,7 +298,7 @@ class CompanionAPI: ObservableObject {
         // Check if we have an API key, if not, try to register
         if apiKey == nil {
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
             } catch {
                 throw CompanionAPIError.registrationFailed
             }
@@ -316,7 +316,7 @@ class CompanionAPI: ObservableObject {
         } catch CompanionAPIError.httpError(let statusCode, _) where statusCode == 401 {
             // If we get 401, try to re-register and retry once
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
                 return try await request(
                     endpoint: "/playlists/\(playlistId)/add",
                     method: "PATCH",
@@ -334,7 +334,7 @@ class CompanionAPI: ObservableObject {
         // Check if we have an API key, if not, try to register
         if apiKey == nil {
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
             } catch {
                 throw CompanionAPIError.registrationFailed
             }
@@ -352,7 +352,7 @@ class CompanionAPI: ObservableObject {
         } catch CompanionAPIError.httpError(let statusCode, _) where statusCode == 401 {
             // If we get 401, try to re-register and retry once
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
                 return try await request(
                     endpoint: "/playlists/\(playlistId)/remove",
                     method: "PATCH",
@@ -378,7 +378,7 @@ class CompanionAPI: ObservableObject {
         // Check if we have an API key, if not, try to register
         if apiKey == nil {
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
             } catch {
                 throw CompanionAPIError.registrationFailed
             }
@@ -405,7 +405,7 @@ class CompanionAPI: ObservableObject {
             // If we get 401, try to re-register and retry once
             print("🔍   ⚠️ Got 401, re-registering and retrying...")
             do {
-                _ = try await autoRegister()
+                _ = try await ensureLoggedIn()
                 searchResponse = try await request(
                     endpoint: endpoint,
                     method: "GET",
