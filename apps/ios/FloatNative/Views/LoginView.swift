@@ -394,9 +394,9 @@ class LoginViewModel: ObservableObject {
             // Base: https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/auth
             var components = URLComponents(string: "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/auth")!
             components.queryItems = [
-                URLQueryItem(name: "client_id", value: "wasserflug"), // Using wasserflug temporarily
+                URLQueryItem(name: "client_id", value: "floatnative"),
                 URLQueryItem(name: "response_type", value: "code"),
-
+                URLQueryItem(name: "redirect_uri", value: "floatnative://auth"),
                 URLQueryItem(name: "scope", value: "openid offline_access"),
                 URLQueryItem(name: "code_challenge", value: codeChallenge),
                 URLQueryItem(name: "code_challenge_method", value: "S256")
@@ -428,7 +428,8 @@ class LoginViewModel: ObservableObject {
                             // Verify code with API
                             try await FloatplaneAPI.shared.exchangeAuthCode(
                                 code: code,
-                                verifier: codeVerifier
+                                verifier: codeVerifier,
+                                redirectUri: "floatnative://auth"
                             )
 
                             // Update UI on success

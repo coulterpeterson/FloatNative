@@ -73,9 +73,9 @@ class FloatplaneAPI: ObservableObject {
     // OAuth Configuration
     private let realm = "floatplane"
     #if os(tvOS)
-    private let clientId = "wasserflug" // Using existing client ID for tvOS
+    private let clientId = "floatnative"
     #else
-    private let clientId = "wasserflug" // Using wasserflug temporarily for iOS as well until own client ID is registered
+    private let clientId = "floatnative"
     #endif
     // private let redirectUri = "floatnative://auth" // For future implementation
 
