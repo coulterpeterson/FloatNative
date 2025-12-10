@@ -6,14 +6,6 @@
     "openapi:generate:kotlin": "pnpm --filter @floatnative/openapi generate:kotlin",
     "openapi:generate:all": "pnpm --filter @floatnative/openapi generate:all",
     "openapi:update-spec": "pnpm --filter @floatnative/openapi update-spec",
-<<<<<<< Updated upstream
-    "api:dev": "pnpm --filter api dev",
-    "api:deploy": "pnpm --filter api deploy",
-    "api:tail": "pnpm --filter api tail",
-    "api:db:generate": "pnpm --filter api db:generate",
-    "api:db:migrate:local": "pnpm --filter api db:migrate:local",
-    "api:db:migrate:remote": "pnpm --filter api db:migrate:remote"
-=======
     "api:dev": "pnpm --filter api run dev",
     "api:deploy": "pnpm --filter api run deploy",
     "api:deploy:non-production": "pnpm --filter api run deploy:non-production",
@@ -23,6 +15,5 @@
     "api:db:migrate:remote": "pnpm --filter api run db:migrate:remote",
     "extension:build": "pnpm --filter floatnative-chrome-extension run build",
     "extension:watch": "pnpm --filter floatnative-chrome-extension run watch"
->>>>>>> Stashed changes
   }
 }

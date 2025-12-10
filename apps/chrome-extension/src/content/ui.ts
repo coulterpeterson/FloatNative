@@ -529,7 +529,14 @@ async function showPlaylistOverlay() {
   closeBtn.onclick = () => overlay.remove();
 
   header.appendChild(title);
-  header.appendChild(closeBtn);
+
+  const headerRight = document.createElement("div");
+  headerRight.style.display = "flex";
+  headerRight.style.alignItems = "center";
+  headerRight.style.gap = "16px";
+
+  headerRight.appendChild(closeBtn);
+  header.appendChild(headerRight);
   overlay.appendChild(header);
 
   const container = document.createElement("div");
@@ -573,10 +580,67 @@ async function showPlaylistOverlay() {
           const name = pl.name || "Untitled";
           const count = Array.isArray(pl.video_ids) ? pl.video_ids.length : 0;
 
-          row.innerHTML = `
-            <div style="font-size: 18px; font-weight: 500;">${name}</div>
-            <div style="color: #aaa;">${count} videos</div>
-          `;
+          // Left side
+          const leftDiv = document.createElement("div");
+          leftDiv.style.fontSize = "18px";
+          leftDiv.style.fontWeight = "500";
+          leftDiv.textContent = name;
+
+          // Right side container
+          const rightDiv = document.createElement("div");
+          rightDiv.style.display = "flex";
+          rightDiv.style.alignItems = "center";
+          rightDiv.style.gap = "15px";
+
+          const countDiv = document.createElement("div");
+          countDiv.style.color = "#aaa";
+          countDiv.textContent = `${count} videos`;
+
+          // Delete Button
+          const deleteBtn = document.createElement("div");
+          Object.assign(deleteBtn.style, {
+            width: "28px",
+            height: "28px",
+            borderRadius: "50%",
+            backgroundColor: "#555",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            color: "white",
+            transition: "background-color 0.2s"
+          });
+          deleteBtn.title = "Delete Playlist";
+          deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: white;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>`;
+
+          deleteBtn.onmouseover = () => deleteBtn.style.backgroundColor = "#ff0000";
+          deleteBtn.onmouseout = () => deleteBtn.style.backgroundColor = "#555";
+
+          deleteBtn.onclick = async (e) => {
+            e.stopPropagation();
+            if (!confirm(`Are you sure you want to delete playlist "${name}"?`)) return;
+
+            deleteBtn.style.cursor = "wait";
+
+            try {
+              const res = await safeSendMessage({ type: "DELETE_PLAYLIST", playlistId: pl.id });
+              if (res.success) {
+                row.remove();
+              } else {
+                alert("Failed to delete playlist: " + res.error);
+                deleteBtn.style.cursor = "pointer";
+              }
+            } catch (err: any) {
+              alert("Error: " + err.message);
+              deleteBtn.style.cursor = "pointer";
+            }
+          };
+
+          rightDiv.appendChild(countDiv);
+          rightDiv.appendChild(deleteBtn);
+
+          row.appendChild(leftDiv);
+          row.appendChild(rightDiv);
 
           row.onclick = async () => {
             // Navigate to detail view
@@ -587,12 +651,39 @@ async function showPlaylistOverlay() {
             const detailContainer = document.createElement("div");
             container.appendChild(detailContainer);
 
+            // Sort Dropdown
+            const sortSelect = document.createElement("select");
+            Object.assign(sortSelect.style, {
+              padding: "6px 12px",
+              backgroundColor: "#2d2d2d",
+              color: "white",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: "4px",
+              fontSize: "14px",
+              outline: "none",
+              cursor: "pointer"
+            });
+            const sortOptions = [
+              { value: "publish_desc", label: "Publish Date Desc" },
+              { value: "publish_asc", label: "Publish Date Asc" },
+              { value: "added_desc", label: "Order Added Desc" },
+              { value: "added_asc", label: "Order Added Asc" },
+            ];
+            sortOptions.forEach(opt => {
+              const option = document.createElement("option");
+              option.value = opt.value;
+              option.textContent = opt.label;
+              sortSelect.appendChild(option);
+            });
+            headerRight.prepend(sortSelect);
+
             // Render Skeleton Loader
             detailContainer.appendChild(renderSkeleton());
 
             // Back button logic
             closeBtn.textContent = "Back to Playlists";
             closeBtn.onclick = () => {
+              sortSelect.remove();
               detailContainer.remove();
               listContent.style.display = "block";
               title.textContent = "Your Playlists";
@@ -615,152 +706,175 @@ async function showPlaylistOverlay() {
               // Render Grid
               detailContainer.innerHTML = "";
 
-              // CSS Grid Layout
-              const grid = document.createElement("div");
-              grid.style.display = "grid";
-              grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(280px, 1fr))";
-              grid.style.gap = "24px";
-              grid.style.marginTop = "20px";
+              let currentPosts = res.posts.map((p: any, i: number) => ({ ...p, _originalIndex: i }));
 
-              res.posts.forEach((post: any) => {
-                const card = document.createElement("a");
-                card.href = `/post/${post.id}`; // Native navigation
-                card.style.textDecoration = "none";
-                card.style.color = "inherit";
-                card.style.display = "flex";
-                card.style.flexDirection = "column";
-                card.style.backgroundColor = "#222";
-                card.style.borderRadius = "8px";
-                card.style.overflow = "hidden";
-                card.style.transform = "translateY(0)";
-                card.style.transition = "transform 0.2s";
+              const renderGrid = () => {
+                detailContainer.innerHTML = "";
 
-                card.onmouseover = () => card.style.transform = "translateY(-4px)";
-                card.onmouseout = () => card.style.transform = "translateY(0)";
+                const grid = document.createElement("div");
+                grid.style.display = "grid";
+                grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(280px, 1fr))";
+                grid.style.gap = "24px";
+                grid.style.marginTop = "20px";
 
-                const thumbUrl = getImageUrl(post.thumbnail);
-                const iconUrl = getImageUrl(post.creator?.icon);
-                const duration = post.metadata?.videoDuration
-                  ? new Date(post.metadata.videoDuration * 1000).toISOString().substr(11, 8).replace(/^00:/, '')
-                  : "";
+                currentPosts.forEach((post: any) => {
+                  const card = document.createElement("a");
+                  card.href = `/post/${post.id}`; // Native navigation
+                  card.style.textDecoration = "none";
+                  card.style.color = "inherit";
+                  card.style.display = "flex";
+                  card.style.flexDirection = "column";
+                  card.style.backgroundColor = "#222";
+                  card.style.borderRadius = "8px";
+                  card.style.overflow = "hidden";
+                  card.style.transform = "translateY(0)";
+                  card.style.transition = "transform 0.2s";
 
-                // Thumbnail Container
-                const thumbContainer = document.createElement("div");
-                Object.assign(thumbContainer.style, {
-                  position: "relative",
-                  aspectRatio: "16/9",
-                  backgroundColor: "#000"
-                });
+                  card.onmouseover = () => card.style.transform = "translateY(-4px)";
+                  card.onmouseout = () => card.style.transform = "translateY(0)";
 
-                if (thumbUrl) {
-                  const img = document.createElement("img");
-                  img.src = thumbUrl;
-                  Object.assign(img.style, {
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover"
+                  const thumbUrl = getImageUrl(post.thumbnail);
+                  const iconUrl = getImageUrl(post.creator?.icon);
+                  const duration = post.metadata?.videoDuration
+                    ? new Date(post.metadata.videoDuration * 1000).toISOString().substr(11, 8).replace(/^00:/, '')
+                    : "";
+
+                  // Thumbnail Container
+                  const thumbContainer = document.createElement("div");
+                  Object.assign(thumbContainer.style, {
+                    position: "relative",
+                    aspectRatio: "16/9",
+                    backgroundColor: "#000"
                   });
-                  thumbContainer.appendChild(img);
-                }
 
-                if (duration) {
-                  const durBadge = document.createElement("div");
-                  durBadge.textContent = duration;
-                  Object.assign(durBadge.style, {
-                    position: "absolute",
-                    bottom: "8px",
-                    right: "8px",
-                    background: "rgba(0,0,0,0.8)",
-                    color: "white",
-                    padding: "2px 6px",
-                    borderRadius: "4px",
-                    fontSize: "12px",
-                    fontWeight: "bold"
-                  });
-                  thumbContainer.appendChild(durBadge);
-                }
-
-                // Remove Button
-                const removeBtn = document.createElement("div");
-                Object.assign(removeBtn.style, {
-                  position: "absolute",
-                  top: "6px",
-                  right: "6px",
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "50%",
-                  backgroundColor: "rgba(0,0,0,0.6)", // Grayish default
-                  color: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "background-color 0.2s",
-                  zIndex: "10",
-                  opacity: "0" // Hidden by default
-                });
-                removeBtn.innerHTML = `<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: white;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>`;
-
-                // Styling handlers
-                removeBtn.onmouseover = () => { removeBtn.style.backgroundColor = "#ff0000"; };
-                removeBtn.onmouseout = () => { removeBtn.style.backgroundColor = "rgba(0,0,0,0.6)"; };
-
-                // Show on card hover
-                card.addEventListener('mouseenter', () => { removeBtn.style.opacity = "1"; });
-                card.addEventListener('mouseleave', () => { removeBtn.style.opacity = "0"; });
-
-                removeBtn.onclick = async (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-
-                  if (!confirm("Remove this video from the playlist?")) return;
-
-                  // Optimistic remove? Or Loading state?
-                  removeBtn.style.backgroundColor = "#ff0000";
-                  removeBtn.style.cursor = "wait";
-
-                  try {
-                    const res = await safeSendMessage({
-                      type: "REMOVE_FROM_PLAYLIST",
-                      playlistId: pl.id,
-                      videoId: post.id
+                  if (thumbUrl) {
+                    const img = document.createElement("img");
+                    img.src = thumbUrl;
+                    Object.assign(img.style, {
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover"
                     });
-
-                    if (res.success) {
-                      // Remove card
-                      card.remove();
-                    } else {
-                      alert("Failed to remove video: " + res.error);
-                      removeBtn.style.backgroundColor = "rgba(0,0,0,0.6)";
-                      removeBtn.style.cursor = "pointer";
-                    }
-                  } catch (err: any) {
-                    alert("Error: " + err.message);
+                    thumbContainer.appendChild(img);
                   }
-                };
 
-                thumbContainer.appendChild(removeBtn);
-                card.appendChild(thumbContainer);
+                  if (duration) {
+                    const durBadge = document.createElement("div");
+                    durBadge.textContent = duration;
+                    Object.assign(durBadge.style, {
+                      position: "absolute",
+                      bottom: "8px",
+                      right: "8px",
+                      background: "rgba(0,0,0,0.8)",
+                      color: "white",
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      fontSize: "12px",
+                      fontWeight: "bold"
+                    });
+                    thumbContainer.appendChild(durBadge);
+                  }
+
+                  // Remove Button
+                  const removeBtn = document.createElement("div");
+                  Object.assign(removeBtn.style, {
+                    position: "absolute",
+                    top: "6px",
+                    right: "6px",
+                    width: "28px",
+                    height: "28px",
+                    borderRadius: "50%",
+                    backgroundColor: "rgba(0,0,0,0.6)", // Grayish default
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    transition: "background-color 0.2s",
+                    zIndex: "10",
+                    opacity: "0" // Hidden by default
+                  });
+                  removeBtn.innerHTML = `<svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: white;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>`;
+
+                  // Styling handlers
+                  removeBtn.onmouseover = () => { removeBtn.style.backgroundColor = "#ff0000"; };
+                  removeBtn.onmouseout = () => { removeBtn.style.backgroundColor = "rgba(0,0,0,0.6)"; };
+
+                  // Show on card hover
+                  card.addEventListener('mouseenter', () => { removeBtn.style.opacity = "1"; });
+                  card.addEventListener('mouseleave', () => { removeBtn.style.opacity = "0"; });
+
+                  removeBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    if (!confirm("Remove this video from the playlist?")) return;
+
+                    // Optimistic remove? Or Loading state?
+                    removeBtn.style.backgroundColor = "#ff0000";
+                    removeBtn.style.cursor = "wait";
+
+                    try {
+                      const res = await safeSendMessage({
+                        type: "REMOVE_FROM_PLAYLIST",
+                        playlistId: pl.id,
+                        videoId: post.id
+                      });
+
+                      if (res.success) {
+                        // Remove card and update model
+                        card.remove();
+                        currentPosts = currentPosts.filter((p: any) => p.id !== post.id);
+                      } else {
+                        alert("Failed to remove video: " + res.error);
+                        removeBtn.style.backgroundColor = "rgba(0,0,0,0.6)";
+                        removeBtn.style.cursor = "pointer";
+                      }
+                    } catch (err: any) {
+                      alert("Error: " + err.message);
+                    }
+                  };
+
+                  thumbContainer.appendChild(removeBtn);
+                  card.appendChild(thumbContainer);
 
 
-                // Metadata
-                const metaDiv = document.createElement("div");
-                metaDiv.style.padding = "12px";
-                metaDiv.innerHTML = `
-                      <div style="display: flex; gap: 10px;">
-                          ${iconUrl ? `<img src="${iconUrl}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;">` : ''}
-                          <div style="flex: 1; min-width: 0;">
-                              <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${post.title}">${post.title}</div>
-                              <div style="color: #aaa; font-size: 13px;">${post.creator?.title || 'Unknown'}</div>
-                              <div style="color: #666; font-size: 12px; margin-top: 4px;">${new Date(post.releaseDate).toLocaleDateString()}</div>
+                  // Metadata
+                  const metaDiv = document.createElement("div");
+                  metaDiv.style.padding = "12px";
+                  metaDiv.innerHTML = `
+                          <div style="display: flex; gap: 10px;">
+                              ${iconUrl ? `<img src="${iconUrl}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;">` : ''}
+                              <div style="flex: 1; min-width: 0;">
+                                  <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${post.title}">${post.title}</div>
+                                  <div style="color: #aaa; font-size: 13px;">${post.creator?.title || 'Unknown'}</div>
+                                  <div style="color: #666; font-size: 12px; margin-top: 4px;">${new Date(post.releaseDate).toLocaleDateString()}</div>
+                              </div>
                           </div>
-                      </div>
-                    `;
-                card.appendChild(metaDiv);
+                        `;
+                  card.appendChild(metaDiv);
 
-                grid.appendChild(card);
-              });
-              detailContainer.appendChild(grid);
+                  grid.appendChild(card);
+                });
+                detailContainer.appendChild(grid);
+              };
+
+              sortSelect.onchange = () => {
+                const val = sortSelect.value;
+                if (val === "publish_desc") {
+                  currentPosts.sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+                } else if (val === "publish_asc") {
+                  currentPosts.sort((a: any, b: any) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime());
+                } else if (val === "added_asc") {
+                  currentPosts.sort((a: any, b: any) => a._originalIndex - b._originalIndex);
+                } else if (val === "added_desc") {
+                  currentPosts.sort((a: any, b: any) => b._originalIndex - a._originalIndex);
+                }
+                renderGrid();
+              };
+
+              // Initial trigger
+              sortSelect.onchange(null as any);
 
             } else {
               detailContainer.innerHTML = `<div style="color: red; padding: 20px;">Error loading videos: ${res.error}</div>`;

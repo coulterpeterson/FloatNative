@@ -149,4 +149,8 @@ export class CompanionAPI {
   async createPlaylist(name: string): Promise<any> {
     return await this.request(`/playlists`, "POST", { name });
   }
+
+  async deletePlaylist(playlistId: string): Promise<any> {
+    return await this.request(`/playlists/${playlistId}`, "DELETE");
+  }
 }

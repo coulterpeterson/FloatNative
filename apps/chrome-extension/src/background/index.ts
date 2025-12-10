@@ -70,4 +70,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(err => sendResponse({ success: false, error: err.toString() }));
     return true;
   }
+
+  if (message.type === "DELETE_PLAYLIST") {
+    const { playlistId } = message;
+    CompanionAPI.getInstance().deletePlaylist(playlistId)
+      .then(result => sendResponse({ success: true, result }))
+      .catch(err => sendResponse({ success: false, error: err.toString() }));
+    return true;
+  }
 });
