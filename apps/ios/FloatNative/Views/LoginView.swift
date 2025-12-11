@@ -394,9 +394,9 @@ class LoginViewModel: ObservableObject {
             // Base: https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/auth
             var components = URLComponents(string: "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/auth")!
             components.queryItems = [
-                URLQueryItem(name: "client_id", value: "floaty"),
+                URLQueryItem(name: "client_id", value: "floatnative"),
                 URLQueryItem(name: "response_type", value: "code"),
-                URLQueryItem(name: "redirect_uri", value: "uk.bw86.floaty://oauth/callback"),
+                URLQueryItem(name: "redirect_uri", value: "floatnative://auth"),
                 URLQueryItem(name: "scope", value: "openid offline_access"),
                 URLQueryItem(name: "code_challenge", value: codeChallenge),
                 URLQueryItem(name: "code_challenge_method", value: "S256")
@@ -409,7 +409,7 @@ class LoginViewModel: ObservableObject {
             // 3. Start ASWebAuthenticationSession
             // Note: This needs to run on MainActor
             try await withCheckedThrowingContinuation(function: "startIOSAuth") { (continuation: CheckedContinuation<Void, Error>) in
-                let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "uk.bw86.floaty") { callbackURL, error in
+                let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "floatnative") { callbackURL, error in
                     if let error = error {
                         continuation.resume(throwing: error)
                         return
@@ -429,7 +429,7 @@ class LoginViewModel: ObservableObject {
                             try await FloatplaneAPI.shared.exchangeAuthCode(
                                 code: code,
                                 verifier: codeVerifier,
-                                redirectUri: "uk.bw86.floaty://oauth/callback"
+                                redirectUri: "floatnative://auth"
                             )
 
                             // Update UI on success
