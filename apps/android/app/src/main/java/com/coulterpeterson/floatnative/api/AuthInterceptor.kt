@@ -68,7 +68,7 @@ class AuthInterceptor(
                         val tokenResponse = runBlocking {
                             authApi.getToken(
                                 grantType = "refresh_token",
-                                clientId = "floatnative",
+                                clientId = "floaty",
                                 refreshToken = refreshToken
                             )
                         }
