@@ -14,6 +14,16 @@
 				<string>floatnative</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>uk.bw86.floaty</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>uk.bw86.floaty</string>
+			</array>
+		</dict>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

@@ -73,9 +73,9 @@ class FloatplaneAPI: ObservableObject {
     // OAuth Configuration
     private let realm = "floatplane"
     #if os(tvOS)
-    private let clientId = "floatnative"
+    private let clientId = "floaty"
     #else
-    private let clientId = "floatnative"
+    private let clientId = "floaty"
     #endif
     // private let redirectUri = "floatnative://auth" // For future implementation
 
