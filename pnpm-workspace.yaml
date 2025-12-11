@@ -1,7 +1,4 @@
 packages:
   - 'packages/*'
-<<<<<<< Updated upstream
   - 'apps/api'
-=======
   - 'apps/chrome-extension'
->>>>>>> Stashed changes
