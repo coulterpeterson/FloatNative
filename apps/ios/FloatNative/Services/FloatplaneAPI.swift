@@ -232,6 +232,7 @@ class FloatplaneAPI: ObservableObject {
         if let headerFields = response.allHeaderFields as? [String: String],
            let url = response.url {
             let cookies = HTTPCookie.cookies(withResponseHeaderFields: headerFields, for: url)
+            
             for cookie in cookies where cookie.name == "sails.sid" {
                 saveAuthCookie(cookie.value)
             }
@@ -259,7 +260,20 @@ class FloatplaneAPI: ObservableObject {
         // Add auth headers
         if requiresAuth {
             if let accessToken = accessToken {
-                urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+                
+                // Add DPoP Proof
+                if let dpopProof = try? DPoPManager.shared.generateProof(
+                    httpMethod: method,
+                    httpUrl: baseURL + endpoint,
+                    accessToken: accessToken
+                ) {
+                    urlRequest.setValue(dpopProof, forHTTPHeaderField: "DPoP")
+                    // DPoP-bound tokens must use the DPoP scheme
+                    urlRequest.setValue("DPoP \(accessToken)", forHTTPHeaderField: "Authorization")
+                } else {
+                    // Fallback to Bearer if DPoP generation fails (shouldn't happen)
+                    urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+                }
             } else if let authCookie = authCookie {
                 // Fallback to legacy cookie
                 urlRequest.setValue("sails.sid=\(authCookie)", forHTTPHeaderField: "Cookie")
@@ -333,7 +347,20 @@ class FloatplaneAPI: ObservableObject {
         // Add auth headers
         if requiresAuth {
             if let accessToken = accessToken {
-                urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+                
+                // Add DPoP Proof
+                if let dpopProof = try? DPoPManager.shared.generateProof(
+                    httpMethod: method,
+                    httpUrl: baseURL + endpoint,
+                    accessToken: accessToken
+                ) {
+                    urlRequest.setValue(dpopProof, forHTTPHeaderField: "DPoP")
+                    // DPoP-bound tokens must use the DPoP scheme
+                    urlRequest.setValue("DPoP \(accessToken)", forHTTPHeaderField: "Authorization")
+                } else {
+                    // Fallback to Bearer if DPoP generation fails (shouldn't happen)
+                    urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+                }
             } else if let authCookie = authCookie {
                 // Fallback to legacy cookie
                 urlRequest.setValue("sails.sid=\(authCookie)", forHTTPHeaderField: "Cookie")
@@ -341,6 +368,20 @@ class FloatplaneAPI: ObservableObject {
                 throw FloatplaneAPIError.notAuthenticated
             }
         }
+        
+        #if DEBUG
+        if let auth = urlRequest.value(forHTTPHeaderField: "Authorization") {
+            print("Auth: \(auth.prefix(20))...")
+        } else {
+            print("Auth: NONE")
+        }
+        if let dpop = urlRequest.value(forHTTPHeaderField: "DPoP") {
+            print("DPoP Headers: \(dpop)")
+        } else {
+            print("DPoP Headers: MISSING")
+        }
+        print("-------------------------------")
+        #endif
 
         // Encode body if present
         if let body = body {
@@ -469,7 +510,8 @@ class FloatplaneAPI: ObservableObject {
     private func requestAuth<T: Decodable>(
         endpoint: String,
         method: String = "POST",
-        body: [String: String]
+        body: [String: String],
+        dpopProof: String? = nil
     ) async throws -> T {
         guard let url = URL(string: authBaseURL + endpoint) else {
             throw FloatplaneAPIError.invalidURL
@@ -479,17 +521,40 @@ class FloatplaneAPI: ObservableObject {
         request.httpMethod = method
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("FloatNative/1.0 (iOS), CFNetwork", forHTTPHeaderField: "User-Agent")
+        
+        if let dpopProof = dpopProof {
+            request.setValue(dpopProof, forHTTPHeaderField: "DPoP")
+        }
 
         // Encode body params
         let bodyString = body.map { "\($0.key)=\($0.value)" }
             .joined(separator: "&")
         request.httpBody = bodyString.data(using: .utf8)
 
+        #if DEBUG
+        print("Body: \(bodyString)")
+        if let dpop = request.value(forHTTPHeaderField: "DPoP") {
+            print("DPoP Headers: \(dpop)")
+        } else {
+            print("DPoP Headers: MISSING")
+        }
+        print("--------------------------------")
+        #endif
+
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FloatplaneAPIError.invalidResponse
         }
+
+        // Extract cookies (crucial for Hybrid DPoP/Cookie video playback)
+        extractCookie(from: httpResponse)
+
+        #if DEBUG
+        print("--------- AUTH RESPONSE ---------")
+        print("Status: \(httpResponse.statusCode)")
+        print("Headers: \(httpResponse.allHeaderFields)")
+        #endif
 
         guard (200...299).contains(httpResponse.statusCode) else {
             // Parse error response
@@ -542,10 +607,23 @@ class FloatplaneAPI: ObservableObject {
             "client_id": clientId,
             "device_code": deviceCode
         ]
+        do {
+            // Generate DPoP proof for the token endpoint
+            let dpopProof = try DPoPManager.shared.generateProof(
+                httpMethod: "POST",
+                httpUrl: authBaseURL + tokenEndpoint
+            )
 
-        let response: OAuthTokenResponse = try await requestAuth(endpoint: tokenEndpoint, body: body)
-        handleOAuthResponse(response)
-        return response
+            let response: OAuthTokenResponse = try await requestAuth(
+                endpoint: tokenEndpoint,
+                body: body,
+                dpopProof: dpopProof
+            )
+            handleOAuthResponse(response)
+            return response
+        } catch {
+            throw error
+        }
     }
 
     /// Exchange Authorization Code for Token (iOS)
@@ -561,7 +639,17 @@ class FloatplaneAPI: ObservableObject {
             body["redirect_uri"] = redirectUri
         }
 
-        let response: OAuthTokenResponse = try await requestAuth(endpoint: tokenEndpoint, body: body)
+        // Generate DPoP proof
+        let dpopProof = try DPoPManager.shared.generateProof(
+            httpMethod: "POST",
+            httpUrl: authBaseURL + tokenEndpoint
+        )
+
+        let response: OAuthTokenResponse = try await requestAuth(
+            endpoint: tokenEndpoint,
+            body: body,
+            dpopProof: dpopProof
+        )
         handleOAuthResponse(response)
 
         // Fetch user info to populate currentUser
@@ -581,7 +669,17 @@ class FloatplaneAPI: ObservableObject {
         ]
 
         do {
-            let response: OAuthTokenResponse = try await requestAuth(endpoint: tokenEndpoint, body: body)
+            // Generate DPoP proof for the token endpoint
+            let dpopProof = try DPoPManager.shared.generateProof(
+                httpMethod: "POST",
+                httpUrl: authBaseURL + tokenEndpoint
+            )
+
+            let response: OAuthTokenResponse = try await requestAuth(
+                endpoint: tokenEndpoint,
+                body: body,
+                dpopProof: dpopProof
+            )
             handleOAuthResponse(response)
         } catch {
             // If refresh fails, clear tokens
@@ -1049,7 +1147,6 @@ class FloatplaneAPI: ObservableObject {
         return try await request(endpoint: endpoint, requiresAuth: true)
     }
 
-    /// Update video progress
     /// Update video progress
     func updateProgress(
         videoId: String,

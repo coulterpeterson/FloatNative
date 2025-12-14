@@ -126,16 +126,6 @@ struct VideoPlayerView: View {
             // Initialize like/dislike counts from post
             currentLikes = post.likes
             currentDislikes = post.dislikes
-
-            // Debug: Log post details
-            print("📱 [VideoPlayerView] Post loaded:")
-            print("📱   ID: \(post.id)")
-            print("📱   Type: \(post.type)")
-            print("📱   Title: \(post.title)")
-            print("📱   Metadata - hasVideo: \(post.metadata.hasVideo)")
-            print("📱   Metadata - hasPicture: \(post.metadata.hasPicture)")
-            print("📱   Metadata - hasGallery: \(post.metadata.hasGallery)")
-            print("📱   Video attachments: \(post.videoAttachments ?? [])")
             print("📱   Picture attachments: \(post.pictureAttachments ?? [])")
             print("📱   Gallery attachments: \(post.galleryAttachments ?? [])")
         }
@@ -431,9 +421,6 @@ struct VideoPlayerView: View {
             // Get video content
             print("📱 [VideoPlayerView.loadVideo] Fetching video content for ID: \(videoId)")
             let content = try await api.getVideoContent(id: videoId)
-            print("📱 [VideoPlayerView.loadVideo] Video content response:")
-            print("📱   Progress: \(content.progress ?? 0)")
-            print("📱   Content: \(content)")
 
             // Get delivery info
             let deliveryInfo = try await api.getDeliveryInfo(
@@ -452,12 +439,6 @@ struct VideoPlayerView: View {
                 startTime: Double(content.progress ?? 0),
                 qualities: qualities
             )
-
-            // Add to watch history
-            print("▶️ VideoPlayerView: About to add to watch history - postId: \(post.id), videoId: \(videoId)")
-            await MainActor.run {
-                WatchHistoryManager.shared.addToHistory(postId: post.id, videoId: videoId)
-            }
 
             // Auto-play
             playerManager.play()
