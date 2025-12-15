@@ -43,11 +43,13 @@ enum CompanionAPIError: LocalizedError {
 
 // MARK: - Registration Models
 
-struct CompanionRegisterRequest: Codable {
-    let sailsSid: String
+struct CompanionLoginRequest: Codable {
+    let accessToken: String
+    let dpopProof: String?
 
     enum CodingKeys: String, CodingKey {
-        case sailsSid = "sails_sid"
+        case accessToken = "access_token"
+        case dpopProof = "dpop_proof"
     }
 }
 
@@ -61,6 +63,10 @@ struct CompanionRegisterResponse: Codable {
         case floatplaneUserId = "floatplane_user_id"
         case message
     }
+}
+
+struct CompanionLogoutResponse: Codable {
+    let message: String
 }
 
 // MARK: - Watch Later Models

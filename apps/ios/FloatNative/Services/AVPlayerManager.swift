@@ -236,17 +236,28 @@ class AVPlayerManager: NSObject, ObservableObject {
         try await loadStream(url: quality.url, startTime: startTime)
     }
 
+    private let resourceLoader = VideoResourceLoader()
+    
     /// Load stream from URL
     private func loadStream(url: String, startTime: Double = 0) async throws {
-        guard let streamURL = URL(string: url) else {
+        // Convert HTTP/HTTPS to custom scheme to force interception
+        guard var components = URLComponents(string: url) else {
+            throw FloatplaneAPIError.invalidURL
+        }
+        components.scheme = "floatnative" // Must match VideoResourceLoader.customScheme
+        
+        guard let streamURL = components.url else {
             throw FloatplaneAPIError.invalidURL
         }
 
         // Clean up old player
         cleanupPlayer()
 
-        // Create new player
+        // Create new player with Interceptor
+        // We do NOT pass headers here because the ResourceLoader will handle the request.
         let asset = AVURLAsset(url: streamURL)
+        asset.resourceLoader.setDelegate(resourceLoader, queue: DispatchQueue.global(qos: .userInitiated))
+        
         let playerItem = AVPlayerItem(asset: asset)
 
         // Configure buffer limits for tvOS to prevent memory issues during long playback
@@ -257,6 +268,7 @@ class AVPlayerManager: NSObject, ObservableObject {
         // iOS can handle larger buffers
         playerItem.preferredForwardBufferDuration = 60
         #endif
+
 
         let newPlayer = AVPlayer(playerItem: playerItem)
         newPlayer.allowsExternalPlayback = true
@@ -409,9 +421,7 @@ class AVPlayerManager: NSObject, ObservableObject {
         player.currentItem?.publisher(for: \.isPlaybackBufferFull)
             .sink { [weak self] isFull in
                 Task { @MainActor in
-                    if isFull {
-                        print("✅ Buffer full at \(self?.currentTime ?? 0)s")
-                    }
+                    // Log removed as per instruction
                 }
             }
             .store(in: &cancellables)

@@ -15,7 +15,10 @@ class KeychainManager {
     private let usernameKey = "username"
     private let passwordKey = "password"
     private let apiKeyKey = "companion_api_key"
-    private let authTokenKey = "floatplane_auth_token"
+    private let authTokenKey = "floatplane_auth_token" // Legacy sails.sid
+    private let accessTokenKey = "oauth_access_token"
+    private let refreshTokenKey = "oauth_refresh_token"
+    private let tokenExpiryKey = "oauth_token_expiry"
 
     private init() {}
 
@@ -97,6 +100,57 @@ class KeychainManager {
         deleteItem(key: authTokenKey)
     }
 
+    // MARK: - OAuth Token Storage
+
+    func saveOAuthTokens(accessToken: String, refreshToken: String, expiresIn: Int) -> Bool {
+        let expiryDate = Date().addingTimeInterval(TimeInterval(expiresIn))
+        let expiryTimestamp = String(expiryDate.timeIntervalSince1970)
+
+        let accessSuccess = saveItem(key: accessTokenKey, value: accessToken)
+        let refreshSuccess = saveItem(key: refreshTokenKey, value: refreshToken)
+        let expirySuccess = saveItem(key: tokenExpiryKey, value: expiryTimestamp)
+
+        return accessSuccess && refreshSuccess && expirySuccess
+    }
+
+    func getAccessToken() -> String? {
+        return getItem(key: accessTokenKey)
+    }
+
+    func getRefreshToken() -> String? {
+        return getItem(key: refreshTokenKey)
+    }
+
+    func getTokenExpiry() -> Date? {
+        guard let timestampString = getItem(key: tokenExpiryKey),
+              let timestamp = TimeInterval(timestampString) else {
+            return nil
+        }
+        return Date(timeIntervalSince1970: timestamp)
+    }
+
+    func clearOAuthTokens() {
+        deleteItem(key: accessTokenKey)
+        deleteItem(key: refreshTokenKey)
+        deleteItem(key: tokenExpiryKey)
+    }
+
+    // MARK: - DPoP Key Storage
+
+    private let dpopKeyTag = "com.floatnative.dpop.key"
+    
+    func saveDPoPKey(_ keyData: Data) -> Bool {
+        return saveItemData(key: dpopKeyTag, data: keyData)
+    }
+    
+    func getDPoPKey() -> Data? {
+        return getItemData(key: dpopKeyTag)
+    }
+    
+    func deleteDPoPKey() {
+        deleteItem(key: dpopKeyTag)
+    }
+
     // MARK: - Private Keychain Operations
 
     private func saveItem(key: String, value: String) -> Bool {
@@ -118,6 +172,18 @@ class KeychainManager {
         return status == errSecSuccess
     }
 
+    private func saveItemData(key: String, data: Data) -> Bool {
+        deleteItem(key: key)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+        ]
+        return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
+    }
+
     private func getItem(key: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -137,6 +203,21 @@ class KeychainManager {
         }
 
         return value
+    }
+
+    private func getItemData(key: String) -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        if SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess {
+            return result as? Data
+        }
+        return nil
     }
 
     private func deleteItem(key: String) {

@@ -1,10 +1,11 @@
 {
-  "name": "FloatNative-API",
+  "name": "api",
   "version": "1.0.0",
   "description": "Companion API for Floatplane iOS/tvOS app - provides playlists and watch later functionality",
   "scripts": {
     "dev": "wrangler dev --env dev",
     "deploy": "wrangler deploy",
+    "deploy:non-production": "wrangler versions upload",
     "tail": "wrangler tail",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 execute floatnative-db-dev --local --env dev --file=./migrations/0000_curious_ink.sql",

@@ -18,8 +18,9 @@ logs/
 .env.local
 .env.*.local
 
-# Claude AI
+# AI
 .claude/
+.gemini/
 
 # Node
 node_modules

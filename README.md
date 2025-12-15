@@ -172,6 +172,20 @@ Open `apps/ios/FloatNative.xcodeproj` in Xcode and build/run the project.
 
 **Note**: API models are auto-generated from OpenAPI spec. See "OpenAPI Model Generation" section above to regenerate models when needed. The app also maintains custom model wrappers in `apps/ios/FloatNative/Models/` for fields not covered by the OpenAPI spec (e.g., `selfUserInteraction`).
 
+
+## Authentication & DPoP
+
+This application implements **DPoP (Demonstrating Proof-of-Possession)** to secure OAuth tokens. This binds access tokens to a private key stored in the device's Secure Enclave/Keychain, preventing token replay attacks if intercepted.
+
+### Video Playback Strategy
+The native iOS video player (`AVPlayer`) does not natively support DPoP because it cannot sign individual HLS segment requests. We solve this using a **Manifest Interception** strategy via `AVAssetResourceLoaderDelegate`:
+
+1.  **Custom Scheme**: The player is initialized with a custom scheme (`floatnative://`) to force all requests through our `VideoResourceLoader`.
+2.  **Manifest Rewrite**: We intercept the Master Playlist download, rewrite the `#EXT-X-KEY` URIs to keep them within our custom scheme, but rewrite all Segment (`.ts`/`.m4s`) URIs to absolute `https://` URLs.
+3.  **Hybrid Execution**:
+    *   **Keys**: Are loaded by our code, signed with a fresh DPoP proof, and returned to the player.
+    *   **Segments**: Are loaded natively by `AVPlayer` over standard HTTPS (bypassing DPoP), which aligns with the backend's design that segment requests do not require session-bound authentication.
+
 ## 🙏 Acknowledgments
 
 - The Community-maintained [FloatplaneAPI](https://github.com/jamamp/FloatplaneAPI)

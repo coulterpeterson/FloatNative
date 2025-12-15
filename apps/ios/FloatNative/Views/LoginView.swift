@@ -7,6 +7,8 @@
 //
 
 import SwiftUI
+import AuthenticationServices
+import CryptoKit
 
 enum LoginMode {
     case qrCode
@@ -59,12 +61,12 @@ struct LoginView: View {
             }
 
             ScrollView {
-                VStack(spacing: 32) {
+                VStack(spacing: 0) {
                     Spacer()
                         .frame(height: 60)
 
                     // Logo and title
-                    VStack(spacing: 16) {
+                    VStack(spacing: 8) {
                         Image("Logo")
                             .resizable()
                             .scaledToFit()
@@ -82,48 +84,61 @@ struct LoginView: View {
                     }
 
                     // Login tabs
-                    if viewModel.needs2FA {
-                        twoFactorForm
-                    } else {
-                        #if os(tvOS)
-                        // tvOS: Native segmented picker with conditional rendering
-                        VStack(spacing: 20) {
-                            Picker("", selection: $loginMode) {
-                                Text("QR Code").tag(LoginMode.qrCode)
-                                Text("Token").tag(LoginMode.token)
-                                //Text("Password").tag(LoginMode.password)
-                            }
-                            .pickerStyle(.segmented)
-                            .padding(.horizontal, 40)
-
-                            if loginMode == .qrCode {
-                                qrCodeLoginForm
-                            } else { // if loginMode == .token
-                                tokenLoginForm
-                            } /*else {
-                                passwordLoginForm
-                            }*/
+                    #if os(tvOS)
+                        // tvOS: Device Flow only
+                        VStack(spacing: 2) {
+                            qrCodeLoginForm
                         }
                         .padding(.top, 20)
                         #else
-                        // iOS: Swipeable page-style tabs
-                        TabView(selection: $loginMode) {
-                            tokenLoginForm
-                                .tag(LoginMode.token)
+                        // iOS: OAuth Login
+                        VStack(spacing: 32) {
+                            Text("Welcome to Floatplane")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundStyle(colorScheme == .dark ? .white : .primary)
 
-                            // passwordLoginForm
-                            //     .tag(LoginMode.password)
+                            // Main Login Button
+                            Button {
+                                Task {
+                                    await viewModel.startIOSAuth()
+                                }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.title3)
+                                    Text("Log in with Floatplane")
+                                        .fontWeight(.semibold)
+                                }
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .tint(.blue)
+                            .shadow(color: .blue.opacity(0.3), radius: 10, x: 0, y: 5)
+
+                            // Legacy Token Option (Hidden/Small)
+                            /*
+                            Button("Use Legacy Token") {
+                                loginMode = .token
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            */
                         }
-                        .tabViewStyle(.page(indexDisplayMode: .always))
-                        .frame(height: 500)
-                        .padding(.top, 20)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 40)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                        .padding(.horizontal)
+                        .padding(.top, 40)
                         #endif
                     }
 
                     Spacer()
                 }
                 .padding()
-            }
 
             // Loading overlay
             if viewModel.isLoading {
@@ -151,30 +166,50 @@ struct LoginView: View {
         }
     }
 
-    // MARK: - QR Code Login Form
+    // MARK: - QR Code Login Form (Device Flow)
 
+    #if os(tvOS)
     private var qrCodeLoginForm: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 2) {
             // Tab indicator
-            Text("QR Code Login")
+            Text("Log in with Floatplane")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundStyle(colorScheme == .dark ? .white : .primary)
                 .padding(.bottom, 8)
 
             // Instructions
-            Text("Scan this QR code with your phone")
-                .font(.subheadline)
-                .foregroundStyle(colorScheme == .dark ? .white.opacity(0.7) : .secondary)
+            if let session = viewModel.deviceCodeSession {
+                VStack(spacing: 4) {
+                    Text("Scan the QR code")
+                        .font(.headline)
+                        .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                }
                 .multilineTextAlignment(.center)
+            } else {
+                 Text("Generating login code...")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
 
-            // QR Code
-            if let qrSession = viewModel.qrSession {
-                VStack(spacing: 20) {
-                    QRCodeView(url: qrSession.loginUrl, size: 300)
+            // QR Code & User Code
+            if let session = viewModel.deviceCodeSession {
+                VStack(spacing: 16) {
+                    // QR Code
+                    QRCodeView(url: session.verificationUriComplete, size: 300)
                         .background(Color.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(radius: 5)
+
+
+                    Text(session.userCode)
+                        .font(.system(size: 40, weight: .bold, design: .monospaced))
+                        .kerning(5) // Spacing between characters
+                        .foregroundStyle(colorScheme == .dark ? .white : .black)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
 
                     // Status message
                     HStack(spacing: 8) {
@@ -187,25 +222,18 @@ struct LoginView: View {
                             .foregroundStyle(colorScheme == .dark ? .white.opacity(0.8) : .secondary)
                     }
 
-                    // Expiration timer
-                    if let expiresAt = viewModel.qrExpiresAt {
-                        let timeRemaining = Int(expiresAt.timeIntervalSinceNow)
-                        if timeRemaining > 0 {
-                            Text("Expires in \(timeRemaining)s")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                        } else {
-                            Text("QR code expired")
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                    }
+
                 }
             } else {
                 // Loading state
-                ProgressView()
-                    .scaleEffect(1.5)
-                    .frame(width: 300, height: 300)
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .frame(width: 300, height: 300)
+                    
+                    Text("Connecting to Floatplane...")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             // Refresh button (if expired)
@@ -213,483 +241,132 @@ struct LoginView: View {
                expiresAt.timeIntervalSinceNow < 0 {
                 Button {
                     Task {
-                        await viewModel.generateQRCode()
+                        await viewModel.startTVAuth()
                     }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.clockwise")
-                        Text("Generate New QR Code")
+                        Text("Get New Code")
                     }
                     .frame(maxWidth: .infinity)
                 }
-                #if os(tvOS)
                 .buttonStyle(.card)
-                #else
-                .buttonStyle(.borderedProminent)
-                #endif
                 .controlSize(.large)
             }
         }
         .padding(.horizontal, 32)
-        .padding(.vertical, 40)
+        .padding(.vertical, 24)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
         .padding(.horizontal)
-        #if os(tvOS)
         .frame(maxWidth: 800)
-        #endif
         .onAppear {
             Task {
-                await viewModel.generateQRCode()
+                await viewModel.startTVAuth()
             }
         }
         .onDisappear {
             viewModel.stopQRCodePolling()
         }
     }
+    #endif
 
-    // MARK: - Token Login Form
 
-    private var tokenLoginForm: some View {
-        VStack(spacing: 20) {
-            // Tab indicator
-            Text("Token Login")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                .padding(.bottom, 8)
-
-            // Instructions
-            VStack(alignment: .leading, spacing: 12) {
-                Text("How to get your token:")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(colorScheme == .dark ? .white : .black)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("1.")
-                            .fontWeight(.medium)
-                        Text("Log into Floatplane.com in Safari/Chrome")
-                    }
-
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("2.")
-                            .fontWeight(.medium)
-                        Text("Open DevTools (right-click → Inspect)")
-                    }
-
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("3.")
-                            .fontWeight(.medium)
-                        Text("Go to Application → Cookies → floatplane.com")
-                    }
-
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("4.")
-                            .fontWeight(.medium)
-                        Text("Copy the 'sails.sid' cookie value")
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : .black)
-            }
-            .padding()
-            .background(Color.secondary.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            // Token field
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Authentication Token")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                TextField("Paste sails.sid token here", text: $viewModel.authToken)
-                    #if os(tvOS)
-                    .textFieldStyle(.automatic)
-                    #else
-                    .textFieldStyle(.roundedBorder)
-                    #endif
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-            }
-
-            // Login button
-            Button {
-                Task {
-                    await viewModel.tokenLogin()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Text("Login with Token")
-                    Image(systemName: "arrow.right")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            #if os(tvOS)
-            .buttonStyle(.card)
-            #else
-            .buttonStyle(.borderedProminent)
-            #endif
-            .controlSize(.large)
-            .padding(.top, 16)
-            .disabled(viewModel.authToken.isEmpty)
-        }
-        .padding(.horizontal, 32)
-        .padding(.vertical, 40)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-        .padding(.horizontal)
-        #if os(tvOS)
-        .frame(maxWidth: 700)
-        #endif
-    }
-
-    // MARK: - Password Login Form
-
-    private var passwordLoginForm: some View {
-        VStack(spacing: 20) {
-            // Tab indicator
-            Text("Password Login")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                .padding(.bottom, 8)
-
-            // Username field
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Username or Email")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                TextField("", text: $viewModel.username)
-                    #if os(tvOS)
-                    .textFieldStyle(.automatic)
-                    #else
-                    .textFieldStyle(.roundedBorder)
-                    #endif
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-            }
-
-            // Password field
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Password")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                SecureField("", text: $viewModel.password)
-                    #if os(tvOS)
-                    .textFieldStyle(.automatic)
-                    #else
-                    .textFieldStyle(.roundedBorder)
-                    #endif
-                    .textInputAutocapitalization(.never)
-            }
-
-            // Login button
-            Button {
-                Task {
-                    await viewModel.login()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Text("Sign In")
-                    Image(systemName: "arrow.right")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            #if os(tvOS)
-            .buttonStyle(.card)
-            #else
-            .buttonStyle(.borderedProminent)
-            #endif
-            .controlSize(.large)
-            .padding(.top, 16)
-            .disabled(viewModel.username.isEmpty || viewModel.password.isEmpty)
-        }
-        .padding(.horizontal, 32)
-        .padding(.vertical, 40)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-        .padding(.horizontal)
-        #if os(tvOS)
-        .frame(maxWidth: 700)
-        #endif
-    }
-
-    // MARK: - 2FA Form
-
-    private var twoFactorForm: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 50))
-                .foregroundStyle(.blue)
-
-            Text("Two-Factor Authentication")
-                .font(.headline)
-                .foregroundStyle(.primary)
-
-            Text("Enter the code from your authenticator app")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            // 2FA code field
-            TextField("", text: $viewModel.twoFactorCode)
-                #if os(tvOS)
-                .textFieldStyle(.automatic)
-                #else
-                .textFieldStyle(.roundedBorder)
-                #endif
-                .textInputAutocapitalization(.never)
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.center)
-                .font(.system(size: 24, weight: .semibold))
-
-            // Verify button
-            Button {
-                Task {
-                    await viewModel.verify2FA()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Text("Verify")
-                    Image(systemName: "checkmark")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            #if os(tvOS)
-            .buttonStyle(.card)
-            #else
-            .buttonStyle(.borderedProminent)
-            #endif
-            .controlSize(.large)
-            .padding(.top, 16)
-            .disabled(viewModel.twoFactorCode.isEmpty)
-
-            // Back button
-            Button("Back to login") {
-                viewModel.needs2FA = false
-                viewModel.twoFactorCode = ""
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 32)
-        .padding(.vertical, 40)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-        .padding(.horizontal)
-        #if os(tvOS)
-        .frame(maxWidth: 700)
-        #endif
-    }
 }
 
 // MARK: - View Model
 
 @MainActor
 class LoginViewModel: ObservableObject {
-    @Published var username = ""
-    @Published var password = ""
-    @Published var twoFactorCode = ""
-    @Published var authToken = ""
-    @Published var needs2FA = false
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var isAuthenticated = false
 
-    // QR Code authentication
-    @Published var qrSession: QRCodeGenerateResponse?
+    // QR Code authentication (Device Flow)
+    @Published var deviceCodeSession: DeviceCodeResponse?
     @Published var qrStatusMessage = "Waiting for scan..."
     @Published var isPollingQRCode = false
     @Published var qrExpiresAt: Date?
 
     private let api = FloatplaneAPI.shared
-    private let companionAPI = CompanionAPI.shared
     private var pollingTask: Task<Void, Never>?
 
-    func login() async {
-        guard !username.isEmpty && !password.isEmpty else { return }
+    // MARK: - TV Device Auth Flow
 
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            let response = try await api.login(
-                username: username,
-                password: password
-            )
-
-            if response.needs2FA {
-                needs2FA = true
-                isLoading = false
-            } else {
-                // Successfully logged in - store credentials in Keychain if auto re-login is enabled
-                if api.autoReloginEnabled {
-                    let saved = KeychainManager.shared.saveCredentials(
-                        username: username,
-                        password: password
-                    )
-                    if !saved {
-                        print("⚠️ Failed to save credentials to Keychain")
-                    }
-                }
-
-                isAuthenticated = true
-                isLoading = false
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-            isLoading = false
-        }
-    }
-
-    func verify2FA() async {
-        guard !twoFactorCode.isEmpty else { return }
-
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            _ = try await api.verify2FA(token: twoFactorCode)
-
-            // Successfully completed 2FA - store credentials in Keychain if auto re-login is enabled
-            if api.autoReloginEnabled {
-                let saved = KeychainManager.shared.saveCredentials(
-                    username: username,
-                    password: password
-                )
-                if !saved {
-                    print("⚠️ Failed to save credentials to Keychain")
-                }
-            }
-
-            isAuthenticated = true
-            isLoading = false
-        } catch {
-            errorMessage = error.localizedDescription
-            isLoading = false
-        }
-    }
-
-    func tokenLogin() async {
-        guard !authToken.isEmpty else { return }
-
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            try await api.loginWithToken(authToken)
-            isAuthenticated = true
-            isLoading = false
-        } catch {
-            errorMessage = error.localizedDescription
-            isLoading = false
-        }
-    }
-
-    // MARK: - QR Code Authentication
-
-    func generateQRCode() async {
-        qrSession = nil
+    func startTVAuth() async {
+        #if os(tvOS)
+        deviceCodeSession = nil
         qrStatusMessage = "Generating QR code..."
         errorMessage = nil
 
         do {
-            // Generate QR code session
-            #if os(tvOS)
-            let deviceInfo = "Apple TV"
-            #else
-            let deviceInfo = "iOS Device"
-            #endif
-
-            let session = try await companionAPI.generateQRCode(deviceInfo: deviceInfo)
-
-            qrSession = session
-            qrExpiresAt = session.expiresAt
-            qrStatusMessage = "Scan QR code with your phone"
-
-            // Start polling
-            startQRCodePolling()
+            // 1. Start Device Auth
+            let session = try await api.startDeviceAuth()
+            
+            deviceCodeSession = session
+            qrExpiresAt = Date().addingTimeInterval(TimeInterval(session.expiresIn))
+            qrStatusMessage = ""
+            
+            // 2. Start Polling
+            startDevicePolling(deviceCode: session.deviceCode, interval: session.interval)
         } catch {
             errorMessage = "Failed to generate QR code: \(error.localizedDescription)"
             qrStatusMessage = "Failed to generate QR code"
         }
+        #endif
     }
 
-    func startQRCodePolling() {
-        guard let sessionId = qrSession?.sessionId else {
-            return
-        }
-
-        // Cancel any existing polling task
+    private func startDevicePolling(deviceCode: String, interval: Int) {
         stopQRCodePolling()
-
         isPollingQRCode = true
-
+        
         pollingTask = Task {
             while !Task.isCancelled {
                 do {
-                    let response = try await companionAPI.pollQRCode(sessionId: sessionId)
-
-                    switch response.status {
-                    case .pending:
-                        qrStatusMessage = response.message
-                        // Poll every 2 seconds
-                        try? await Task.sleep(nanoseconds: 2_000_000_000)
-
-                    case .completed:
-                        // Login successful - we got the token
-                        qrStatusMessage = "Logging in..."
-                        isPollingQRCode = false
-
-                        // Store the API key for companion API access
-                        if let apiKey = response.apiKey {
-                            _ = KeychainManager.shared.saveAPIKey(apiKey)
-                        }
-
-                        // Use the sails.sid token to login to Floatplane
-                        // Run login in a detached task so it won't be cancelled if polling stops
-                        let tokenToUse = response.sailsSid ?? response.apiKey
-                        if let sailsSid = tokenToUse {
-
-                            // Use detached task to prevent cancellation when polling task is cancelled
-                            Task.detached { [weak self] in
-                                guard let self = self else { return }
-
-                                do {
-                                    try await self.api.loginWithToken(sailsSid)
-
-                                    // Update UI state on MainActor
-                                    await MainActor.run {
-                                        self.qrStatusMessage = "Login successful!"
-                                        self.isAuthenticated = true
-                                    }
-                                } catch {
-                                    // Update UI state on MainActor
-                                    await MainActor.run {
-                                        self.errorMessage = "Failed to complete login: \(error.localizedDescription)"
-                                        self.qrStatusMessage = "Login failed"
-                                    }
-                                }
-                            }
-                        } else {
-                            errorMessage = "No token received from QR code session"
-                            qrStatusMessage = "Login failed"
-                        }
-
-                        return
-
-                    case .expired:
-                        qrStatusMessage = "QR code expired"
-                        isPollingQRCode = false
-                        return
+                    // Poll for token
+                    _ = try await api.pollDeviceToken(deviceCode: deviceCode)
+                    
+                    // Success!
+                    await MainActor.run {
+                        self.isAuthenticated = true
+                        self.isPollingQRCode = false
+                        self.qrStatusMessage = "Login successful!"
                     }
+                    return
+                    
+                } catch let error as FloatplaneAPIError {
+                    // Handle specific OAuth errors
+                    if case .httpError(_, let message) = error {
+                        if message == "authorization_pending" {
+                            // Continue polling
+                        } else if message == "slow_down" {
+                            // Increase polling interval
+                            try? await Task.sleep(nanoseconds: UInt64((interval + 5) * 1_000_000_000))
+                            continue
+                        } else if message == "expired_token" {
+                            await MainActor.run {
+                                self.qrStatusMessage = "Code expired"
+                                self.isPollingQRCode = false
+                            }
+                            return
+                        } else {
+                            // Other error
+                            await MainActor.run {
+                                self.errorMessage = "Login failed: \(message ?? "Unknown error")"
+                                self.isPollingQRCode = false
+                            }
+                            return
+                        }
+                    } else if case .notAuthenticated = error {
+                         // Should not happen during polling specifically unless endpoints invalid
+                    } 
+                    
+                    // Default polling interval
+                    try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                    
                 } catch {
-                    // Network error - retry after a short delay
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    // Generic error, retry
+                    try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
                 }
             }
         }
@@ -700,7 +377,127 @@ class LoginViewModel: ObservableObject {
         pollingTask = nil
         isPollingQRCode = false
     }
+
+    // MARK: - iOS OAuth Flow
+
+    func startIOSAuth() async {
+        #if !os(tvOS)
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // 1. Generate PKCE Verifier and Challenge
+            let codeVerifier = generateCodeVerifier()
+            let codeChallenge = generateCodeChallenge(from: codeVerifier)
+
+            // 2. Construct Auth URL
+            // Base: https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/auth
+            var components = URLComponents(string: "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/auth")!
+            components.queryItems = [
+                URLQueryItem(name: "client_id", value: "floatnative"),
+                URLQueryItem(name: "response_type", value: "code"),
+                URLQueryItem(name: "redirect_uri", value: "floatnative://auth"),
+                URLQueryItem(name: "scope", value: "openid offline_access"),
+                URLQueryItem(name: "code_challenge", value: codeChallenge),
+                URLQueryItem(name: "code_challenge_method", value: "S256")
+            ]
+
+            guard let authURL = components.url else {
+                throw FloatplaneAPIError.invalidURL
+            }
+
+            // 3. Start ASWebAuthenticationSession
+            // Note: This needs to run on MainActor
+            try await withCheckedThrowingContinuation(function: "startIOSAuth") { (continuation: CheckedContinuation<Void, Error>) in
+                let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "floatnative") { callbackURL, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+
+                    guard let callbackURL = callbackURL,
+                          let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: true),
+                          let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
+                        continuation.resume(throwing: FloatplaneAPIError.invalidResponse)
+                        return
+                    }
+
+                    // 4. Exchange Code for Token
+                    Task {
+                        do {
+                            // Verify code with API
+                            try await FloatplaneAPI.shared.exchangeAuthCode(
+                                code: code,
+                                verifier: codeVerifier,
+                                redirectUri: "floatnative://auth"
+                            )
+
+                            // Update UI on success
+                            await MainActor.run {
+                                self.isAuthenticated = true
+                                self.isLoading = false
+                                continuation.resume()
+                            }
+                        } catch {
+                            await MainActor.run {
+                                self.errorMessage = "Failed to exchange token: \(error.localizedDescription)"
+                                self.isLoading = false
+                                continuation.resume(throwing: error)
+                            }
+                        }
+                    }
+                }
+
+
+
+                // Start session
+                session.presentationContextProvider = AuthenticationContextProvider.shared
+                session.start()
+            }
+        } catch {
+            errorMessage = "Login failed: \(error.localizedDescription)"
+            isLoading = false
+        }
+        #endif
+    }
+
+    private func generateCodeVerifier() -> String {
+        var buffer = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, buffer.count, &buffer)
+        return Data(buffer).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+            .trimmingCharacters(in: .whitespaces)
+    }
+
+    private func generateCodeChallenge(from verifier: String) -> String {
+        guard let data = verifier.data(using: .utf8) else { return "" }
+        let hashed = SHA256.hash(data: data)
+        return Data(hashed).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+            .trimmingCharacters(in: .whitespaces)
+    }
 }
+
+// MARK: - Authentication Context Provider
+
+#if !os(tvOS)
+class AuthenticationContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    static let shared = AuthenticationContextProvider()
+    
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        // Find the active window scene's key window
+        let scene = UIApplication.shared.connectedScenes
+            .first { $0.activationState == .foregroundActive } as? UIWindowScene
+        return scene?.windows.first { $0.isKeyWindow } ?? ASPresentationAnchor()
+    }
+}
+#endif
+
+
 
 #Preview {
     LoginView()
