@@ -47,6 +47,7 @@ class DPoPManager {
         let htm: String     // HTTP Method
         let htu: String     // HTTP URL
         let ath: String?    // Access Token Hash (optional)
+        let nonce: String?  // Server-provided nonce (optional)
     }
     
     struct JWKHeader: Encodable {
@@ -58,7 +59,8 @@ class DPoPManager {
     func generateProof(
         httpMethod: String,
         httpUrl: String,
-        accessToken: String? = nil
+        accessToken: String? = nil,
+        nonce: String? = nil
     ) throws -> String {
         let privateKey = try getOrGenerateKey()
         let publicKey = privateKey.publicKey
@@ -104,7 +106,8 @@ class DPoPManager {
             jti: UUID().uuidString,
             htm: httpMethod,
             htu: htu,
-            ath: ath
+            ath: ath,
+            nonce: nonce
         )
         
         // 3. Encode and Sign
