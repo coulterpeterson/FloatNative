@@ -21,7 +21,7 @@ auth.post('/login', rateLimit('AUTH_STRICT_LIMITER', byIP), async (c) => {
   try {
     const db = c.get('db');
     const body = await c.req.json();
-    const { access_token } = body;
+    const { access_token, dpop_proof } = body;
 
     if (!access_token || typeof access_token !== 'string') {
       return c.json(
@@ -36,7 +36,11 @@ auth.post('/login', rateLimit('AUTH_STRICT_LIMITER', byIP), async (c) => {
     // Validate Floatplane token and get user ID
     let floatplaneUserId: string;
     try {
-      floatplaneUserId = await validateFloatplaneToken(access_token, c.env.FLOATPLANE_API_URL);
+      floatplaneUserId = await validateFloatplaneToken(
+        access_token, 
+        c.env.FLOATPLANE_API_URL,
+        dpop_proof
+      );
     } catch (error) {
       if (error instanceof FloatplaneAPIError) {
         if (error.statusCode === 401 || error.statusCode === 403) {

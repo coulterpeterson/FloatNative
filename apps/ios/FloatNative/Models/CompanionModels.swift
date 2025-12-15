@@ -45,9 +45,11 @@ enum CompanionAPIError: LocalizedError {
 
 struct CompanionLoginRequest: Codable {
     let accessToken: String
+    let dpopProof: String?
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
+        case dpopProof = "dpop_proof"
     }
 }
 
