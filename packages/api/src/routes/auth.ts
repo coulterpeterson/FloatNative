@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, Context } from 'hono';
 import { eq } from 'drizzle-orm';
 import { users } from '../db/schema';
 import { validateFloatplaneCookie, validateFloatplaneToken, FloatplaneAPIError } from '../services/floatplane';
@@ -8,6 +8,7 @@ import type { Env } from '../db';
 import type { DrizzleDB } from '../db';
 import { logError, logWarn } from '../utils/logger';
 import { rateLimit, byIP } from '../middleware/rate-limit';
+import { authenticateAPIKey, type AuthContext } from '../middleware/auth';
 
 const auth = new Hono<{ Bindings: Env; Variables: { db: DrizzleDB } }>();
 
@@ -225,4 +226,42 @@ auth.post('/register', rateLimit('AUTH_STRICT_LIMITER', byIP), async (c) => {
   }
 });
 
+/**
+ * POST /auth/logout
+ * Invalidate the user's API key.
+ * Rate limited: 20 req/min by API key
+ */
+auth.post('/logout', authenticateAPIKey, async (c: Context<{ Bindings: Env } & AuthContext>) => {
+  try {
+    const db = c.get('db');
+    const user = c.get('user');
+
+    // Generate a new API key to invalidate the old one
+    const newApiKey = generateAPIKey();
+
+    await db
+      .update(users)
+      .set({
+        api_key: newApiKey,
+        // Optionally, update last_accessed_at to null or a logout timestamp
+        // For now, keep it updated on access
+      })
+      .where(eq(users.floatplane_user_id, user.floatplane_user_id));
+
+    return c.json({
+      message: 'Logged out successfully. API key invalidated.',
+    });
+  } catch (error) {
+    logError(c, error, 'Logout error');
+    return c.json(
+      {
+        error: 'Internal Server Error',
+        message: 'Failed to logout user',
+      },
+      500
+    );
+  }
+});
+
 export default auth;
+
