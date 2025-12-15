@@ -63,6 +63,10 @@ struct CompanionRegisterResponse: Codable {
     }
 }
 
+struct CompanionLogoutResponse: Codable {
+    let message: String
+}
+
 // MARK: - Watch Later Models
 
 struct WatchLaterAddRequest: Codable {

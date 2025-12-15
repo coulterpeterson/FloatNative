@@ -164,6 +164,31 @@ class CompanionAPI: ObservableObject {
         return try await login(accessToken: accessToken)
     }
 
+    // MARK: - Logout
+
+    /// Logout from companion API (invalidate API key) and clear local key
+    func logout() async {
+        // Only attempt if we have an API key
+        guard apiKey != nil else {
+            // Ensure local key is cleared even if we think it's null (just in case)
+            KeychainManager.shared.clearAPIKey()
+            return
+        }
+
+        do {
+            let _: CompanionLogoutResponse = try await request(
+                endpoint: "/auth/logout",
+                method: "POST",
+                requiresAuth: true
+            )
+        } catch {
+            print("⚠️ Companion API logout failed: \(error)")
+        }
+
+        // Clear local key regardless of server success
+        KeychainManager.shared.clearAPIKey()
+    }
+
     // MARK: - Watch Later
 
     /// Add a video to Watch Later

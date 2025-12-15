@@ -701,6 +701,9 @@ class FloatplaneAPI: ObservableObject {
 
     /// Logout
     func logout() async throws {
+        // Logout from Companion API (invalidate key)
+        await CompanionAPI.shared.logout()
+
         // Try to call logout endpoint, but don't fail if it errors
         do {
             try await requestWithoutResponse(
