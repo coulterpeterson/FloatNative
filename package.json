@@ -12,7 +12,7 @@
     "api:tail": "pnpm --filter api run tail",
     "api:db:generate": "pnpm --filter api run db:generate",
     "api:db:migrate:local": "pnpm --filter api run db:migrate:local",
-    "api:db:migrate:remote": "pnpm --filter api run db:migrate:remote"
+    "api:db:migrate:remote": "pnpm --filter api run db:migrate:remote",
     "extension:build": "pnpm --filter floatnative-chrome-extension run build",
     "extension:watch": "pnpm --filter floatnative-chrome-extension run watch"
   }
