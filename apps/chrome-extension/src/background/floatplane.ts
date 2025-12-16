@@ -1,5 +1,6 @@
 
 import { AuthService } from "./auth";
+import { DPoPManager } from "./dpop";
 
 export interface BlogPost {
   id: string;
@@ -78,10 +79,16 @@ export class FloatplaneAPI {
       throw new Error("Not authenticated");
     }
 
+    const url = `${this.baseUrl}/api/v3/content/post?id=${id}`;
+
+    // Generate DPoP proof
+    const dpopProof = await DPoPManager.getInstance().generateProof("GET", url, token);
+
     // console.log(`FloatplaneAPI: Fetching post ${id}...`);
-    const response = await fetch(`${this.baseUrl}/api/v3/content/post?id=${id}`, {
+    const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `DPoP ${token}`,
+        DPoP: dpopProof
       },
     });
 

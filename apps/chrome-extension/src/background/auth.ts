@@ -1,3 +1,5 @@
+import { DPoPManager } from "./dpop";
+
 // Helper for random strings
 function generateRandomString(length: number = 21): string {
   const array = new Uint8Array(length);
@@ -5,11 +7,13 @@ function generateRandomString(length: number = 21): string {
   return Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
 }
 
-// Configuration
 const AUTH_BASE_URL = "https://auth.floatplane.com";
 const FLOATPLANE_BASE_URL = "https://www.floatplane.com";
-const CLIENT_ID = "wasserflug";
+const CLIENT_ID = "floatnative"; // Updated to match iOS
+// Configuration
+// Configuration at lines 8-10 is kept.
 const TOKEN_ENDPOINT = `${AUTH_BASE_URL}/realms/floatplane/protocol/openid-connect/token`;
+const AUTH_ENDPOINT = `${AUTH_BASE_URL}/realms/floatplane/protocol/openid-connect/auth`;
 
 // Storage Keys
 const KEY_ACCESS_TOKEN = "fp_access_token";
@@ -28,61 +32,118 @@ export class AuthService {
     return AuthService.instance;
   }
 
-  // --- Device Auth Flow ---
+  // --- PKCE Auth Flow ---
 
-  async startDeviceAuth(): Promise<{ deviceCode: string; userCode: string; verificationUri: string; expiresIn: number; interval: number }> {
-    const body = new URLSearchParams({
-      client_id: CLIENT_ID,
-      scope: "openid offline_access"
-    });
-
-    const response = await fetch(`${AUTH_BASE_URL}/realms/floatplane/protocol/openid-connect/auth/device`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: body.toString()
-    });
-
-    if (!response.ok) {
-      throw new Error(`Device Auth Init Failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return {
-      deviceCode: data.device_code,
-      userCode: data.user_code,
-      verificationUri: data.verification_uri,
-      expiresIn: data.expires_in,
-      interval: data.interval
-    };
+  // Helper to generate Code Verifier
+  private generateCodeVerifier(): string {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return this.base64UrlEncode(array);
   }
 
-  async pollDeviceToken(deviceCode: string): Promise<any> {
+  // Helper to generate Code Challenge
+  private async generateCodeChallenge(verifier: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const hash = await crypto.subtle.digest("SHA-256", data);
+    return this.base64UrlEncode(new Uint8Array(hash));
+  }
+
+  private base64UrlEncode(array: Uint8Array): string {
+    let str = "";
+    const bytes = Array.from(array);
+    for (const b of bytes) {
+      str += String.fromCharCode(b);
+    }
+    return btoa(str)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+  }
+
+
+  async startAuthFlow(): Promise<boolean> {
+    try {
+      // 1. Get Redirect URI dynamically
+      const redirectUri = chrome.identity.getRedirectURL();
+      console.log("Expected Redirect URI:", "https://cnjjpkfgigpedhakhcaoanjdjcccajci.chromiumapp.org/");
+      console.log("Actual Redirect URI:  ", redirectUri);
+
+      if (!redirectUri.includes("cnjjpkfgigpedhakhcaoanjdjcccajci")) {
+        console.warn("WARNING: Extension ID mismatch. Auth will likely fail at the provider level or browser level.");
+      }
+
+      // 2. Generate PKCE
+      const verifier = this.generateCodeVerifier();
+      const challenge = await this.generateCodeChallenge(verifier);
+
+      // 3. Construct Auth URL
+      const authUrl = new URL(AUTH_ENDPOINT);
+      authUrl.searchParams.set("client_id", CLIENT_ID);
+      authUrl.searchParams.set("response_type", "code");
+      authUrl.searchParams.set("redirect_uri", redirectUri);
+      authUrl.searchParams.set("scope", "openid offline_access");
+      authUrl.searchParams.set("code_challenge", challenge);
+      authUrl.searchParams.set("code_challenge_method", "S256");
+
+      console.log("Launching Web Auth Flow:", authUrl.toString());
+
+      // 4. Launch Web Auth Flow
+      const responseUrl = await chrome.identity.launchWebAuthFlow({
+        url: authUrl.toString(),
+        interactive: true
+      });
+
+      if (chrome.runtime.lastError || !responseUrl) {
+        throw new Error(chrome.runtime.lastError?.message || "Auth failed (no redirect URL)");
+      }
+
+      // 5. Extract Code
+      // URL will look like: https://<app-id>.chromiumapp.org/?code=...
+      const url = new URL(responseUrl);
+      const code = url.searchParams.get("code");
+
+      if (!code) {
+        throw new Error("No code found in redirect URL");
+      }
+
+      // 6. Exchange Code for Token
+      await this.exchangeAuthCode(code, verifier, redirectUri);
+      return true;
+
+    } catch (e: any) {
+      console.error("Auth Flow Error:", e);
+      throw e;
+    }
+  }
+
+  private async exchangeAuthCode(code: string, verifier: string, redirectUri: string): Promise<void> {
+    const dpopProof = await DPoPManager.getInstance().generateProof("POST", TOKEN_ENDPOINT);
+
     const body = new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+      grant_type: "authorization_code",
       client_id: CLIENT_ID,
-      device_code: deviceCode
+      code: code,
+      redirect_uri: redirectUri,
+      code_verifier: verifier
     });
 
     const response = await fetch(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "application/x-www-form-urlencoded",
+        "DPoP": dpopProof
       },
       body: body.toString()
     });
 
-    const data = await response.json();
-
-    if (response.ok) {
-      await this.handleTokenResponse(data);
-      return data;
-    } else {
-      // Return error object to caller (e.g. authorization_pending)
-      // { error: "authorization_pending" }
-      return data;
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Token Exchange Failed: ${response.status} ${text}`);
     }
+
+    const data = await response.json();
+    await this.handleTokenResponse(data);
   }
 
   // --- Token Management ---
@@ -117,6 +178,8 @@ export class AuthService {
   }
 
   private async refreshAccessToken(refreshToken: string): Promise<void> {
+    const dpopProof = await DPoPManager.getInstance().generateProof("POST", TOKEN_ENDPOINT);
+
     const body = new URLSearchParams({
       grant_type: "refresh_token",
       client_id: CLIENT_ID,
@@ -126,7 +189,8 @@ export class AuthService {
     const response = await fetch(TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "application/x-www-form-urlencoded",
+        "DPoP": dpopProof
       },
       body: body.toString()
     });

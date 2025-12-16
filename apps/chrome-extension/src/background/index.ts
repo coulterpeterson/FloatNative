@@ -11,22 +11,19 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("Background received message:", message);
 
-  if (message.type === "START_DEVICE_AUTH") {
-    AuthService.getInstance().startDeviceAuth()
-      .then(data => sendResponse({ success: true, data }))
-      .catch(err => sendResponse({ success: false, error: err.toString() }));
+  if (message.type === "CHECK_AUTH_STATUS") {
+    AuthService.getInstance().getAccessToken()
+      .then(token => sendResponse({ isAuthenticated: !!token }))
+      .catch(err => sendResponse({ isAuthenticated: false, error: err.toString() }));
     return true;
   }
 
-  if (message.type === "POLL_DEVICE_TOKEN") {
-    const { deviceCode } = message;
-    AuthService.getInstance().pollDeviceToken(deviceCode)
-      .then(data => {
-        // If success, we also ensure Companion Login
-        if (data.access_token) {
-          CompanionAPI.getInstance().ensureLoggedIn().catch(console.error);
-        }
-        sendResponse({ success: true, data });
+  if (message.type === "START_AUTH_FLOW") {
+    AuthService.getInstance().startAuthFlow()
+      .then(() => {
+        // Ensure companion login
+        CompanionAPI.getInstance().ensureLoggedIn().catch(console.error);
+        sendResponse({ success: true });
       })
       .catch(err => sendResponse({ success: false, error: err.toString() }));
     return true;

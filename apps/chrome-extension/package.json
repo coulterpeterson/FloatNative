@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "Floatplane Chrome Extension for Playlists",
   "scripts": {
-    "build": "webpack --config webpack.config.js",
-    "watch": "webpack --config webpack.config.js --watch"
+    "build": "webpack --config webpack.config.js --mode production",
+    "build:dev": "webpack --config webpack.config.js --mode development",
+    "watch": "webpack --config webpack.config.js --watch --mode development"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.32",

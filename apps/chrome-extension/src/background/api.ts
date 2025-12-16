@@ -1,4 +1,5 @@
 import { AuthService } from "./auth";
+import { DPoPManager } from "./dpop";
 
 const COMPANION_BASE_URL = "https://api.floatnative.coulterpeterson.com";
 const KEY_COMPANION_API_KEY = "fp_companion_key";
@@ -110,7 +111,19 @@ export class CompanionAPI {
 
   private async performCompanionLogin(accessToken: string): Promise<{ api_key: string }> {
     const url = `${COMPANION_BASE_URL}/auth/login`;
-    const payload = { access_token: accessToken };
+
+    // Generate DPoP proof for the Floatplane /user/self endpoint
+    // This allows the companion API to validate the token on our behalf
+    const dpopProof = await DPoPManager.getInstance().generateProof(
+      "GET",
+      "https://www.floatplane.com/api/v3/user/self",
+      accessToken
+    );
+
+    const payload = {
+      access_token: accessToken,
+      dpop_proof: dpopProof
+    };
     console.log("CompanionAPI: Performing login exchange with payload", payload);
 
     const response = await fetch(url, {
