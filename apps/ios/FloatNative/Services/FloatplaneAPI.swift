@@ -100,6 +100,7 @@ class FloatplaneAPI: ObservableObject {
     @Published private(set) var accessToken: String?
     private var refreshToken: String?
     private var tokenExpiry: Date?
+    private var lastDPoPNonce: String? // Store latest server-provided nonce
 
     // Legacy Cookie (for backward compatibility during migration)
     private var authCookie: String? {
@@ -132,7 +133,12 @@ class FloatplaneAPI: ObservableObject {
     }
 
     private func checkAuthState() {
-        if let expiry = tokenExpiry, expiry > Date() {
+        // If we have a refresh token, we consider the user "potentially" authenticated.
+        // The first API call will fail with 401 if access token is expired,
+        // triggering the refresh flow automatically.
+        if refreshToken != nil {
+            isAuthenticated = true
+        } else if let expiry = tokenExpiry, expiry > Date() {
             isAuthenticated = true
         } else if authCookie != nil {
             isAuthenticated = true
@@ -265,7 +271,8 @@ class FloatplaneAPI: ObservableObject {
                 if let dpopProof = try? DPoPManager.shared.generateProof(
                     httpMethod: method,
                     httpUrl: baseURL + endpoint,
-                    accessToken: accessToken
+                    accessToken: accessToken,
+                    nonce: lastDPoPNonce
                 ) {
                     urlRequest.setValue(dpopProof, forHTTPHeaderField: "DPoP")
                     // DPoP-bound tokens must use the DPoP scheme
@@ -297,11 +304,23 @@ class FloatplaneAPI: ObservableObject {
         // Extract cookies from response
         extractCookie(from: httpResponse)
 
+        // Create case-insensitive lookup for headers
+        let headers = Dictionary(uniqueKeysWithValues: httpResponse.allHeaderFields.map {
+            // Keys in allHeaderFields can be Any, usually String.
+            (String(describing: $0.key).lowercased(), String(describing: $0.value))
+        })
+        
+        // Capture DPoP-Nonce if present
+        if let nonce = headers["dpop-nonce"] {
+            self.lastDPoPNonce = nonce
+        }
+        
         // Handle HTTP errors
         guard (200...299).contains(httpResponse.statusCode) else {
-            // Check for authentication errors (401 Unauthorized)
-            if httpResponse.statusCode == 401 {
+            // Check for authentication errors (401 Unauthorized or 403 Forbidden)
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 // Try OAuth Refresh first
+
                 if refreshToken != nil && !isRelogging {
                     isRelogging = true
                     defer { isRelogging = false }
@@ -352,7 +371,8 @@ class FloatplaneAPI: ObservableObject {
                 if let dpopProof = try? DPoPManager.shared.generateProof(
                     httpMethod: method,
                     httpUrl: baseURL + endpoint,
-                    accessToken: accessToken
+                    accessToken: accessToken,
+                    nonce: lastDPoPNonce
                 ) {
                     urlRequest.setValue(dpopProof, forHTTPHeaderField: "DPoP")
                     // DPoP-bound tokens must use the DPoP scheme
@@ -398,11 +418,23 @@ class FloatplaneAPI: ObservableObject {
         // Extract cookies from response
         extractCookie(from: httpResponse)
 
+        // Create case-insensitive lookup for headers
+        let headers = Dictionary(uniqueKeysWithValues: httpResponse.allHeaderFields.map {
+            // Keys in allHeaderFields can be Any, usually String.
+            (String(describing: $0.key).lowercased(), String(describing: $0.value))
+        })
+        
+        // Capture DPoP-Nonce if present
+        if let nonce = headers["dpop-nonce"] {
+            self.lastDPoPNonce = nonce
+        }
+        
         // Handle HTTP errors
         guard (200...299).contains(httpResponse.statusCode) else {
-            // Check for authentication errors (401 Unauthorized)
-            if httpResponse.statusCode == 401 {
+            // Check for authentication errors (401 Unauthorized or 403 Forbidden)
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 // Try OAuth Refresh first
+
                 if refreshToken != nil && !isRelogging {
                     isRelogging = true
                     defer { isRelogging = false }
@@ -550,6 +582,18 @@ class FloatplaneAPI: ObservableObject {
         // Extract cookies (crucial for Hybrid DPoP/Cookie video playback)
         extractCookie(from: httpResponse)
 
+        // Create case-insensitive lookup for headers
+        let headers = Dictionary(uniqueKeysWithValues: httpResponse.allHeaderFields.map {
+            // Keys in allHeaderFields can be Any, usually String.
+            (String(describing: $0.key).lowercased(), String(describing: $0.value))
+        })
+        
+        // Capture DPoP-Nonce if present
+        if let nonce = headers["dpop-nonce"] {
+            self.lastDPoPNonce = nonce
+        }
+
+
         #if DEBUG
         print("--------- AUTH RESPONSE ---------")
         print("Status: \(httpResponse.statusCode)")
@@ -611,7 +655,8 @@ class FloatplaneAPI: ObservableObject {
             // Generate DPoP proof for the token endpoint
             let dpopProof = try DPoPManager.shared.generateProof(
                 httpMethod: "POST",
-                httpUrl: authBaseURL + tokenEndpoint
+                httpUrl: authBaseURL + tokenEndpoint,
+                nonce: lastDPoPNonce
             )
 
             let response: OAuthTokenResponse = try await requestAuth(
@@ -642,7 +687,8 @@ class FloatplaneAPI: ObservableObject {
         // Generate DPoP proof
         let dpopProof = try DPoPManager.shared.generateProof(
             httpMethod: "POST",
-            httpUrl: authBaseURL + tokenEndpoint
+            httpUrl: authBaseURL + tokenEndpoint,
+            nonce: lastDPoPNonce
         )
 
         let response: OAuthTokenResponse = try await requestAuth(
@@ -672,7 +718,8 @@ class FloatplaneAPI: ObservableObject {
             // Generate DPoP proof for the token endpoint
             let dpopProof = try DPoPManager.shared.generateProof(
                 httpMethod: "POST",
-                httpUrl: authBaseURL + tokenEndpoint
+                httpUrl: authBaseURL + tokenEndpoint,
+                nonce: lastDPoPNonce
             )
 
             let response: OAuthTokenResponse = try await requestAuth(
