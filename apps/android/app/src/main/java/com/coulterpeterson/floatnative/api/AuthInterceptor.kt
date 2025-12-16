@@ -19,8 +19,11 @@ class AuthInterceptor(
         // 1. Add Headers
         val accessToken = tokenManager.accessToken
         val authCookie = tokenManager.authCookie
+        
+        val url = originalRequest.url.toString()
+        val isFloatplane = url.contains("floatplane.com") || url.contains("floatnative.coulterpeterson.com")
 
-        if (accessToken != null) {
+        if (accessToken != null && isFloatplane) {
             // Generate DPoP Proof
             try {
                 val method = originalRequest.method

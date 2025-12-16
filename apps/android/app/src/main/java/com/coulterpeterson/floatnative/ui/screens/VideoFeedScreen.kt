@@ -47,10 +47,7 @@ fun VideoFeedScreen(
                         VideoCard(
                             post = post,
                             onClick = {
-                                val videoId = post.videoAttachments?.firstOrNull()
-                                if (videoId != null) {
-                                    onPlayVideo(videoId)
-                                }
+                                onPlayVideo(post.id)
                             }
                         )
                     }

@@ -34,9 +34,17 @@ fun VideoPlayerScreen(
 
     // Initialize ExoPlayer
     val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            playWhenReady = true
-        }
+        val dataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(
+            com.coulterpeterson.floatnative.api.FloatplaneApi.okHttpClient
+        )
+        val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(dataSourceFactory)
+
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build()
+            .apply {
+                playWhenReady = true
+            }
     }
 
     // Cleanup on dispose

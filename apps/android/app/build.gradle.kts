@@ -85,7 +85,9 @@ dependencies {
     implementation(libs.androidx.tv.material)
     
     // Media3 (ExoPlayer)
-    implementation(libs.androidx.media3.exoplayer)
-    implementation(libs.androidx.media3.ui)
+    implementation("androidx.media3:media3-exoplayer:1.2.0")
+    implementation("androidx.media3:media3-ui:1.2.0")
+    implementation("androidx.media3:media3-datasource-okhttp:1.2.0")
+    implementation("androidx.media3:media3-exoplayer-hls:1.2.0")
     implementation(libs.androidx.media3.common)
 }

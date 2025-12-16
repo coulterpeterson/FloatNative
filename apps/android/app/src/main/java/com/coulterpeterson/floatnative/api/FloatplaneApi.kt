@@ -67,6 +67,9 @@ object FloatplaneApi {
     // Interactive
     val commentV3: CommentV3Api by lazy { apiClient.createService(CommentV3Api::class.java) }
 
+    lateinit var okHttpClient: OkHttpClient
+        private set
+
     fun init(context: Context) {
         tokenManager = TokenManager(context)
 
@@ -87,7 +90,7 @@ object FloatplaneApi {
         dpopManager = com.coulterpeterson.floatnative.data.DPoPManager(context)
         val authInterceptor = AuthInterceptor(tokenManager, dpopManager) { oauthApi }
 
-        val okHttpClient = OkHttpClient.Builder()
+        okHttpClient = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
             .addInterceptor(loggingInterceptor)
             .build()
@@ -147,6 +150,15 @@ object FloatplaneApi {
         val userSelfUrl = "https://www.floatplane.com/api/v3/user/self"
         val loginProof = dpopManager.generateProof("GET", userSelfUrl, response.access_token)
         
+        // 5. Fetch User Self to prime "sails.sid" session cookie
+        // The interceptor will automatically extract the cookie from the response.
+        try {
+            userV3.getSelf()
+        } catch (e: Exception) {
+            android.util.Log.e("FloatplaneApi", "Failed to fetch self for cookie priming", e)
+            // Continue, as some things might still work
+        }
+
         val loginRequest = CompanionLoginRequest(
             accessToken = response.access_token,
             dpopProof = loginProof
@@ -162,7 +174,8 @@ object FloatplaneApi {
              // Handle error? Throw?
              // For now just log or ignore, app works without companion login partially (but playlists fail)
              // Ideally we throw so ViewModel shows error
-             throw Exception("Companion Login Failed: ${companionResponse.code()}")
+             // throw Exception("Companion Login Failed: ${companionResponse.code()}")
+             android.util.Log.e("FloatplaneApi", "Companion Login Failed: ${companionResponse.code()}")
         }
     }
 }
