@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coulterpeterson.floatnative.api.FloatplaneApi
 import com.coulterpeterson.floatnative.openapi.models.CreatorModelV3
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -28,12 +29,23 @@ class CreatorsViewModel : ViewModel() {
         viewModelScope.launch {
             _state.value = CreatorsState.Loading
             try {
-                // Empty search string returns all creators usually, or top creators.
-                val response = FloatplaneApi.creatorV3.getCreators(search = "")
-                if (response.isSuccessful && response.body() != null) {
-                    _state.value = CreatorsState.Content(response.body()!!)
+                val creatorsDeferred = async { FloatplaneApi.creatorV3.getCreators(search = "") }
+                val subscriptionsDeferred = async { FloatplaneApi.subscriptionsV3.listUserSubscriptionsV3() }
+
+                val creatorsResponse = creatorsDeferred.await()
+                val subscriptionsResponse = subscriptionsDeferred.await()
+
+                if (creatorsResponse.isSuccessful && subscriptionsResponse.isSuccessful) {
+                    val allCreators = creatorsResponse.body() ?: emptyList()
+                    val subscriptions = subscriptionsResponse.body() ?: emptyList()
+                    
+                    val subscribedCreatorIds = subscriptions.map { it.creator }.toSet()
+                    val subscribedCreators = allCreators.filter { it.id in subscribedCreatorIds }
+                    
+                    android.util.Log.d("CreatorsDebug", "Filtered ${subscribedCreators.size} subscribed creators from ${allCreators.size} total.")
+                    _state.value = CreatorsState.Content(subscribedCreators)
                 } else {
-                    _state.value = CreatorsState.Error("Failed to fetch creators: ${response.code()}")
+                    _state.value = CreatorsState.Error("Failed to fetch data. Creators: ${creatorsResponse.code()}, Subs: ${subscriptionsResponse.code()}")
                 }
             } catch (e: Exception) {
                 _state.value = CreatorsState.Error(e.message ?: "Unknown error")

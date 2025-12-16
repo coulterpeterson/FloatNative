@@ -8,10 +8,10 @@ import com.coulterpeterson.floatnative.ui.screens.MainScreen
 import com.coulterpeterson.floatnative.ui.screens.auth.LoginScreen
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(startDestination: String = Screen.Login.route) {
     val navController = rememberNavController()
     
-    NavHost(navController = navController, startDestination = Screen.Login.route) {
+    NavHost(navController = navController, startDestination = startDestination) {
         
         composable(Screen.Login.route) {
             LoginScreen(

@@ -26,10 +26,18 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val isTv = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
-                    if (isTv) {
-                        com.coulterpeterson.floatnative.ui.navigation.TvAppNavigation()
+                    
+                    val token = com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.accessToken
+                    val startDestination = if (!token.isNullOrEmpty()) {
+                        com.coulterpeterson.floatnative.ui.navigation.Screen.Home.route
                     } else {
-                        AppNavigation()
+                        com.coulterpeterson.floatnative.ui.navigation.Screen.Login.route
+                    }
+
+                    if (isTv) {
+                        com.coulterpeterson.floatnative.ui.navigation.TvAppNavigation(startDestination = startDestination)
+                    } else {
+                        AppNavigation(startDestination = startDestination)
                     }
                 }
             }

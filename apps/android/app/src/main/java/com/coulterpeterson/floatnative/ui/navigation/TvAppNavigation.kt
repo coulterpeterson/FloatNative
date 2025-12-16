@@ -12,10 +12,10 @@ import com.coulterpeterson.floatnative.ui.screens.VideoPlayerScreen
 
 @androidx.annotation.OptIn(androidx.tv.material3.ExperimentalTvMaterial3Api::class)
 @Composable
-fun TvAppNavigation() {
+fun TvAppNavigation(startDestination: String = Screen.Login.route) {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = Screen.Login.route) {
+    NavHost(navController = navController, startDestination = startDestination) {
         
         composable(Screen.Login.route) {
             // Reusing standard LoginScreen. 

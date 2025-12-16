@@ -31,7 +31,7 @@ fun VideoCard(
                     .aspectRatio(16f / 9f)
             ) {
                 AsyncImage(
-                    model = post.thumbnail?.path, // Need to handle full URL if path is relative
+                    model = post.thumbnail?.path?.toString(),
                     contentDescription = post.title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop

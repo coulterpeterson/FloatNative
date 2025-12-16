@@ -57,6 +57,8 @@ object FloatplaneApi {
     // Video
     val videoV2: VideoV2Api by lazy { retrofit.create(VideoV2Api::class.java) }
 
+    val subscriptionsV3: SubscriptionsV3Api by lazy { retrofit.create(SubscriptionsV3Api::class.java) }
+
     // Manual API for missing endpoints
     val manual: ManualApi by lazy {
         apiClient.createService(ManualApi::class.java)

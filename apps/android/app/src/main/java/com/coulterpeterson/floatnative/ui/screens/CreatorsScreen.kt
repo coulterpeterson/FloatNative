@@ -4,9 +4,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,7 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.coulterpeterson.floatnative.ui.components.CreatorCard
+import com.coulterpeterson.floatnative.ui.components.ChannelListItem
+import com.coulterpeterson.floatnative.ui.components.CreatorListItem
 import com.coulterpeterson.floatnative.viewmodels.CreatorsState
 import com.coulterpeterson.floatnative.viewmodels.CreatorsViewModel
 
@@ -41,17 +41,21 @@ fun CreatorsScreen(
                 )
             }
             is CreatorsState.Content -> {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 160.dp),
-                    contentPadding = PaddingValues(16.dp),
+                LazyColumn(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(currentState.creators) { creator ->
-                        CreatorCard(
+                        CreatorListItem(
                             creator = creator,
-                            onClick = { onCreatorClick(creator.id) },
-                            modifier = Modifier.padding(8.dp)
+                            onClick = { onCreatorClick(creator.id) }
                         )
+
+                        creator.channels.forEach { channel ->
+                             ChannelListItem(
+                                 channel = channel,
+                                 onClick = { /* TODO: Navigate to channel? Or filter feed? */ },
+                             )
+                        }
                     }
                 }
             }

@@ -40,7 +40,7 @@ fun CreatorCard(
             
             if (imageUrl != null) {
                  AsyncImage(
-                    model = imageUrl,
+                    model = imageUrl.toString(),
                     contentDescription = creator.title,
                     modifier = Modifier
                         .fillMaxWidth()
