@@ -60,8 +60,8 @@ class AuthInterceptor(
             }
         }
 
-        // 3. Handle 401 Unauthorized
-        if (response.code == 401) {
+        // 3. Handle 401 Unauthorized or 403 Forbidden
+        if (response.code == 401 || response.code == 403) {
             val refreshToken = tokenManager.refreshToken
             if (refreshToken != null) {
                 synchronized(this) {
@@ -130,10 +130,8 @@ class AuthInterceptor(
                         )
 
                     } catch (e: Exception) {
-                        // Refresh failed
-                        // Don't clear tokens here automatically, let the UI handle the 401 final failure?
-                        // Or clear them to force logout?
-                        // For now we just return the original 401
+                        // Refresh failed, clear tokens to force re-login
+                        tokenManager.clearAll()
                     }
                 }
             }
