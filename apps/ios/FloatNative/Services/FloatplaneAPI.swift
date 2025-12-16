@@ -133,7 +133,12 @@ class FloatplaneAPI: ObservableObject {
     }
 
     private func checkAuthState() {
-        if let expiry = tokenExpiry, expiry > Date() {
+        // If we have a refresh token, we consider the user "potentially" authenticated.
+        // The first API call will fail with 401 if access token is expired,
+        // triggering the refresh flow automatically.
+        if refreshToken != nil {
+            isAuthenticated = true
+        } else if let expiry = tokenExpiry, expiry > Date() {
             isAuthenticated = true
         } else if authCookie != nil {
             isAuthenticated = true
