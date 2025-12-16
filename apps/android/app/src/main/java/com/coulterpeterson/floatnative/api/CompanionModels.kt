@@ -6,7 +6,8 @@ import java.util.Date
 
 @JsonClass(generateAdapter = true)
 data class CompanionLoginRequest(
-    @Json(name = "access_token") val accessToken: String
+    @Json(name = "access_token") val accessToken: String,
+    @Json(name = "dpop_proof") val dpopProof: String
 )
 
 @JsonClass(generateAdapter = true)

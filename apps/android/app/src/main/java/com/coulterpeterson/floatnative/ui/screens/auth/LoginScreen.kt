@@ -56,25 +56,10 @@ fun LoginScreen(
                 
                 Spacer(modifier = Modifier.height(32.dp))
                 
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("Username") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large
-                )
-                
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Password") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large
-                )
+                val context = androidx.compose.ui.platform.LocalContext.current
                 
                 Button(
-                    onClick = { viewModel.login(username, password) },
+                    onClick = { viewModel.startAuthFlow(context) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = MaterialTheme.shapes.extraLarge,
                     enabled = state !is LoginState.Loading
@@ -85,8 +70,16 @@ fun LoginScreen(
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
-                        Text("Log In")
+                        Text("Log In with Floatplane")
                     }
+                }
+                
+                if (state is LoginState.Error) {
+                    Text(
+                        text = (state as LoginState.Error).message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             }
         }

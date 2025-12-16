@@ -51,6 +51,10 @@ class TokenManager(context: Context) {
         get() = retrieve(KEY_COMPANION_API_KEY)
         set(value) = save(KEY_COMPANION_API_KEY, value)
 
+    var codeVerifier: String?
+        get() = retrieve("pkce_verifier")
+        set(value) = save("pkce_verifier", value)
+
     fun clearAll() {
         prefs.edit().clear().apply()
     }

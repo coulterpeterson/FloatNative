@@ -58,6 +58,9 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    
+    // Auth - Browser
+    implementation("androidx.browser:browser:1.8.0")
 
     // Networking
     implementation(libs.retrofit)

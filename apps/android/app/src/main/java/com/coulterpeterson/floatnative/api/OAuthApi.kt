@@ -9,6 +9,7 @@ interface OAuthApi {
     @FormUrlEncoded
     @POST("realms/floatplane/protocol/openid-connect/token")
     suspend fun getToken(
+        @retrofit2.http.Header("DPoP") dpop: String,
         @Field("grant_type") grantType: String,
         @Field("client_id") clientId: String,
         @Field("code") code: String? = null,

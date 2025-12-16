@@ -11,26 +11,35 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 
+import com.coulterpeterson.floatnative.openapi.infrastructure.Serializer
+
 object FloatplaneApi {
 
-    lateinit var tokenManager: TokenManager
+    val authCodeFlow = kotlinx.coroutines.flow.MutableSharedFlow<String>(replay = 0)
+
+    lateinit var dpopManager: com.coulterpeterson.floatnative.data.DPoPManager
         private set
+        
+    private lateinit var oauthApi: OAuthApi
+
+    // Use PUBLIC setter for tokenManager to avoid any potential visibility weirdness with lateinit
+    lateinit var tokenManager: TokenManager
 
     private lateinit var apiClient: ApiClient
-    private lateinit var retrofit: Retrofit // Added for new API initializers
-    private lateinit var loggingInterceptor: HttpLoggingInterceptor // Made lateinit to be accessible by companionOkHttpClient
-    private lateinit var moshi: Moshi // Added for MoshiConverterFactory
+    private lateinit var retrofit: Retrofit 
+    private lateinit var loggingInterceptor: HttpLoggingInterceptor 
+    private lateinit var moshi: Moshi 
 
     // --- Companion API Setup ---
     private const val COMPANION_BASE_URL = "https://api.floatnative.coulterpeterson.com"
 
-    private lateinit var companionAuthInterceptor: CompanionAuthInterceptor // Made lateinit
-    private lateinit var companionOkHttpClient: OkHttpClient // Made lateinit
-    private lateinit var companionRetrofit: Retrofit // Made lateinit
-    lateinit var companionApi: CompanionApi // Made lateinit
+    private lateinit var companionAuthInterceptor: CompanionAuthInterceptor
+    private lateinit var companionOkHttpClient: OkHttpClient
+    private lateinit var companionRetrofit: Retrofit
+    lateinit var companionApi: CompanionApi
 
     // --- Singleton Initializers for OpenAPI services ---
-    val authV2 by lazy { apiClient.createService(AuthV2Api::class.java) }
+    val authV2: AuthV2Api by lazy { apiClient.createService(AuthV2Api::class.java) }
     val authV3: AuthV3Api by lazy { retrofit.create(AuthV3Api::class.java) }
 
     val userV2: UserV2Api by lazy { retrofit.create(UserV2Api::class.java) }
@@ -54,14 +63,12 @@ object FloatplaneApi {
     }
     
     // Interactive
-    val commentV3 by lazy { apiClient.createService(CommentV3Api::class.java) }
+    val commentV3: CommentV3Api by lazy { apiClient.createService(CommentV3Api::class.java) }
 
     fun init(context: Context) {
         tokenManager = TokenManager(context)
 
-        moshi = Moshi.Builder()
-            .add(KotlinJsonAdapterFactory())
-            .build()
+        moshi = Serializer.moshiBuilder.build()
             
         loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY // TODO: Reduce level in production
@@ -73,9 +80,10 @@ object FloatplaneApi {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             
-        val oauthApi = oauthRetrofit.create(OAuthApi::class.java)
+        oauthApi = oauthRetrofit.create(OAuthApi::class.java)
 
-        val authInterceptor = AuthInterceptor(tokenManager) { oauthApi }
+        dpopManager = com.coulterpeterson.floatnative.data.DPoPManager(context)
+        val authInterceptor = AuthInterceptor(tokenManager, dpopManager) { oauthApi }
 
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
@@ -109,5 +117,50 @@ object FloatplaneApi {
             .build()
             
         companionApi = companionRetrofit.create(CompanionApi::class.java)
+    }
+    
+    suspend fun exchangeAuthCode(code: String, verifier: String) {
+        val tokenEndpoint = "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/token"
+        
+        // 1. Generate DPoP proof
+        val dpop = dpopManager.generateProof("POST", tokenEndpoint)
+        
+        // 2. Exchange Token
+        val response = oauthApi.getToken(
+            dpop = dpop,
+            grantType = "authorization_code",
+            clientId = "floatnative",
+            code = code,
+            codeVerifier = verifier,
+            redirectUri = "floatnative://auth"
+        )
+        
+        // 3. Save Tokens
+        tokenManager.accessToken = response.access_token
+        tokenManager.refreshToken = response.refresh_token
+        // TODO: Save expiry logic if needed in TokenManager
+        
+        // 4. Companion Login
+        // Generate DPoP for user/self
+        val userSelfUrl = "https://www.floatplane.com/api/v3/user/self"
+        val loginProof = dpopManager.generateProof("GET", userSelfUrl, response.access_token)
+        
+        val loginRequest = CompanionLoginRequest(
+            accessToken = response.access_token,
+            dpopProof = loginProof
+        )
+        
+        val companionResponse = companionApi.login(loginRequest)
+        if (companionResponse.isSuccessful) {
+            val body = companionResponse.body()
+            if (body != null) {
+                tokenManager.companionApiKey = body.apiKey
+            }
+        } else {
+             // Handle error? Throw?
+             // For now just log or ignore, app works without companion login partially (but playlists fail)
+             // Ideally we throw so ViewModel shows error
+             throw Exception("Companion Login Failed: ${companionResponse.code()}")
+        }
     }
 }

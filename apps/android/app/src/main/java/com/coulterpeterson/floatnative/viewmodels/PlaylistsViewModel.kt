@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coulterpeterson.floatnative.api.FloatplaneApi
 import com.coulterpeterson.floatnative.api.Playlist
+import com.coulterpeterson.floatnative.data.TokenManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -57,7 +58,9 @@ class PlaylistsViewModel : ViewModel() {
         if (tokenManager.companionApiKey == null) {
             val accessToken = tokenManager.accessToken
             if (accessToken != null) {
-                 val loginRequest = com.coulterpeterson.floatnative.api.CompanionLoginRequest(accessToken)
+                 val userSelfUrl = "https://www.floatplane.com/api/v3/user/self"
+                 val dpopProof = FloatplaneApi.dpopManager.generateProof("GET", userSelfUrl, accessToken)
+                 val loginRequest = com.coulterpeterson.floatnative.api.CompanionLoginRequest(accessToken, dpopProof)
                  val loginResponse = FloatplaneApi.companionApi.login(loginRequest)
                  if (loginResponse.isSuccessful && loginResponse.body() != null) {
                      tokenManager.companionApiKey = loginResponse.body()!!.apiKey
