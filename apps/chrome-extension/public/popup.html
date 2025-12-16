@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Floatplane Playlists</title>
+  <style>
+    body {
+      width: 320px;
+      min-height: 400px;
+      background-color: #1a1a1a;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 20px;
+      color: #3e8ede;
+    }
+
+    #qrcode {
+      margin: 20px auto;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .code-display {
+      background: #333;
+      padding: 10px 20px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 24px;
+      letter-spacing: 2px;
+      margin: 15px 0;
+      font-weight: bold;
+      user-select: all;
+    }
+
+    .instruction {
+      font-size: 14px;
+      margin: 10px 20px;
+      line-height: 1.4;
+    }
+
+    button {
+      background-color: #3e8ede;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: background 0.2s;
+      margin-top: 20px;
+    }
+
+    button:hover {
+      background-color: #2b7bc5;
+    }
+
+    a {
+      color: #3e8ede;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    #success-view {
+      display: none;
+    }
+
+    #login-view {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="login-view">
+    <img src="assets/icon128.png" style="width: 64px; height: 64px; margin-bottom: 10px;">
+    <h1>Floatplane Playlists</h1>
+    <div class="instruction">Log in to manage your playlists.</div>
+
+    <button id="login-btn">Log In with Floatplane</button>
+
+    <div id="status" class="instruction" style="color: #aaa; font-size: 12px; margin-top: 10px;"></div>
+  </div>
+
+  <div id="success-view">
+    <h1>Logged In!</h1>
+    <p class="instruction">You can now use the "Save to Playlist" button on videos and access Playlists from the
+      sidebar.</p>
+    <div style="font-size: 64px; color: #4caf50; margin: 20px;">✓</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>

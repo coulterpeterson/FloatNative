@@ -134,18 +134,26 @@ export async function validateFloatplaneCookie(
  * Validates a Floatplane OAuth access token by calling the /user/self endpoint
  * @param accessToken The OAuth access token
  * @param floatplaneApiUrl The base URL for the Floatplane API
+ * @param dpopProof Optional DPoP proof if the token is DPoP-bound
  * @returns The Floatplane user ID if valid
  * @throws FloatplaneAPIError if token is invalid or API call fails
  */
 export async function validateFloatplaneToken(
   accessToken: string,
-  floatplaneApiUrl: string
+  floatplaneApiUrl: string,
+  dpopProof?: string
 ): Promise<string> {
   try {
+    const headers: Record<string, string> = {
+      Authorization: dpopProof ? `DPoP ${accessToken}` : `Bearer ${accessToken}`,
+    };
+
+    if (dpopProof) {
+      headers['DPoP'] = dpopProof;
+    }
+
     const response = await fetch(`${floatplaneApiUrl}/user/self`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers,
       // @ts-ignore - cf property exists in Workers but not in standard fetch types
       cf: {
         cacheTtl: 0,

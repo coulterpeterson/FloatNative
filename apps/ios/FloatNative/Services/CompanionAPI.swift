@@ -140,7 +140,18 @@ class CompanionAPI: ObservableObject {
     
     /// Login with companion API using Floatplane OAuth token
     func login(accessToken: String) async throws -> String {
-        let loginRequest = CompanionLoginRequest(accessToken: accessToken)
+        // Generate DPoP proof for the Floatplane /user/self endpoint
+        // This allows the companion API to validate the token on our behalf
+        let dpopProof = try? DPoPManager.shared.generateProof(
+            httpMethod: "GET",
+            httpUrl: "https://www.floatplane.com/api/v3/user/self",
+            accessToken: accessToken
+        )
+        
+        let loginRequest = CompanionLoginRequest(
+            accessToken: accessToken,
+            dpopProof: dpopProof
+        )
         
         let response: CompanionRegisterResponse = try await request(
             endpoint: "/auth/login",
@@ -162,6 +173,31 @@ class CompanionAPI: ObservableObject {
         }
         
         return try await login(accessToken: accessToken)
+    }
+
+    // MARK: - Logout
+
+    /// Logout from companion API (invalidate API key) and clear local key
+    func logout() async {
+        // Only attempt if we have an API key
+        guard apiKey != nil else {
+            // Ensure local key is cleared even if we think it's null (just in case)
+            KeychainManager.shared.clearAPIKey()
+            return
+        }
+
+        do {
+            let _: CompanionLogoutResponse = try await request(
+                endpoint: "/auth/logout",
+                method: "POST",
+                requiresAuth: true
+            )
+        } catch {
+            print("⚠️ Companion API logout failed: \(error)")
+        }
+
+        // Clear local key regardless of server success
+        KeychainManager.shared.clearAPIKey()
     }
 
     // MARK: - Watch Later

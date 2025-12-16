@@ -135,6 +135,22 @@ class KeychainManager {
         deleteItem(key: tokenExpiryKey)
     }
 
+    // MARK: - DPoP Key Storage
+
+    private let dpopKeyTag = "com.floatnative.dpop.key"
+    
+    func saveDPoPKey(_ keyData: Data) -> Bool {
+        return saveItemData(key: dpopKeyTag, data: keyData)
+    }
+    
+    func getDPoPKey() -> Data? {
+        return getItemData(key: dpopKeyTag)
+    }
+    
+    func deleteDPoPKey() {
+        deleteItem(key: dpopKeyTag)
+    }
+
     // MARK: - Private Keychain Operations
 
     private func saveItem(key: String, value: String) -> Bool {
@@ -156,6 +172,18 @@ class KeychainManager {
         return status == errSecSuccess
     }
 
+    private func saveItemData(key: String, data: Data) -> Bool {
+        deleteItem(key: key)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+        ]
+        return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
+    }
+
     private func getItem(key: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -175,6 +203,21 @@ class KeychainManager {
         }
 
         return value
+    }
+
+    private func getItemData(key: String) -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        if SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess {
+            return result as? Data
+        }
+        return nil
     }
 
     private func deleteItem(key: String) {

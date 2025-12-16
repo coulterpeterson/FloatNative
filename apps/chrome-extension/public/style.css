@@ -1,0 +1,44 @@
+/* Floatplane Native Extension Styles */
+
+/* Playlist Dropdown */
+.fp-playlist-dropdown {
+    font-family: 'Roboto', sans-serif;
+    font-size: 14px;
+    animation: fp-fade-in 0.2s ease-out;
+}
+
+@keyframes fp-fade-in {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Playlist Overlay */
+.fp-playlist-overlay {
+    font-family: 'Roboto', sans-serif;
+    backdrop-filter: blur(5px);
+}
+
+.fp-playlist-overlay h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 500;
+}
+
+.fp-playlist-overlay button {
+    background: #3e8ede;
+    border: none;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.fp-playlist-overlay button:hover {
+    background: #2b7bc5;
+}
+
+/* Sidebar Link Highlight */
+.fp-sidebar-playlists:hover {
+    background-color: rgba(255, 255, 255, 0.08); /* Mimic Floatplane hover */
+}
