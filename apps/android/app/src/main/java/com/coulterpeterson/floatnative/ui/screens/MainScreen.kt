@@ -89,10 +89,50 @@ fun MainScreen(
                 )
             }
 
+            composable(
+                route = "creator/{creatorId}",
+                arguments = listOf(navArgument("creatorId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val creatorId = backStackEntry.arguments?.getString("creatorId")
+                VideoFeedScreen(
+                    creatorId = creatorId,
+                    onPlayVideo = { postId ->
+                        navController.navigate("video/$postId")
+                    },
+                    onClearFilter = {
+                         navController.popBackStack()
+                    }
+                )
+            }
+
+            composable(
+                route = "channel/{channelId}?creator={creatorId}",
+                arguments = listOf(
+                    navArgument("channelId") { type = NavType.StringType },
+                    navArgument("creatorId") { type = NavType.StringType; nullable = true }
+                )
+            ) { backStackEntry ->
+                val channelId = backStackEntry.arguments?.getString("channelId")
+                val creatorId = backStackEntry.arguments?.getString("creatorId")
+                VideoFeedScreen(
+                    channelId = channelId,
+                    creatorId = creatorId,
+                    onPlayVideo = { postId ->
+                        navController.navigate("video/$postId")
+                    },
+                    onClearFilter = {
+                         navController.popBackStack()
+                    }
+                )
+            }
+
             composable(Screen.Creators.route) { 
                 CreatorsScreen(
                     onCreatorClick = { creatorId ->
-                        // TODO: Navigate to Creator Detail Screen
+                        navController.navigate("creator/$creatorId")
+                    },
+                    onChannelClick = { channelId, creatorId ->
+                        navController.navigate("channel/$channelId?creator=$creatorId")
                     }
                 ) 
             }

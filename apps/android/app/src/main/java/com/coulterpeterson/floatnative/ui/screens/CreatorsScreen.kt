@@ -24,6 +24,7 @@ import com.coulterpeterson.floatnative.viewmodels.CreatorsViewModel
 @Composable
 fun CreatorsScreen(
     onCreatorClick: (String) -> Unit = {},
+    onChannelClick: (String, String) -> Unit = { _, _ -> },
     viewModel: CreatorsViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -53,7 +54,7 @@ fun CreatorsScreen(
                         creator.channels.forEach { channel ->
                              ChannelListItem(
                                  channel = channel,
-                                 onClick = { /* TODO: Navigate to channel? Or filter feed? */ },
+                                 onClick = { onChannelClick(channel.id, creator.id) },
                              )
                         }
                     }
