@@ -17,5 +17,11 @@ interface CompanionApi {
     @POST("/playlists")
     suspend fun createPlaylist(@Body request: PlaylistCreateRequest): Response<Playlist>
     
+    @GET("/ltt/search")
+    suspend fun searchLTT(@Query("q") query: String): Response<LTTSearchResponse>
+
+    @POST("/auth/logout")
+    suspend fun logout(): Response<Unit>
+
     // Add other endpoints as needed (add/remove video, etc.)
 }

@@ -3,6 +3,8 @@ package com.coulterpeterson.floatnative.data
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class TokenManager(context: Context) {
 
@@ -67,7 +69,24 @@ class TokenManager(context: Context) {
         }
     }
 
-    private fun retrieve(key: String): String? {
+    fun retrieve(key: String): String? {
         return prefs.getString(key, null)
     }
+
+    // Settings
+    private val _themeFlow = kotlinx.coroutines.flow.MutableStateFlow(prefs.getString("theme_mode", "dark") ?: "dark")
+    val themeFlow = _themeFlow.asStateFlow()
+
+    var themeMode: String
+        get() = prefs.getString("theme_mode", "dark") ?: "dark"
+        set(value) {
+            prefs.edit().putString("theme_mode", value).apply()
+            _themeFlow.value = value
+        }
+
+    var enhancedLttSearchEnabled: Boolean
+        get() = prefs.getBoolean("enhanced_ltt_search_enabled", false)
+        set(value) {
+            prefs.edit().putBoolean("enhanced_ltt_search_enabled", value).apply()
+        }
 }

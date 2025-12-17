@@ -46,7 +46,16 @@ fun AppNavigation(startDestination: String = Screen.Login.route) {
         }
         
         composable(Screen.Settings.route) {
-            // Placeholder for Settings
+            com.coulterpeterson.floatnative.ui.screens.SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onLogoutSuccess = {
+                     navController.navigate(Screen.Login.route) {
+                         popUpTo(Screen.Home.route) { inclusive = true }
+                         // Also clear backstack completely to prevent back-press return
+                         popUpTo(0)
+                     }
+                }
+            )
         }
     }
 }

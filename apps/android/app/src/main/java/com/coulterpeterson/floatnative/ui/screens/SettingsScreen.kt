@@ -1,25 +1,19 @@
 package com.coulterpeterson.floatnative.ui.screens
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.coulterpeterson.floatnative.viewmodels.SettingsState
 import com.coulterpeterson.floatnative.viewmodels.SettingsViewModel
 
@@ -31,6 +25,12 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val userProfile by viewModel.userProfile.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
+    val enhancedSearchEnabled by viewModel.enhancedSearchEnabled.collectAsState()
+    val isLttOnlySubscriber by viewModel.isLttOnlySubscriber.collectAsState()
+    
+    val uriHandler = LocalUriHandler.current
 
     LaunchedEffect(state) {
         if (state is SettingsState.LoggedOut) {
@@ -50,21 +50,133 @@ fun SettingsScreen(
             )
         }
     ) { innerPadding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .padding(innerPadding)
-                .fillMaxSize()
+                .fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            ListItem(
-                headlineContent = { Text("Log Out") },
-                leadingContent = {
-                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Log Out")
-                },
-                modifier = Modifier.clickable {
-                    viewModel.logout()
+            // --- Profile Section ---
+            item {
+                userProfile?.let { user ->
+                    ListItem(
+                        headlineContent = { Text(user.username ?: "User") },
+                        supportingContent = { Text(user.email ?: "") },
+                        leadingContent = {
+                            AsyncImage(
+                                model = user.profileImage?.path ?: "",
+                                contentDescription = "Avatar",
+                                modifier = Modifier.size(48.dp)
+                            )
+                        }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
                 }
-            )
-            // Add other settings here (Version, Theme, etc)
+            }
+
+            // --- Appearance Section ---
+            item {
+                Text("Appearance", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Column {
+                    ThemeOption(
+                        label = "System Default",
+                        selected = themeMode == "system",
+                        onClick = { viewModel.setThemeMode("system") }
+                    )
+                    ThemeOption(
+                        label = "Light",
+                        selected = themeMode == "light",
+                        onClick = { viewModel.setThemeMode("light") }
+                    )
+                    ThemeOption(
+                        label = "Dark",
+                        selected = themeMode == "dark",
+                        onClick = { viewModel.setThemeMode("dark") }
+                    )
+                }
+            }
+
+            // --- Search Section ---
+            item {
+                Text("Search", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                ListItem(
+                    headlineContent = { Text("Enhanced LTT Search") },
+                    supportingContent = { 
+                        if (isLttOnlySubscriber) {
+                            Text("Use specialized search for LTT content.")
+                        } else {
+                            Text("Only available if subscribed solely to Linus Tech Tips.")
+                        }
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = enhancedSearchEnabled,
+                            onCheckedChange = { viewModel.setEnhancedSearchEnabled(it) },
+                            enabled = isLttOnlySubscriber
+                        )
+                    }
+                )
+            }
+
+            // --- Support Section ---
+            item {
+                Text("Support", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                ListItem(
+                    headlineContent = { Text("Send Feedback") },
+                    modifier = Modifier.clickable {
+                        // TODO: Use actual support URL
+                        uriHandler.openUri("https://www.floatplane.com/support") 
+                    }
+                )
+                ListItem(
+                    headlineContent = { Text("Subscribe to YouTube") },
+                    modifier = Modifier.clickable {
+                        uriHandler.openUri("https://www.youtube.com/channel/UCphFFY8duoCDcn1-0y1W8cg") // Floatplane Channel? Or LTT? Using placeholder.
+                    }
+                )
+            }
+
+            // --- Logout ---
+            item {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                Button(
+                    onClick = { viewModel.logout() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Log Out")
+                }
+            }
         }
+    }
+}
+
+@Composable
+fun ThemeOption(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp)
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onClick
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(start = 8.dp)
+        )
     }
 }

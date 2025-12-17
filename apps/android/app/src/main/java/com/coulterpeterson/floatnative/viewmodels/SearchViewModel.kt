@@ -38,6 +38,8 @@ class SearchViewModel : ViewModel() {
         val currentQuery = _query.value
         if (currentQuery.isBlank()) return
 
+        val LTT_CREATOR_ID = "59f94c0bdd241b70349eb72b"
+
         viewModelScope.launch {
             _state.value = SearchState.Loading
             
@@ -50,6 +52,37 @@ class SearchViewModel : ViewModel() {
                 }
                 
                 val subscriptions = subsResponse.body()!!
+                
+                // Check Enhanced Search Conditions
+                val isLttOnlySubscriber = subscriptions.size == 1 && subscriptions.first().creator == LTT_CREATOR_ID
+                val enhancedSearchEnabled = FloatplaneApi.tokenManager.enhancedLttSearchEnabled
+                
+                if (enhancedSearchEnabled && isLttOnlySubscriber) {
+                    // --- ENHANCED SEARCH ---
+                    try {
+                        val companionResponse = FloatplaneApi.companionApi.searchLTT(currentQuery)
+                        if (companionResponse.isSuccessful && companionResponse.body() != null) {
+                            val results = companionResponse.body()!!.results
+                            if (results.isEmpty()) {
+                                 _state.value = SearchState.Empty(currentQuery)
+                            } else {
+                                // Convert to BlogPostModelV3
+                                val blogPosts = results.map { convertLttResultToBlogPost(it, LTT_CREATOR_ID) }
+                                // Sort by release date (newest first) - string comparison usually works for ISO8601
+                                val sorted = blogPosts.sortedByDescending { it.releaseDate }
+                                _state.value = SearchState.Content(sorted)
+                            }
+                            return@launch
+                        } else {
+                            // Fallback to standard search if companion fails
+                            // Log warning?
+                        }
+                    } catch (e: Exception) {
+                        // Fallback to standard
+                    }
+                }
+
+                // --- STANDARD SEARCH ---
                 val creatorIds = subscriptions.map { it.creator }
 
                 // 2. Search each creator in parallel
@@ -73,13 +106,6 @@ class SearchViewModel : ViewModel() {
                 if (allResults.isEmpty()) {
                     _state.value = SearchState.Empty(currentQuery)
                 } else {
-                    // Sort by release date (newest first)
-                    // Note: releaseDate is OffsetDateTime in model, but we might encounter parsing issues if Moshi adapter isn't perfect.
-                    // Assuming string or standard comparable for now.
-                    // Actually BlogPostModelV3 releaseDate is Date? or String? In generated code it's probably standard java.util.Date or OffsetDateTime.
-                    // Let's check ContentV3Api signature... it says `java.time.OffsetDateTime?`. 
-                    // Wait, the generated model might use something else. Let's assume standard sort for now unless we see it's broken.
-                    
                     val sorted = allResults.sortedByDescending { it.releaseDate }
                     _state.value = SearchState.Content(sorted)
                 }
@@ -88,5 +114,89 @@ class SearchViewModel : ViewModel() {
                 _state.value = SearchState.Error(e.message ?: "Unknown error")
             }
         }
+    }
+
+    private fun convertLttResultToBlogPost(result: com.coulterpeterson.floatnative.api.LTTSearchResult, creatorId: String): BlogPostModelV3 {
+        // Construct minimal BlogPostModelV3 from search result
+        // This is a partial mapping sufficient for the UI to display the card
+        
+        val thumbnail = if (result.thumbnailUrl != null) {
+            com.coulterpeterson.floatnative.openapi.models.ImageModel(
+                width = 1920, height = 1080, path = java.net.URI.create(result.thumbnailUrl), childImages = null
+            )
+        } else null
+        
+        val creatorOwner = com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3CreatorOwner(id = creatorId, username = result.creatorName)
+        
+        // Minimal Creator object
+        val creator = com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3Creator(
+            id = creatorId,
+            owner = creatorOwner,
+            title = result.creatorName,
+            urlname = result.creatorName.lowercase().replace(" ", ""),
+            description = result.creatorName,
+            about = "",
+            category = com.coulterpeterson.floatnative.openapi.models.CreatorModelV3Category("tech", "Technology"),
+            cover = null, 
+            icon = com.coulterpeterson.floatnative.openapi.models.ImageModel(512, 512, java.net.URI.create("/creator/icon/placeholder"), null),
+            liveStream = null, subscriptionPlans = emptyList(), discoverable = true, subscriberCountDisplay = "", incomeDisplay = false,
+            defaultChannel = null, channels = null, card = null
+        )
+
+        // Channel
+        val channelIcon = if (result.channelIconUrl != null) {
+            com.coulterpeterson.floatnative.openapi.models.ImageModel(512, 512, java.net.URI.create(result.channelIconUrl), null)
+        } else {
+            com.coulterpeterson.floatnative.openapi.models.ImageModel(512, 512, java.net.URI.create("/channel/icon/placeholder"), null)
+        }
+
+        val channel = com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3Channel(
+             id = result.channelTitle.lowercase().replace(" ", ""),
+             creator = creatorId,
+             title = result.channelTitle,
+             urlname = result.channelTitle.lowercase().replace(" ", ""),
+             about = "", order = null, cover = null, card = null, icon = channelIcon, socialLinks = null
+        )
+        
+        // Metadata
+        val metadata = com.coulterpeterson.floatnative.openapi.models.PostMetadataModel(
+            hasVideo = result.hasVideo,
+            videoCount = if (result.hasVideo) 1 else 0,
+            videoDuration = java.math.BigDecimal.valueOf(result.videoDuration.toLong()),
+            hasAudio = false, audioCount = null, audioDuration = java.math.BigDecimal.ZERO, hasPicture = false, pictureCount = null, hasGallery = null, galleryCount = null, isFeatured = false
+        )
+
+        // Parse Date
+        val parsedDate = try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                java.time.OffsetDateTime.parse(result.releaseDate)
+            } else {
+                // Should use ThreeTenABP or similar if targeting older androids, but minSdk likely 26+ for this project?
+                // Planing safe:
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+
+        return BlogPostModelV3(
+            id = result.id,
+            guid = result.id,
+            title = result.title,
+            text = "",
+            type = com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3.Type.blogPost,
+            channel = channel,
+            tags = emptyList(),
+            attachmentOrder = if (result.hasVideo) listOf(result.id) else emptyList(),
+            metadata = metadata,
+            releaseDate = parsedDate ?: java.time.OffsetDateTime.now(), 
+            likes = 0, dislikes = 0, score = 0, comments = 0,
+            creator = creator,
+            wasReleasedSilently = false,
+            thumbnail = thumbnail,
+            isAccessible = true,
+            videoAttachments = if (result.hasVideo) listOf(result.id) else null,
+            audioAttachments = null, pictureAttachments = null, galleryAttachments = null
+        )
     }
 }

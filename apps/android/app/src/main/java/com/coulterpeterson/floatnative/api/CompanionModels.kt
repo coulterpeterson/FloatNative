@@ -38,3 +38,23 @@ data class PlaylistResponse(
 data class PlaylistCreateRequest(
     val name: String
 )
+
+@JsonClass(generateAdapter = true)
+data class LTTSearchResponse(
+    val query: String,
+    val count: Int,
+    val results: List<LTTSearchResult>
+)
+
+@JsonClass(generateAdapter = true)
+data class LTTSearchResult(
+    val id: String,
+    val title: String,
+    @Json(name = "creator_name") val creatorName: String, // "Linus Tech Tips"
+    @Json(name = "channel_title") val channelTitle: String, // "Channel Super Fun"
+    @Json(name = "has_video") val hasVideo: Boolean,
+    @Json(name = "video_duration") val videoDuration: Int, // seconds
+    @Json(name = "release_date") val releaseDate: String, // ISO8601
+    @Json(name = "thumbnail_url") val thumbnailUrl: String?, // Full URL or path? Usually path on backend, but response might differ.
+    @Json(name = "channel_icon_url") val channelIconUrl: String?
+)

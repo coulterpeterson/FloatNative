@@ -13,6 +13,8 @@ import com.coulterpeterson.floatnative.ui.screens.auth.LoginScreen
 import com.coulterpeterson.floatnative.ui.theme.FloatNativeTheme
 import com.coulterpeterson.floatnative.ui.navigation.AppNavigation
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -20,7 +22,18 @@ class MainActivity : ComponentActivity() {
         
         enableEdgeToEdge()
         setContent {
-            FloatNativeTheme {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            
+            // Observe theme changes from TokenManager flow
+            val themeMode by com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.themeFlow.collectAsState(initial = "dark")
+            
+            val isDarkTheme = when (themeMode) {
+                "light" -> false
+                "dark" -> true
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+
+            FloatNativeTheme(darkTheme = isDarkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -37,7 +50,8 @@ class MainActivity : ComponentActivity() {
                     if (isTv) {
                         com.coulterpeterson.floatnative.ui.navigation.TvAppNavigation(startDestination = startDestination)
                     } else {
-                        AppNavigation(startDestination = startDestination)
+                         // I will abort this specific replace, modify TokenManager to have a Flow, then come back.
+                         AppNavigation(startDestination = startDestination)
                     }
                 }
             }
