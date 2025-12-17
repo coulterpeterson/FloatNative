@@ -174,7 +174,7 @@ interface ContentV3Api {
      * @return [ContentCreatorListV3Response]
      */
     @GET("api/v3/content/creator/list")
-    suspend fun getMultiCreatorBlogPosts(@Query("ids") ids: @JvmSuppressWildcards kotlin.collections.List<kotlin.String>, @Query("limit") limit: kotlin.Int, @Query("fetchAfter") fetchAfter: @JvmSuppressWildcards kotlin.collections.List<ContentCreatorListLastItems>? = null): Response<ContentCreatorListV3Response>
+    suspend fun getMultiCreatorBlogPosts(@Query("ids") ids: @JvmSuppressWildcards kotlin.collections.List<kotlin.String>, @Query("limit") limit: kotlin.Int, @QueryMap fetchAfter: kotlin.collections.Map<kotlin.String, kotlin.String> = kotlin.collections.emptyMap()): Response<ContentCreatorListV3Response>
 
     /**
      * GET api/v3/content/picture
