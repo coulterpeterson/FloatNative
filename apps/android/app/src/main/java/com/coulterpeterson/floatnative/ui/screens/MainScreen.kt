@@ -14,6 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import android.content.res.Configuration
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -41,8 +43,14 @@ fun MainScreen(
         topBar = {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
+            val configuration = LocalConfiguration.current
+            val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val isVideo = currentRoute == "video/{postId}"
             
-            if (currentRoute == Screen.History.route) {
+            // Hide TopBar in fullscreen video (landscape)
+            if (isVideo && isLandscape) {
+                // No TopBar
+            } else if (currentRoute == Screen.History.route) {
                 TopAppBar(
                     title = { Text("Watch History") },
                     navigationIcon = {
@@ -53,7 +61,14 @@ fun MainScreen(
                 )
             } else {
                 TopAppBar(
-                    title = { Text("FloatNative") },
+                    title = { if (!isVideo) Text("FloatNative") },
+                    navigationIcon = {
+                        if (isVideo) {
+                            IconButton(onClick = { navController.popBackStack() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
+                        }
+                    },
                     actions = {
                         var showMenu by remember { mutableStateOf(false) }
                         

@@ -4,12 +4,14 @@ import android.content.res.Configuration
 import android.text.format.DateUtils
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.annotation.OptIn
+import kotlin.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,7 +33,7 @@ import com.coulterpeterson.floatnative.ui.components.VideoDescription
 import com.coulterpeterson.floatnative.viewmodels.VideoPlayerState
 import com.coulterpeterson.floatnative.viewmodels.VideoPlayerViewModel
 
-@OptIn(UnstableApi::class)
+@OptIn(UnstableApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun VideoPlayerScreen(
     postId: String,
@@ -158,7 +160,8 @@ fun VideoPlayerScreen(
                                     onLikeClick = { viewModel.toggleLike() },
                                     onDislikeClick = { viewModel.toggleDislike() },
                                     onDownloadClick = { viewModel.downloadVideo() },
-                                    onShareClick = { /* Implement Share */ }
+                                    onQualityClick = { showQualityDialog = true },
+                                    qualityLabel = currentState.currentQuality?.label ?: "Auto"
                                 )
                                 Divider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                             }
@@ -170,27 +173,6 @@ fun VideoPlayerScreen(
                                     descriptionHtml = currentState.blogPost.text, 
                                     releaseDate = currentState.blogPost.releaseDate
                                 )
-                                Divider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                            }
-                            
-                            // Quality Selector (Example UI)
-                            item {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { 
-                                            showQualityDialog = true
-                                        }
-                                        .padding(16.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Resolution")
-                                    Text(
-                                        text = currentState.currentQuality?.label ?: "Auto",
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
                                 Divider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                             }
                             

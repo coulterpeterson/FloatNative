@@ -27,8 +27,10 @@ sealed class VideoPlayerState {
         val comments: List<CommentModel> = emptyList(),
         val isLoadingComments: Boolean = false,
         // Quality State
+        // Quality State
         val availableQualities: List<CdnDeliveryV3Variant> = emptyList(),
-        val currentQuality: CdnDeliveryV3Variant? = null
+        val currentQuality: CdnDeliveryV3Variant? = null,
+        val group: CdnDeliveryV3Group? = null
     ) : VideoPlayerState()
     data class Error(val message: String) : VideoPlayerState()
 }
@@ -133,9 +135,15 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 val deliveryInfo = deliveryResponse.body()!!
                 val group = deliveryInfo.groups.firstOrNull()
                 // Get all variants
-                val variants = group?.variants ?: emptyList()
-                // Default to highest quality or first
-                val variant = variants.firstOrNull()
+                var variants = group?.variants ?: emptyList()
+                
+                // User Request: Remove 4K options
+                variants = variants.filter { variant ->
+                    !variant.label.contains("4K", true) && !variant.label.contains("2160p", true)
+                }
+
+                // Default to 1080p or first available
+                val variant = variants.find { it.label.contains("1080p", true) } ?: variants.firstOrNull()
 
                 if (group != null && variant != null) {
                     val streamUrl = resolveUrl(variant.url, variant, group)
@@ -147,7 +155,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                         dislikes = post.dislikes,
                         userInteraction = initialInteraction,
                         availableQualities = variants,
-                        currentQuality = variant
+                        currentQuality = variant,
+                        group = group
                     )
                     
                     // Load comments after initial content load
@@ -286,24 +295,17 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
     
-    fun changeQuality(quality: CdnDeliveryV3Variant, group: CdnDeliveryV3Group? = null) {
+    fun changeQuality(quality: CdnDeliveryV3Variant) {
         val currentState = _state.value as? VideoPlayerState.Content ?: return
         if (quality == currentState.currentQuality) return
         
-        // We need 'group' to resolve relative URLs if passed, or we can find the group again.
-        // For simplicity, let's assume we can resolve it or the UI passes the full URL.
-        // Actually, resolveUrl logic needs 'group'.
-        // Let's rely on the URL being resolved at the UI layer or passing needed info.
-        // Or better: Re-fetch or store the Group in State.
-        
-        // A temporary hack: Just assume resolved URL or re-resolve if we had the group.
-        // Since we don't store group in state, let's trust the 'url' property of variant for now
-        // or improve State to hold the Group.
-        
+        // Use stored group to resolve URL
+        val group = currentState.group
         var streamUrl = quality.url
-        // If relative, we might have issues.
-        // Ideally we store the whole DeliveryInfo or Group in State.
-        // Let's blindly update for now, but in reality we should improve this.
+        
+        if (group != null) {
+             streamUrl = resolveUrl(quality.url, quality, group)
+        }
         
         _state.value = currentState.copy(
             currentQuality = quality,

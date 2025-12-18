@@ -34,7 +34,8 @@ fun VideoActionButtons(
     onLikeClick: () -> Unit,
     onDislikeClick: () -> Unit,
     onDownloadClick: () -> Unit,
-    onShareClick: () -> Unit
+    onQualityClick: () -> Unit,
+    qualityLabel: String
 ) {
     Row(
         modifier = Modifier
@@ -65,11 +66,11 @@ fun VideoActionButtons(
             onClick = onDownloadClick
         )
 
-        // Share Button
+        // Quality Button (Replaces Share)
         ActionButton(
-            icon = Icons.Default.Share,
-            label = "Share",
-            onClick = onShareClick
+            icon = Icons.Default.Settings,
+            label = qualityLabel,
+            onClick = onQualityClick
         )
     }
 }
