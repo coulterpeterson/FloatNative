@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.coulterpeterson.floatnative.api.FloatplaneApi
 import com.coulterpeterson.floatnative.openapi.apis.DeliveryV3Api
 import com.coulterpeterson.floatnative.openapi.models.*
+import java.time.OffsetDateTime
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -30,7 +32,8 @@ sealed class VideoPlayerState {
         // Quality State
         val availableQualities: List<CdnDeliveryV3Variant> = emptyList(),
         val currentQuality: CdnDeliveryV3Variant? = null,
-        val group: CdnDeliveryV3Group? = null
+        val group: CdnDeliveryV3Group? = null,
+        val currentUser: UserModel? = null
     ) : VideoPlayerState()
     data class Error(val message: String) : VideoPlayerState()
 }
@@ -161,6 +164,28 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                     
                     // Load comments after initial content load
                     loadComments(postId)
+                    
+                    // Fetch Current User separately (fire and forget update)
+                    launch {
+                        try {
+                            val userResponse = FloatplaneApi.userV3.getSelf()
+                            if (userResponse.isSuccessful && userResponse.body() != null) {
+                                val userSelf = userResponse.body()!!
+                                val userModel = UserModel(
+                                    id = userSelf.id,
+                                    username = userSelf.username,
+                                    profileImage = userSelf.profileImage
+                                )
+                                // Update state with current user
+                                val updateState = _state.value as? VideoPlayerState.Content
+                                if (updateState != null) {
+                                    _state.value = updateState.copy(currentUser = userModel)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Ignore user fetch failure
+                        }
+                    }
                     
                 } else {
                     _state.value = VideoPlayerState.Error("No stream URL found")
@@ -311,6 +336,49 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             currentQuality = quality,
             videoUrl = streamUrl // This forces a player reload in the UI
         )
+    }
+
+    fun postComment(text: String) {
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+        val currentUser = currentState.currentUser ?: return // Need user info for optimistic update
+        
+        // Construct fake comment immediately
+        val newComment = CommentModel(
+            id = UUID.randomUUID().toString(),
+            blogPost = currentState.blogPost.id,
+            user = currentUser,
+            text = text,
+            replying = null,
+            postDate = OffsetDateTime.now(),
+            editDate = null,
+            editCount = 0,
+            isEdited = false,
+            likes = 0,
+            dislikes = 0,
+            score = 0,
+            interactionCounts = CommentV3PostResponseInteractionCounts(0, 0),
+            userInteraction = emptyList(),
+            totalReplies = 0,
+            replies = emptyList()
+        )
+        
+        // Optimistically update
+        _state.value = currentState.copy(
+            comments = listOf(newComment) + currentState.comments
+        )
+        
+        // Fire and forget API call
+        viewModelScope.launch {
+            try {
+                val request = CommentV3PostRequest(
+                    blogPost = currentState.blogPost.id,
+                    text = text
+                )
+                FloatplaneApi.commentV3.postComment(request)
+            } catch (e: Exception) {
+                // Ignore failure as requested
+            }
+        }
     }
 
     private fun resolveUrl(url: String, variant: CdnDeliveryV3Variant, group: CdnDeliveryV3Group): String {

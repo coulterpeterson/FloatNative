@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Comment
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,6 +49,9 @@ fun VideoPlayerScreen(
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     var showQualityDialog by remember { mutableStateOf(false) }
+    var showCommentInput by remember { mutableStateOf(false) }
+    var commentText by remember { mutableStateOf("") }
+    val sheetState = rememberModalBottomSheetState()
 
     // Initialize ExoPlayer
     val exoPlayer = remember {
@@ -90,10 +95,10 @@ fun VideoPlayerScreen(
         }
     }
     
-    Scaffold(
+    Surface(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
+        color = MaterialTheme.colorScheme.background
+    ) {
         if (isLandscape) {
             // Fullscreen Player
             Box(modifier = Modifier
@@ -103,11 +108,11 @@ fun VideoPlayerScreen(
             }
         } else {
             // Portrait Layout
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
+            Box(Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                ) {
                 // 1. Video Player (16:9)
                 Box(
                     modifier = Modifier
@@ -227,7 +232,67 @@ fun VideoPlayerScreen(
                             )
                         }
                     }
+                    }
                 }
+                
+                // FAB for Comments
+                FloatingActionButton(
+                    onClick = { showCommentInput = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Comment, contentDescription = "Comment")
+                }
+            }
+        }
+    }
+    
+    // Comment Input Sheet
+    if (showCommentInput) {
+        ModalBottomSheet(
+            onDismissRequest = { showCommentInput = false },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    // Ensure padding for keyboard
+                    .navigationBarsPadding()
+                    .imePadding()
+            ) {
+                Text(
+                    text = "Add a comment",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                OutlinedTextField(
+                    value = commentText,
+                    onValueChange = { commentText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Write something...") },
+                    trailingIcon = {
+                        IconButton(
+                            onClick = { 
+                                if (commentText.isNotBlank()) {
+                                    viewModel.postComment(commentText)
+                                    showCommentInput = false
+                                    commentText = ""
+                                }
+                            },
+                            enabled = commentText.isNotBlank()
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Post")
+                        }
+                    },
+                    singleLine = false,
+                    maxLines = 4
+                )
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
