@@ -12,6 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.coulterpeterson.floatnative.viewmodels.SettingsState
@@ -65,9 +67,11 @@ fun SettingsScreen(
                         supportingContent = { Text(user.email ?: "") },
                         leadingContent = {
                             AsyncImage(
-                                model = user.profileImage?.path ?: "",
+                                model = user.profileImage?.path?.toString() ?: "",
                                 contentDescription = "Avatar",
-                                modifier = Modifier.size(48.dp)
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
                             )
                         }
                     )

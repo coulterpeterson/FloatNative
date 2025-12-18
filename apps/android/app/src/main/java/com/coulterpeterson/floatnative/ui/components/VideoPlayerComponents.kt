@@ -25,6 +25,9 @@ import com.coulterpeterson.floatnative.openapi.models.CommentModel
 import com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import coil.compose.AsyncImage
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
 
 @Composable
 fun VideoActionButtons(
@@ -210,23 +213,18 @@ fun CommentItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = (depth * 16).dp, top = 8.dp, bottom = 8.dp, end = 16.dp)
-            .padding(start = if(depth > 0) 8.dp else 16.dp) // Base padding
+            .padding(start = (depth * 32).dp, top = 8.dp, bottom = 8.dp, end = 16.dp)
+            .padding(start = 16.dp) // Consistent base padding
     ) {
         Row(verticalAlignment = Alignment.Top) {
-            // Profile Pic Placeholder
-            Surface(
-                shape = androidx.compose.foundation.shape.CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(32.dp)
-            ) {
-                 Box(contentAlignment = Alignment.Center) {
-                     Text(
-                         text = comment.user.username.firstOrNull()?.toString()?.uppercase() ?: "?",
-                         style = MaterialTheme.typography.labelMedium
-                     )
-                 }
-            }
+            // Profile Pic
+            AsyncImage(
+                model = comment.user.profileImage?.path?.toString() ?: "",
+                contentDescription = "Avatar",
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+            )
             
             Spacer(modifier = Modifier.width(12.dp))
             
