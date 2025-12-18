@@ -2,6 +2,7 @@
 - [] Add link truncation to description and timestamp linking to description/comments
 - [] Add playlist management sheet to video player with button in actions bar
 - [] Flesh out playlists screens 
+- [] Add 3 dot menu to video feed for 'mark as watched', 'watch later', and 'save to playlist' actions
 - [] Test native and companion search functionality (and the enhanced LTI search toggle)
 - [] Format landscape video player 
 - [] Enable background play
@@ -11,3 +12,4 @@
 - [] Change support link to discord server
 - [] Tablet grid styles
 - [] Android TV styles/versions of screens
+- [] Chromecast support that triggers the Android TV version to open to that video(?)
