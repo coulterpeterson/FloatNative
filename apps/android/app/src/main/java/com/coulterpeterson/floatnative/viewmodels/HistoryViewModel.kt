@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -50,10 +51,10 @@ class HistoryViewModel : ViewModel() {
     }
 
     private fun groupHistory(history: List<WatchHistoryResponse>): Map<String, List<WatchHistoryResponse>> {
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
         isoFormat.timeZone = TimeZone.getTimeZone("UTC")
-        val displayFormat = SimpleDateFormat("EEEE, MMMM d", Locale.getDefault())
+        val weekdayFormat = SimpleDateFormat("EEEE", Locale.getDefault())
+        val monthDayFormat = SimpleDateFormat("MMMM d", Locale.getDefault())
         
         // Helper to parse date string
         fun parseDate(dateStr: String): Date {
@@ -64,10 +65,36 @@ class HistoryViewModel : ViewModel() {
             }
         }
 
-        // Group by day formatted string
+        val now = Calendar.getInstance()
+        val itemCal = Calendar.getInstance()
+
+        // Group by relative date string
         return history.groupBy { item ->
             val date = parseDate(item.updatedAt)
-            displayFormat.format(date)
+            itemCal.time = date
+            
+            when {
+                isSameDay(now, itemCal) -> "Today"
+                isYesterday(now, itemCal) -> "Yesterday"
+                isSameWeek(now, itemCal) -> weekdayFormat.format(date)
+                else -> monthDayFormat.format(date)
+            }
         }
+    }
+
+    private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
+        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && 
+               cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+    }
+
+    private fun isYesterday(now: Calendar, itemCal: Calendar): Boolean {
+        val yesterday = now.clone() as Calendar
+        yesterday.add(Calendar.DAY_OF_YEAR, -1)
+        return isSameDay(yesterday, itemCal)
+    }
+
+    private fun isSameWeek(now: Calendar, itemCal: Calendar): Boolean {
+        return now.get(Calendar.YEAR) == itemCal.get(Calendar.YEAR) &&
+               now.get(Calendar.WEEK_OF_YEAR) == itemCal.get(Calendar.WEEK_OF_YEAR)
     }
 }

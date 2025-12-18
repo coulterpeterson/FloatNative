@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import com.coulterpeterson.floatnative.viewmodels.HistoryState
 import com.coulterpeterson.floatnative.viewmodels.HistoryViewModel
 import com.coulterpeterson.floatnative.openapi.models.ImageModel
 import androidx.compose.ui.graphics.Color
+import com.coulterpeterson.floatnative.utils.DateUtils
 
 @Composable
 fun HistoryScreen(
@@ -80,13 +82,30 @@ fun HistoryItemCard(item: WatchHistoryResponse, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Thumbnail
-        AsyncImage(
-            model = item.blogPost.thumbnail?.path,
-            contentDescription = null,
-            modifier = Modifier
-                .width(160.dp)
-                .aspectRatio(16f/9f)
-        )
+        // Thumbnail with Progress Bar
+        Box(modifier = Modifier
+            .width(160.dp)
+            .aspectRatio(16f/9f)
+        ) {
+            AsyncImage(
+                model = item.blogPost.thumbnail?.path?.toString(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize()
+            )
+            
+            // Progress Bar
+            if (item.progress > 0) {
+                 LinearProgressIndicator(
+                    progress = item.progress / 100f,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(4.dp),
+                    color = Color.Red,
+                    trackColor = Color.Transparent
+                )
+            }
+        }
         
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -96,14 +115,14 @@ fun HistoryItemCard(item: WatchHistoryResponse, onClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = item.blogPost.creator.title,
+                text = item.blogPost.channel.title,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray
             )
-             Text(
-                text = "${item.progress}% watched",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary
+            Text(
+                text = DateUtils.getRelativeTime(item.blogPost.releaseDate),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
             )
         }
     }
