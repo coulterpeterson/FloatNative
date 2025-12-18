@@ -7,9 +7,11 @@
 - [] Format landscape video player 
 - [] Enable background play
 - [] Enable PiP 
+- [] Implement live support
 - [] Add actual FloatNative logo to app
 - [] Style login screen after the ios version
 - [] Change support link to discord server
 - [] Tablet grid styles
 - [] Android TV styles/versions of screens
 - [] Chromecast support that triggers the Android TV version to open to that video(?)
+- [] Pollsplane integration on the VODs(?)
