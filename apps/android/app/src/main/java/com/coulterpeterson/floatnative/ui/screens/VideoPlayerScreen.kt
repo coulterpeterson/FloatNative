@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -186,7 +187,13 @@ fun VideoPlayerScreen(
                                 CommentSection(
                                     comments = currentState.comments,
                                     isLoading = currentState.isLoadingComments,
-                                    totalComments = currentState.blogPost.comments // Or currentState.comments.size if flattened?
+                                    totalComments = currentState.blogPost.comments, // Or currentState.comments.size if flattened?
+                                    onLikeComment = viewModel::likeComment,
+                                    onDislikeComment = viewModel::dislikeComment,
+                                    onReplyComment = { comment ->
+                                        viewModel.startReply(comment)
+                                        showCommentInput = true
+                                    }
                                 )
                             }
                             
@@ -252,7 +259,10 @@ fun VideoPlayerScreen(
     // Comment Input Sheet
     if (showCommentInput) {
         ModalBottomSheet(
-            onDismissRequest = { showCommentInput = false },
+            onDismissRequest = { 
+                showCommentInput = false
+                viewModel.cancelReply() 
+            },
             sheetState = sheetState
         ) {
             Column(
@@ -260,14 +270,34 @@ fun VideoPlayerScreen(
                     .fillMaxWidth()
                     .padding(16.dp)
                     // Ensure padding for keyboard
-                    .navigationBarsPadding()
+                     .navigationBarsPadding()
                     .imePadding()
             ) {
-                Text(
-                    text = "Add a comment",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                val replyingTo = (state as? VideoPlayerState.Content)?.replyingToComment
+                
+                if (replyingTo != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Replying to ${replyingTo.user.username}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        IconButton(onClick = { viewModel.cancelReply() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancel Reply")
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Add a comment",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 OutlinedTextField(

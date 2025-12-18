@@ -178,7 +178,10 @@ fun VideoDescription(
 fun CommentSection(
     comments: List<CommentModel>,
     isLoading: Boolean,
-    totalComments: Int
+    totalComments: Int,
+    onLikeComment: (String) -> Unit,
+    onDislikeComment: (String) -> Unit,
+    onReplyComment: (CommentModel) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -198,7 +201,13 @@ fun CommentSection(
             // Given "Comments View Hierarchy", let's do correct recursion.
             
             comments.forEach { comment ->
-                CommentItem(comment = comment, depth = 0)
+                CommentItem(
+                    comment = comment, 
+                    depth = 0,
+                    onLike = onLikeComment,
+                    onDislike = onDislikeComment,
+                    onReply = onReplyComment
+                )
                 Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             }
         }
@@ -208,7 +217,10 @@ fun CommentSection(
 @Composable
 fun CommentItem(
     comment: CommentModel,
-    depth: Int
+    depth: Int,
+    onLike: (String) -> Unit,
+    onDislike: (String) -> Unit,
+    onReply: (CommentModel) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -254,17 +266,51 @@ fun CommentItem(
                 
                 // Interaction Row
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.ThumbUp,
-                        contentDescription = "Like",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "${comment.likes}",
-                        style = MaterialTheme.typography.labelSmall
-                    )
+                    // Like Button
+                    val isLiked = comment.userInteraction?.contains(CommentModel.UserInteraction.like) == true
+                    Row(
+                        modifier = Modifier
+                            .clickable { onLike(comment.id) }
+                            .padding(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (isLiked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
+                            contentDescription = "Like",
+                            modifier = Modifier.size(16.dp),
+                            tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "${comment.likes}",
+                            style = MaterialTheme.typography.labelSmall,
+                             color = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Dislike Button
+                    val isDisliked = comment.userInteraction?.contains(CommentModel.UserInteraction.dislike) == true
+                    Row(
+                        modifier = Modifier
+                            .clickable { onDislike(comment.id) }
+                            .padding(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                             imageVector = if (isDisliked) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDown,
+                            contentDescription = "Dislike",
+                            modifier = Modifier.size(16.dp),
+                             tint = if (isDisliked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "${comment.dislikes}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isDisliked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     
                     Spacer(modifier = Modifier.width(16.dp))
                     
@@ -272,7 +318,10 @@ fun CommentItem(
                         text = "Reply",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clickable { onReply(comment) }
+                            .padding(4.dp)
                     )
                 }
             }
@@ -281,7 +330,13 @@ fun CommentItem(
     
     // Recursive Replies
     comment.replies?.forEach { reply ->
-        CommentItem(comment = reply, depth = depth + 1)
+        CommentItem(
+            comment = reply, 
+            depth = depth + 1,
+            onLike = onLike,
+            onDislike = onDislike,
+            onReply = onReply
+        )
     }
 }
 

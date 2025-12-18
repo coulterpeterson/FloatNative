@@ -9,6 +9,7 @@ import com.squareup.moshi.Json
 import com.coulterpeterson.floatnative.openapi.models.CommentLikeV3PostRequest
 import com.coulterpeterson.floatnative.openapi.models.CommentModel
 import com.coulterpeterson.floatnative.openapi.models.CommentV3PostRequest
+import com.coulterpeterson.floatnative.openapi.models.CommentV3ReplyRequest
 import com.coulterpeterson.floatnative.openapi.models.CommentV3PostResponse
 import com.coulterpeterson.floatnative.openapi.models.ErrorModel
 
@@ -184,5 +185,22 @@ interface CommentV3Api {
      */
     @POST("api/v3/comment")
     suspend fun postComment(@Body commentV3PostRequest: CommentV3PostRequest): Response<CommentV3PostResponse>
+
+    /**
+     * POST api/v3/comment/reply
+     * Post Reply
+     * Post a reply to an existing comment.
+     * Responses:
+     *  - 200: OK
+     *  - 400: Bad Request
+     *  - 401: Unauthenticated
+     *  - 403: Forbidden
+     *  - 404: Not Found
+     *
+     * @param commentV3ReplyRequest
+     * @return [CommentV3PostResponse]
+     */
+    @POST("api/v3/comment/reply")
+    suspend fun postReply(@Body commentV3ReplyRequest: CommentV3ReplyRequest): Response<CommentV3PostResponse>
 
 }

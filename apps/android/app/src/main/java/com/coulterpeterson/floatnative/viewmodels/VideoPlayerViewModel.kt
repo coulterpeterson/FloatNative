@@ -33,7 +33,8 @@ sealed class VideoPlayerState {
         val availableQualities: List<CdnDeliveryV3Variant> = emptyList(),
         val currentQuality: CdnDeliveryV3Variant? = null,
         val group: CdnDeliveryV3Group? = null,
-        val currentUser: UserModel? = null
+        val currentUser: UserModel? = null,
+        val replyingToComment: CommentModel? = null
     ) : VideoPlayerState()
     data class Error(val message: String) : VideoPlayerState()
 }
@@ -319,6 +320,113 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
     }
+
+    fun startReply(comment: CommentModel) {
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+        _state.value = currentState.copy(replyingToComment = comment)
+    }
+
+    fun cancelReply() {
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+        _state.value = currentState.copy(replyingToComment = null)
+    }
+
+    fun likeComment(commentId: String) {
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+        
+        // Optimistic update
+        _state.value = currentState.copy(
+            comments = updateCommentInteraction(currentState.comments, commentId, true)
+        )
+        
+        viewModelScope.launch {
+            try {
+                val request = CommentLikeV3PostRequest(
+                    comment = commentId,
+                    blogPost = currentState.blogPost.id
+                )
+                FloatplaneApi.commentV3.likeComment(request)
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+    }
+
+    fun dislikeComment(commentId: String) {
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+
+        // Optimistic update
+        _state.value = currentState.copy(
+            comments = updateCommentInteraction(currentState.comments, commentId, false)
+        )
+
+        viewModelScope.launch {
+            try {
+                val request = CommentLikeV3PostRequest(
+                    comment = commentId,
+                    blogPost = currentState.blogPost.id
+                )
+                FloatplaneApi.commentV3.dislikeComment(request)
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+    }
+
+    private fun updateCommentInteraction(comments: List<CommentModel>, targetId: String, isLike: Boolean): List<CommentModel> {
+        return comments.map { comment ->
+            if (comment.id == targetId) {
+                val currentLikes = comment.userInteraction?.contains(CommentModel.UserInteraction.like) == true
+                val currentDislikes = comment.userInteraction?.contains(CommentModel.UserInteraction.dislike) == true
+                
+                val newInteraction = ArrayList<CommentModel.UserInteraction>()
+                // Copy existing interactions excluding like/dislike
+                comment.userInteraction?.forEach {
+                    if (it != CommentModel.UserInteraction.like && it != CommentModel.UserInteraction.dislike) {
+                        newInteraction.add(it)
+                    }
+                }
+
+                var newLikeCount = comment.likes
+                var newDislikeCount = comment.dislikes
+                
+                if (isLike) {
+                   if (currentLikes) {
+                       newLikeCount--
+                   } else {
+                       newLikeCount++
+                       newInteraction.add(CommentModel.UserInteraction.like)
+                       if (currentDislikes) newDislikeCount--
+                   }
+                } else { // Dislike
+                    if (currentDislikes) {
+                        newDislikeCount--
+                    } else {
+                        newDislikeCount++
+                        newInteraction.add(CommentModel.UserInteraction.dislike)
+                        if (currentLikes) newLikeCount--
+                    }
+                }
+                
+                comment.copy(
+                    likes = newLikeCount, 
+                    dislikes = newDislikeCount,
+                    userInteraction = newInteraction,
+                    interactionCounts = com.coulterpeterson.floatnative.openapi.models.CommentV3PostResponseInteractionCounts(
+                        like = newLikeCount,
+                         dislike = newDislikeCount
+                    )
+                )
+            } else {
+                val updatedReplies = if (!comment.replies.isNullOrEmpty()) {
+                    updateCommentInteraction(comment.replies!!, targetId, isLike)
+                } else {
+                    comment.replies
+                }
+                comment.copy(replies = updatedReplies)
+            }
+        }
+    }
     
     fun changeQuality(quality: CdnDeliveryV3Variant) {
         val currentState = _state.value as? VideoPlayerState.Content ?: return
@@ -341,6 +449,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     fun postComment(text: String) {
         val currentState = _state.value as? VideoPlayerState.Content ?: return
         val currentUser = currentState.currentUser ?: return // Need user info for optimistic update
+        val replyingTo = currentState.replyingToComment
         
         // Construct fake comment immediately
         val newComment = CommentModel(
@@ -348,7 +457,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             blogPost = currentState.blogPost.id,
             user = currentUser,
             text = text,
-            replying = null,
+            replying = replyingTo?.id,
             postDate = OffsetDateTime.now(),
             editDate = null,
             editCount = 0,
@@ -363,20 +472,53 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         )
         
         // Optimistically update
+        val newComments = if (replyingTo != null) {
+            insertReply(currentState.comments, replyingTo.id, newComment)
+        } else {
+            listOf(newComment) + currentState.comments
+        }
+        
         _state.value = currentState.copy(
-            comments = listOf(newComment) + currentState.comments
+            comments = newComments,
+            replyingToComment = null // Clear reply state
         )
         
         // Fire and forget API call
         viewModelScope.launch {
             try {
-                val request = CommentV3PostRequest(
-                    blogPost = currentState.blogPost.id,
-                    text = text
-                )
-                FloatplaneApi.commentV3.postComment(request)
+                if (replyingTo != null) {
+                    val request = CommentV3ReplyRequest(
+                        blogPost = currentState.blogPost.id,
+                        text = text,
+                        replyTo = replyingTo.id
+                    )
+                    FloatplaneApi.commentV3.postReply(request)
+                } else {
+                    val request = CommentV3PostRequest(
+                        blogPost = currentState.blogPost.id,
+                        text = text
+                    )
+                    FloatplaneApi.commentV3.postComment(request)
+                }
             } catch (e: Exception) {
                 // Ignore failure as requested
+            }
+        }
+    }
+
+    private fun insertReply(comments: List<CommentModel>, parentId: String, newReply: CommentModel): List<CommentModel> {
+        return comments.map { comment ->
+            if (comment.id == parentId) {
+                val currentReplies = comment.replies ?: emptyList()
+                val newReplies = currentReplies + newReply
+                comment.copy(replies = newReplies, totalReplies = (comment.totalReplies ?: 0) + 1)
+            } else {
+                val updatedReplies = if (!comment.replies.isNullOrEmpty()) {
+                    insertReply(comment.replies!!, parentId, newReply)
+                } else {
+                    comment.replies
+                }
+                comment.copy(replies = updatedReplies)
             }
         }
     }
