@@ -1,0 +1,13 @@
+- [] Fix video player screen download functionality
+- [] Add link truncation to description and timestamp linking to description/comments
+- [] Add playlist management sheet to video player with button in actions bar
+- [] Flesh out playlists screens 
+- [] Test native and companion search functionality (and the enhanced LTI search toggle)
+- [] Format landscape video player 
+- [] Enable background play
+- [] Enable PiP 
+- [] Add actual FloatNative logo to app
+- [] Style login screen after the ios version
+- [] Change support link to discord server
+- [] Tablet grid styles
+- [] Android TV styles/versions of screens
