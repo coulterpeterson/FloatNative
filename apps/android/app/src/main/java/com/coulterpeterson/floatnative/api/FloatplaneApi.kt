@@ -182,15 +182,16 @@ object FloatplaneApi {
     suspend fun ensureCompanionLogin(forceRefresh: Boolean = false): Boolean {
         android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Called with forceRefresh=$forceRefresh")
         
-        // If force refresh, clear the old API key
-        if (forceRefresh) {
-            android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Clearing old API key")
-            tokenManager.companionApiKey = null
+        // If we have an API key and not forcing refresh, we're good
+        if (!forceRefresh && tokenManager.companionApiKey != null) {
+            android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: API key already exists, skipping login")
+            return true
         }
         
-        if (tokenManager.companionApiKey != null) {
-            android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: API key already exists, skipping")
-            return true
+        // If force refresh, clear the old API key
+        if (forceRefresh) {
+            android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Clearing old API key due to forceRefresh")
+            tokenManager.companionApiKey = null
         }
 
         var accessToken = tokenManager.accessToken 
