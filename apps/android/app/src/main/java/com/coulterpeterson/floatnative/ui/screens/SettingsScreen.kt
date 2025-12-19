@@ -15,6 +15,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import androidx.documentfile.provider.DocumentFile
 import coil.compose.AsyncImage
 import com.coulterpeterson.floatnative.viewmodels.SettingsState
 import com.coulterpeterson.floatnative.viewmodels.SettingsViewModel
@@ -31,8 +36,22 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsState()
     val enhancedSearchEnabled by viewModel.enhancedSearchEnabled.collectAsState()
     val isLttOnlySubscriber by viewModel.isLttOnlySubscriber.collectAsState()
+    val downloadLocationUri by viewModel.downloadLocation.collectAsState()
     
+    val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            viewModel.setDownloadLocation(uri.toString())
+        }
+    }
 
     LaunchedEffect(state) {
         if (state is SettingsState.LoggedOut) {
@@ -123,6 +142,31 @@ fun SettingsScreen(
                             onCheckedChange = { viewModel.setEnhancedSearchEnabled(it) },
                             enabled = isLttOnlySubscriber
                         )
+                    }
+                )
+            }
+
+            // --- Downloads Section ---
+            item {
+                Text("Downloads", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                val locationLabel = if (downloadLocationUri != null) {
+                    try {
+                        val treeUri = android.net.Uri.parse(downloadLocationUri)
+                        DocumentFile.fromTreeUri(context, treeUri)?.name ?: downloadLocationUri
+                    } catch (e: Exception) {
+                        "Custom Folder"
+                    }
+                } else {
+                    "System Default (Cache)"
+                }
+
+                ListItem(
+                    headlineContent = { Text("Download Location") },
+                    supportingContent = { Text(locationLabel ?: "Select Folder") },
+                    modifier = Modifier.clickable {
+                        folderPickerLauncher.launch(null)
                     }
                 )
             }

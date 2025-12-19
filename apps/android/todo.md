@@ -1,4 +1,4 @@
-- [] Fix video player screen download functionality
+- [X] Fix video player screen download functionality
 - [] Add link truncation to description and timestamp linking to description/comments
 - [] Add playlist management sheet to video player with button in actions bar
 - [] Flesh out playlists screens 

@@ -89,4 +89,14 @@ class TokenManager(context: Context) {
         set(value) {
             prefs.edit().putBoolean("enhanced_ltt_search_enabled", value).apply()
         }
+
+    var downloadLocationUri: String?
+        get() = prefs.getString("download_location_uri", null)
+        set(value) {
+            if (value == null) {
+                prefs.edit().remove("download_location_uri").apply()
+            } else {
+                prefs.edit().putString("download_location_uri", value).apply()
+            }
+        }
 }

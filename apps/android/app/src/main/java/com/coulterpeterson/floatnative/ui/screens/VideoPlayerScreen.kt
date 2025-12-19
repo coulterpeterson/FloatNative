@@ -25,12 +25,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.coulterpeterson.floatnative.ui.components.CommentSection
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
 import com.coulterpeterson.floatnative.ui.components.VideoActionButtons
 import com.coulterpeterson.floatnative.ui.components.VideoDescription
 import com.coulterpeterson.floatnative.viewmodels.VideoPlayerState
@@ -45,6 +49,7 @@ fun VideoPlayerScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
+    val downloadState by viewModel.downloadState.collectAsState()
     val configuration = LocalConfiguration.current
     // Very simple check for landscape
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -53,6 +58,18 @@ fun VideoPlayerScreen(
     var showCommentInput by remember { mutableStateOf(false) }
     var commentText by remember { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState()
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            viewModel.setDownloadLocation(uri.toString())
+        }
+    }
 
     // Initialize ExoPlayer
     val exoPlayer = remember {
@@ -79,6 +96,22 @@ fun VideoPlayerScreen(
     // Load video
     LaunchedEffect(postId) {
         viewModel.loadVideo(postId)
+    }
+    
+    // Handle Permission Request
+    LaunchedEffect(Unit) {
+        viewModel.requestPermissionEvent.collect {
+             // Show Toast explaining why?
+             android.widget.Toast.makeText(context, "Select a folder to save downloads", android.widget.Toast.LENGTH_LONG).show()
+             folderPickerLauncher.launch(null)
+        }
+    }
+
+    // Handle Download Completion
+    LaunchedEffect(Unit) {
+        viewModel.downloadCompletedEvent.collect { fileName ->
+             android.widget.Toast.makeText(context, "Saved $fileName", android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     // Observe state and update player
@@ -326,7 +359,27 @@ fun VideoPlayerScreen(
             }
         }
     }
+    if (downloadState) {
+        Dialog(onDismissRequest = { /* Prevent dismiss */ }) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Downloading...", style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        }
+    }
 }
+
 
 @OptIn(UnstableApi::class)
 @Composable

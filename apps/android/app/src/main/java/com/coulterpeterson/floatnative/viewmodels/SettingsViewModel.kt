@@ -33,6 +33,9 @@ class SettingsViewModel : ViewModel() {
     private val _isLttOnlySubscriber = MutableStateFlow(false)
     val isLttOnlySubscriber = _isLttOnlySubscriber.asStateFlow()
 
+    private val _downloadLocation = MutableStateFlow<String?>(FloatplaneApi.tokenManager.downloadLocationUri)
+    val downloadLocation = _downloadLocation.asStateFlow()
+
     init {
         fetchUserProfile()
         checkLttOnlySubscription()
@@ -81,6 +84,11 @@ class SettingsViewModel : ViewModel() {
     fun setEnhancedSearchEnabled(enabled: Boolean) {
         FloatplaneApi.tokenManager.enhancedLttSearchEnabled = enabled
         _enhancedSearchEnabled.value = enabled
+    }
+
+    fun setDownloadLocation(uri: String?) {
+        FloatplaneApi.tokenManager.downloadLocationUri = uri
+        _downloadLocation.value = uri
     }
 
     fun logout() {

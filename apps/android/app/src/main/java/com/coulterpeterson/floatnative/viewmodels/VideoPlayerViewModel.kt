@@ -9,11 +9,20 @@ import androidx.lifecycle.viewModelScope
 import com.coulterpeterson.floatnative.api.FloatplaneApi
 import com.coulterpeterson.floatnative.openapi.apis.DeliveryV3Api
 import com.coulterpeterson.floatnative.openapi.models.*
+import java.io.File
+import java.io.FileOutputStream
 import java.time.OffsetDateTime
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.core.content.FileProvider
+import okhttp3.Request
+import java.io.InputStream
 
 sealed class VideoPlayerState {
     object Idle : VideoPlayerState()
@@ -47,51 +56,123 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private val _downloadState = MutableStateFlow<Boolean>(false)
     val downloadState = _downloadState.asStateFlow()
 
+    private val _downloadCompletedEvent = MutableSharedFlow<String>()
+    val downloadCompletedEvent = _downloadCompletedEvent.asSharedFlow()
+
+    private val _requestPermissionEvent = MutableSharedFlow<Unit>()
+    val requestPermissionEvent = _requestPermissionEvent.asSharedFlow()
+
     fun downloadVideo() {
-        // Simple download implementation using DownloadManager
         val currentState = _state.value as? VideoPlayerState.Content ?: return
         val context = getApplication<Application>()
         
         viewModelScope.launch {
             _downloadState.value = true
             try {
-                // Determine best quality for download (or match current)
-                val quality = currentState.currentQuality ?: currentState.availableQualities.firstOrNull()
-                if (quality == null) {
+                // 1. Get video ID
+                val videoId = currentState.blogPost.videoAttachments?.firstOrNull()?.id ?: run {
+                     _downloadState.value = false
+                     return@launch
+                }
+
+                // 2. Fetch Download Delivery Info
+                val deliveryResponse = FloatplaneApi.deliveryV3.getDeliveryInfoV3(
+                    scenario = DeliveryV3Api.ScenarioGetDeliveryInfoV3.download,
+                    entityId = videoId,
+                    outputKind = DeliveryV3Api.OutputKindGetDeliveryInfoV3.flat
+                )
+
+                if (!deliveryResponse.isSuccessful || deliveryResponse.body() == null) {
+                    _downloadState.value = false
+                     return@launch
+                }
+
+                val deliveryInfo = deliveryResponse.body()!!
+                val downloadGroup = deliveryInfo.groups.firstOrNull()
+                val downloadVariants = downloadGroup?.variants ?: emptyList()
+
+                // 3. Match quality
+                // Try to find a download variant that matches the *current* playback quality's resolution/label
+                val targetQuality = currentState.currentQuality
+                var selectedVariant = downloadVariants.find { 
+                    it.label == targetQuality?.label 
+                }
+                
+                // Fallback: Best available if no exact match or no target
+                if (selectedVariant == null) {
+                     selectedVariant = downloadVariants.firstOrNull()
+                }
+
+                if (selectedVariant == null) {
                     _downloadState.value = false
                     return@launch
                 }
+                
+                val downloadUrl = selectedVariant.url
+                // Note: 'flat' URLs might still need resolution if they are relative? 
+                // Usually flat MP4s are absolute, but let's check.
+                // If it's relative, we can use the same resolveUrl helper using the downloadGroup.
 
-                // Ideally we get a "download" scenario URL from API, but for now we use the stream URL 
-                // or assume we need to fetch 'download' scenario.
-                // The iOS code does: valid download quality?
-                // Let's assume the current stream URL is okay or fetch download scenario.
-                // Fetching download scenario is safer.
+                var finalUrl = downloadUrl
+                if (downloadGroup != null) {
+                    finalUrl = resolveUrl(downloadUrl, selectedVariant, downloadGroup)
+                }
+
+                // 4. Create File (Check permissions)
+                val downloadUriString = FloatplaneApi.tokenManager.downloadLocationUri
+                if (downloadUriString == null) {
+                    _downloadState.value = false
+                    _requestPermissionEvent.emit(Unit)
+                    return@launch
+                }
+
+                val treeUri = android.net.Uri.parse(downloadUriString)
+                val fileName = "${currentState.blogPost.title.replace("[^a-zA-Z0-9.-]", "_")}.mp4"
                 
-                // We'll skip complex logic for now and use the stream URL if it's MP4/flat, 
-                // but HLS (fmp4) might not work with DownloadManager directly for offline playback seamlessly without ExoPlayer downloader.
-                // User requirement: "Resolution setting (that sets playback resolution and download resolution)"
+                val docFile = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri)
+                val newFile = docFile?.createFile("video/mp4", fileName)
                 
-                // For this agent task, I will mock the "Start Download" toast/intent 
-                // or just log it, as fully implementing ffmpeg/HLS download is complex.
-                // But the user asked to "replicate features".
-                // I will start a DownloadManager request for the "url".
+                if (newFile == null) {
+                     _downloadState.value = false
+                     _requestPermissionEvent.emit(Unit)
+                     return@launch
+                }
+
+                withContext(Dispatchers.IO) {
+                    val request = Request.Builder().url(finalUrl).build()
+                    val response = FloatplaneApi.okHttpClient.newCall(request).execute()
+                    if (!response.isSuccessful) throw Exception("Download failed: ${response.code}")
+
+                    val body = response.body ?: throw Exception("No body")
+                    val inputStream = body.byteStream()
+                    // Open output stream via ContentResolver
+                    val outputStream = context.contentResolver.openOutputStream(newFile.uri) ?: throw Exception("Cannot open output stream")
+
+                    inputStream.use { input ->
+                        outputStream.use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                }
+
                 
-                val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                val request = DownloadManager.Request(android.net.Uri.parse(quality.url))
-                    .setTitle(currentState.blogPost.title)
-                    .setDescription("Downloading video...")
-                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "${currentState.blogPost.title}.mp4")
-                
-                downloadManager.enqueue(request)
-                
-                // Show Toast or UI feedback handled by State
+                _downloadCompletedEvent.emit(fileName)
+
             } catch (e: Exception) {
-                // Log error
+                e.printStackTrace()
+                // Could emit error event here
+                FloatplaneApi.tokenManager.downloadLocationUri = null // Reset if failed?
+                _requestPermissionEvent.emit(Unit) // Retry permission
+            } finally {
+                _downloadState.value = false
             }
-            _downloadState.value = false
         }
+    }
+
+    fun setDownloadLocation(uri: String) {
+        FloatplaneApi.tokenManager.downloadLocationUri = uri
+        // Auto-retry download?
+        downloadVideo()
     }
 
 
