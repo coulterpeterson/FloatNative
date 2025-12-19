@@ -1,7 +1,7 @@
 - [X] Fix video player screen download functionality
 - [X] Add link truncation to description and timestamp linking to description/comments
 - [X] Add playlist management sheet to video player with button in actions bar
-- [] Flesh out playlists screens 
+- [X] Flesh out playlists screens 
 - [] Add 3 dot menu to video feed for 'mark as watched', 'watch later', and 'save to playlist' actions
 - [] Test native and companion search functionality (and the enhanced LTI search toggle)
 - [] Format landscape video player 

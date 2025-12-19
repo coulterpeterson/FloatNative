@@ -27,6 +27,16 @@ import com.coulterpeterson.floatnative.ui.components.VideoCard
 import com.coulterpeterson.floatnative.viewmodels.HomeFeedState
 import com.coulterpeterson.floatnative.viewmodels.HomeFeedViewModel
 
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import com.coulterpeterson.floatnative.ui.components.PlaylistSelectionSheet
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoFeedScreen(
@@ -48,15 +58,22 @@ fun VideoFeedScreen(
     val state by viewModel.state.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val filter by viewModel.filter.collectAsState()
+    // State for playlists and sheet
+    val userPlaylists by viewModel.userPlaylists.collectAsState()
+    var showPlaylistSheet by remember { mutableStateOf(false) }
+    var selectedPostForMenu by remember { mutableStateOf<com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3?>(null) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = LocalContext.current
 
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.loadPlaylists()
+    }
+    
     // Determine filter display info
-    // For now, since we don't have the creator object passed in, we depend on the feed content or just generic text
-    // Refinement: Check if state has content and grab creator info from first post?
-    // Or fetch in ViewModel.
-    // Let's use generic "Filtered Feed" if title unavailable, or try to get metadata from somewhere?
-    // Actually, state.posts.firstOrNull()?.channel?.title might work if feed loaded!
+    // ... (rest of logic)
     
     var filterTitle = "Filtered Feed"
+    // ... (logic continues 59-69)
     if (state is HomeFeedState.Content) {
         val firstPost = (state as HomeFeedState.Content).posts.firstOrNull()
         if (firstPost != null) {
@@ -70,9 +87,9 @@ fun VideoFeedScreen(
 
     androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
         
-        // Filter Bar
+        // Filter Bar (74-109)
         if (filter !is HomeFeedViewModel.FeedFilter.All) {
-            androidx.compose.material3.Surface(
+           androidx.compose.material3.Surface(
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 2.dp,
                 shadowElevation = 2.dp
@@ -127,10 +144,40 @@ fun VideoFeedScreen(
                 is HomeFeedState.Content -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(currentState.posts) { post ->
-                            VideoCard(
+                             val watchLaterPlaylist = userPlaylists.find { it.isWatchLater }
+                             val isInWatchLater = watchLaterPlaylist?.videoIds?.contains(post.id) == true
+
+                             VideoCard(
                                 post = post,
                                 onClick = {
                                     onPlayVideo(post.id)
+                                },
+                                menuItems = { onDismiss ->
+                                    DropdownMenuItem(
+                                        text = { Text("Mark as Watched") },
+                                        onClick = {
+                                            viewModel.markAsWatched(post)
+                                            onDismiss()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(if (isInWatchLater) "Remove from Watch Later" else "Save to Watch Later") },
+                                        onClick = {
+                                            viewModel.toggleWatchLater(post) { wasAdded ->
+                                                val msg = if (wasAdded) "Added to Watch Later" else "Removed from Watch Later"
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                            }
+                                            onDismiss()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Save to Playlist") },
+                                        onClick = {
+                                            selectedPostForMenu = post
+                                            showPlaylistSheet = true
+                                            onDismiss()
+                                        }
+                                    )
                                 }
                             )
                         }
@@ -151,8 +198,6 @@ fun VideoFeedScreen(
                                         strokeWidth = 2.dp
                                     )
                                 } else {
-                                    // Invisible trigger
-                                    // Only trigger if we have posts (don't trigger on empty state)
                                     if (currentState.posts.isNotEmpty()) {
                                         androidx.compose.runtime.LaunchedEffect(Unit) {
                                             viewModel.loadMore()
@@ -160,6 +205,30 @@ fun VideoFeedScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+                    
+                    if (showPlaylistSheet && selectedPostForMenu != null) {
+                        ModalBottomSheet(
+                           onDismissRequest = { showPlaylistSheet = false },
+                            sheetState = sheetState
+                        ) {
+                            PlaylistSelectionSheet(
+                                playlists = userPlaylists,
+                                videoId = selectedPostForMenu!!.id,
+                                onToggleWatchLater = { 
+                                     selectedPostForMenu?.let { p ->
+                                         viewModel.toggleWatchLater(p) { wasAdded ->
+                                             val msg = if (wasAdded) "Added to Watch Later" else "Removed from Watch Later"
+                                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() 
+                                         }
+                                     }
+                                },
+                                onAddToPlaylist = { id -> viewModel.addToPlaylist(id, selectedPostForMenu!!.id) },
+                                onRemoveFromPlaylist = { id -> viewModel.removeFromPlaylist(id, selectedPostForMenu!!.id) },
+                                onCreatePlaylist = { name -> viewModel.createPlaylist(name) },
+                                onDismiss = { showPlaylistSheet = false }
+                            )
                         }
                     }
                 }
