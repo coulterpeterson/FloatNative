@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
     private var isInPipMode by mutableStateOf(false)
     // Default aspect ratio 16:9
     var pipParams: android.app.PictureInPictureParams.Builder? = null
+    var isVideoPlaying: Boolean = false
     
     fun updatePipParams(aspectRatio: android.util.Rational?) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -87,20 +88,13 @@ class MainActivity : ComponentActivity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            // Enter PiP mode if we are playing video? 
-            // For now, we assume if the user leaves, we try to enter PiP.
-            // A more robust check would be to consult the navigation graph or ViewModel.
-            // But this is a good baseline.
-            // Use stored params if available, otherwise default
-            // setPictureInPictureParams should have been called by VideoScreen already, 
-            // but we can call enter with builder.
-            // If we use enterPictureInPictureMode(params), it uses THOSE params.
-            // If we use pipParams var, we can use that.
-            
-            val params = pipParams?.build() ?: android.app.PictureInPictureParams.Builder()
-                .setAspectRatio(android.util.Rational(16, 9))
-                .build()
-            enterPictureInPictureMode(params)
+            if (isVideoPlaying) {
+                // Enter PiP mode if we are playing video
+                val params = pipParams?.build() ?: android.app.PictureInPictureParams.Builder()
+                    .setAspectRatio(android.util.Rational(16, 9))
+                    .build()
+                enterPictureInPictureMode(params)
+            }
         }
     }
 

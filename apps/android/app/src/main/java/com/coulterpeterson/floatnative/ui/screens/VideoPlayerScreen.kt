@@ -153,6 +153,11 @@ fun VideoPlayerScreen(
                     (context as? com.coulterpeterson.floatnative.MainActivity)?.updatePipParams(ratio)
                 }
             }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                super.onIsPlayingChanged(isPlaying)
+                (context as? com.coulterpeterson.floatnative.MainActivity)?.isVideoPlaying = isPlaying
+            }
         }
         exoPlayer.addListener(listener)
         // Check initial size
@@ -162,8 +167,12 @@ fun VideoPlayerScreen(
              (context as? com.coulterpeterson.floatnative.MainActivity)?.updatePipParams(ratio)
         }
         
+        // Initial play state check
+        (context as? com.coulterpeterson.floatnative.MainActivity)?.isVideoPlaying = exoPlayer.isPlaying
+        
         onDispose {
             exoPlayer.removeListener(listener)
+            (context as? com.coulterpeterson.floatnative.MainActivity)?.isVideoPlaying = false
         }
     }
     
