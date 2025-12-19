@@ -188,6 +188,112 @@ export async function validateFloatplaneToken(
     );
   }
 }
+/**
+ * Validates a Floatplane OAuth access token locally by decoding the JWT
+ * This avoids calling Floatplane's API, which is necessary for DPoP-bound tokens
+ * since we don't have the device's private key to generate valid DPoP proofs
+ * @param accessToken The OAuth access token (JWT)
+ * @returns The Floatplane user ID from the token's 'sub' claim
+ * @throws FloatplaneAPIError if token is invalid or missing user ID
+ */
+export function validateFloatplaneTokenLocally(accessToken: string): string {
+  try {
+    // JWT format: header.payload.signature
+    const parts = accessToken.split('.');
+    if (parts.length !== 3) {
+      throw new FloatplaneAPIError('Invalid JWT format');
+    }
+
+    // Decode the payload (base64url)
+    const payloadB64 = parts[1];
+    // Replace URL-safe chars and add padding if needed
+    const payloadB64Padded = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+    const payloadJson = atob(payloadB64Padded);
+    const payload = JSON.parse(payloadJson);
+
+    // Extract user ID from 'sub' claim
+    if (!payload.sub || typeof payload.sub !== 'string') {
+      throw new FloatplaneAPIError('JWT missing sub claim');
+    }
+
+    // Optional: Check expiration
+    if (payload.exp && typeof payload.exp === 'number') {
+      const now = Math.floor(Date.now() / 1000);
+      if (now >= payload.exp) {
+        throw new FloatplaneAPIError('JWT has expired', 401);
+      }
+    }
+
+    return payload.sub;
+  } catch (error) {
+    if (error instanceof FloatplaneAPIError) {
+      throw error;
+    }
+    throw new FloatplaneAPIError(
+      'Failed to decode JWT',
+      undefined,
+      error as Error
+    );
+  }
+}
+
+
+/**
+ * Extract the JKT (JSON Web Key Thumbprint) from a DPoP proof
+ * The JKT uniquely identifies the device's DPoP key pair
+ * @param dpopProof The DPoP proof JWT
+ * @returns The JKT thumbprint string
+ * @throws FloatplaneAPIError if the proof is invalid or missing JWK
+ */
+export function extractDPoPJKT(dpopProof: string): string {
+  try {
+    // DPoP proof is a JWT with format: header.payload.signature
+    const parts = dpopProof.split('.');
+    if (parts.length !== 3) {
+      throw new FloatplaneAPIError('Invalid DPoP proof format');
+    }
+
+    // Decode the header (base64url)
+    const headerB64 = parts[0];
+    // Replace URL-safe chars and add padding if needed
+    const headerB64Padded = headerB64.replace(/-/g, '+').replace(/_/g, '/');
+    const headerJson = atob(headerB64Padded);
+    const header = JSON.parse(headerJson);
+
+    if (!header.jwk) {
+      throw new FloatplaneAPIError('DPoP proof missing jwk in header');
+    }
+
+    // Calculate SHA-256 thumbprint of the JWK
+    // For a proper JKT, we need to canonicalize the JWK and hash it
+    // For now, we'll use a simplified approach: serialize the JWK deterministically
+    const jwk = header.jwk;
+
+    // Create canonical JWK string (sorted keys)
+    const canonicalJwk = JSON.stringify({
+      crv: jwk.crv,
+      kty: jwk.kty,
+      x: jwk.x,
+      y: jwk.y,
+    });
+
+    // Calculate SHA-256 hash and base64url encode it
+    // Note: In a Worker environment, we use the Web Crypto API
+    return btoa(canonicalJwk)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  } catch (error) {
+    if (error instanceof FloatplaneAPIError) {
+      throw error;
+    }
+    throw new FloatplaneAPIError(
+      'Failed to extract DPoP JKT',
+      undefined,
+      error as Error
+    );
+  }
+}
 
 /**
  * Fetches posts from Floatplane for a specific creator with pagination

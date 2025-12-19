@@ -78,15 +78,18 @@ class CompanionAPI: ObservableObject {
 
         // Perform request
         do {
+
             let (data, response) = try await session.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw CompanionAPIError.invalidResponse
             }
 
+
             // Handle HTTP errors
             guard (200...299).contains(httpResponse.statusCode) else {
                 let errorMessage = String(data: data, encoding: .utf8) ?? nil
+
                 throw CompanionAPIError.httpError(statusCode: httpResponse.statusCode, message: errorMessage)
             }
 
@@ -127,11 +130,13 @@ class CompanionAPI: ObservableObject {
 
                 return try decoder.decode(T.self, from: data)
             } catch {
+
                 throw CompanionAPIError.decodingError(error)
             }
         } catch let error as CompanionAPIError {
             throw error
         } catch {
+
             throw CompanionAPIError.networkError(error)
         }
     }
@@ -140,6 +145,8 @@ class CompanionAPI: ObservableObject {
     
     /// Login with companion API using Floatplane OAuth token
     func login(accessToken: String) async throws -> String {
+
+
         // Generate DPoP proof for the Floatplane /user/self endpoint
         // This allows the companion API to validate the token on our behalf
         let dpopProof = try? DPoPManager.shared.generateProof(
@@ -172,7 +179,19 @@ class CompanionAPI: ObservableObject {
             throw CompanionAPIError.notAuthenticated
         }
         
-        return try await login(accessToken: accessToken)
+        do {
+            return try await login(accessToken: accessToken)
+        } catch {
+            // If login failed (e.g. token expired), try refreshing the token
+            print("⚠️ Companion API login failed: \(error.localizedDescription). Attempting token refresh...")
+            try await FloatplaneAPI.shared.refreshAccessToken()
+            
+            guard let newToken = FloatplaneAPI.shared.accessToken else {
+                throw CompanionAPIError.notAuthenticated
+            }
+            
+            return try await login(accessToken: newToken)
+        }
     }
 
     // MARK: - Logout

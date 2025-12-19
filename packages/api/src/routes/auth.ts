@@ -1,7 +1,7 @@
 import { Hono, Context } from 'hono';
 import { eq } from 'drizzle-orm';
-import { users } from '../db/schema';
-import { validateFloatplaneCookie, validateFloatplaneToken, FloatplaneAPIError } from '../services/floatplane';
+import { users, deviceSessions } from '../db/schema';
+import { validateFloatplaneCookie, validateFloatplaneToken, validateFloatplaneTokenLocally, extractDPoPJKT, FloatplaneAPIError } from '../services/floatplane';
 import { generateAPIKey } from '../utils/auth';
 import { getOrCreateWatchLater } from '../services/playlist';
 import type { Env } from '../db';
@@ -15,13 +15,14 @@ const auth = new Hono<{ Bindings: Env; Variables: { db: DrizzleDB } }>();
 /**
  * POST /auth/login
  * Login a user by validating their Floatplane OAuth access token
+ * Creates a device-specific API key based on the DPoP key thumbprint
  * Rate limited: 20 req/min by IP
  */
 auth.post('/login', rateLimit('AUTH_STRICT_LIMITER', byIP), async (c) => {
   try {
     const db = c.get('db');
     const body = await c.req.json();
-    const { access_token, dpop_proof } = body;
+    const { access_token, dpop_proof, device_info } = body;
 
     if (!access_token || typeof access_token !== 'string') {
       return c.json(
@@ -33,17 +34,40 @@ auth.post('/login', rateLimit('AUTH_STRICT_LIMITER', byIP), async (c) => {
       );
     }
 
-    // Validate Floatplane token and get user ID
+    if (!dpop_proof || typeof dpop_proof !== 'string') {
+      return c.json(
+        {
+          error: 'Bad Request',
+          message: 'Missing or invalid dpop_proof in request body',
+        },
+        400
+      );
+    }
+
+    // Extract DPoP JKT to identify the device
+    let dpopJkt: string;
+    try {
+      dpopJkt = extractDPoPJKT(dpop_proof);
+    } catch (error) {
+      logError(c, error, 'Failed to extract DPoP JKT');
+      return c.json(
+        {
+          error: 'Bad Request',
+          message: 'Invalid DPoP proof format',
+        },
+        400
+      );
+    }
+
+    // Validate Floatplane token locally by decoding JWT
+    // We can't call Floatplane's API because the token is DPoP-bound to the device
+    // and we don't have the device's private key to generate valid DPoP proofs
     let floatplaneUserId: string;
     try {
-      floatplaneUserId = await validateFloatplaneToken(
-        access_token, 
-        c.env.FLOATPLANE_API_URL,
-        dpop_proof
-      );
+      floatplaneUserId = validateFloatplaneTokenLocally(access_token);
     } catch (error) {
       if (error instanceof FloatplaneAPIError) {
-        if (error.statusCode === 401 || error.statusCode === 403) {
+        if (error.statusCode === 401) {
           return c.json(
             {
               error: 'Unauthorized',
@@ -52,51 +76,35 @@ auth.post('/login', rateLimit('AUTH_STRICT_LIMITER', byIP), async (c) => {
             401
           );
         }
-        logError(c, error, 'Floatplane API error');
+        logError(c, error, 'JWT validation error');
         return c.json(
           {
-            error: 'Bad Gateway',
-            message: 'Failed to validate Floatplane credentials',
+            error: 'Bad Request',
+            message: 'Failed to validate Floatplane token',
           },
-          502
+          400
         );
       }
       throw error;
     }
 
-    // Get or create user
+    // Ensure user exists in users table
     const existingUser = await db
       .select()
       .from(users)
       .where(eq(users.floatplane_user_id, floatplaneUserId))
       .limit(1);
 
-    let user;
     let isNewUser = false;
 
-    if (existingUser.length > 0) {
-      // User exists, update last_accessed_at
-      user = existingUser[0];
-      await db
-        .update(users)
-        .set({ last_accessed_at: new Date().toISOString() })
-        .where(eq(users.floatplane_user_id, floatplaneUserId));
-    } else {
-      // Create new user
+    if (existingUser.length === 0) {
+      // Create new user (with placeholder API key)
       isNewUser = true;
-      const apiKey = generateAPIKey();
+      const placeholderApiKey = generateAPIKey();
       await db.insert(users).values({
         floatplane_user_id: floatplaneUserId,
-        api_key: apiKey,
+        api_key: placeholderApiKey,
       });
-
-      // Fetch the newly created user
-      const newUser = await db
-        .select()
-        .from(users)
-        .where(eq(users.floatplane_user_id, floatplaneUserId))
-        .limit(1);
-      user = newUser[0];
 
       // Create Watch Later playlist for new users
       try {
@@ -106,9 +114,41 @@ auth.post('/login', rateLimit('AUTH_STRICT_LIMITER', byIP), async (c) => {
       }
     }
 
+    // Check if this device already has a session
+    const existingSession = await db
+      .select()
+      .from(deviceSessions)
+      .where(eq(deviceSessions.dpop_jkt, dpopJkt))
+      .limit(1);
+
+    let apiKey: string;
+
+    if (existingSession.length > 0) {
+      // Device already has an API key
+      apiKey = existingSession[0].api_key;
+
+      // Update last accessed
+      await db
+        .update(deviceSessions)
+        .set({ last_accessed_at: new Date().toISOString() })
+        .where(eq(deviceSessions.dpop_jkt, dpopJkt));
+    } else {
+      // Create new device session
+      apiKey = generateAPIKey();
+      await db.insert(deviceSessions).values({
+        id: crypto.randomUUID(),
+        floatplane_user_id: floatplaneUserId,
+        api_key: apiKey,
+        dpop_jkt: dpopJkt,
+        device_info: device_info || null,
+        created_at: new Date().toISOString(),
+        last_accessed_at: new Date().toISOString(),
+      });
+    }
+
     return c.json({
-      api_key: user.api_key,
-      floatplane_user_id: user.floatplane_user_id,
+      api_key: apiKey,
+      floatplane_user_id: floatplaneUserId,
       message: isNewUser ? 'User registered successfully' : 'User logged in successfully',
     });
   } catch (error) {

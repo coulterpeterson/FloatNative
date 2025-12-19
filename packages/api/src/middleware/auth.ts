@@ -1,6 +1,6 @@
 import { Context, Next } from 'hono';
 import { eq } from 'drizzle-orm';
-import { users, type User } from '../db/schema';
+import { users, deviceSessions, type User } from '../db/schema';
 import { extractBearerToken } from '../utils/auth';
 import type { Env } from '../db';
 import type { DrizzleDB } from '../db';
@@ -17,6 +17,7 @@ export type AuthContext = {
 /**
  * Middleware to authenticate requests using API key from Authorization header
  * Expects: Authorization: Bearer {api_key}
+ * Looks up the API key in device_sessions table
  * Attaches the authenticated user to c.get('user')
  */
 export async function authenticateAPIKey(c: Context<{ Bindings: Env } & AuthContext>, next: Next) {
@@ -37,10 +38,14 @@ export async function authenticateAPIKey(c: Context<{ Bindings: Env } & AuthCont
       );
     }
 
-    // Query database for user with matching API key
-    const result = await db.select().from(users).where(eq(users.api_key, apiKey)).limit(1);
+    // Query database for device session with matching API key
+    const sessionResult = await db
+      .select()
+      .from(deviceSessions)
+      .where(eq(deviceSessions.api_key, apiKey))
+      .limit(1);
 
-    if (result.length === 0) {
+    if (sessionResult.length === 0) {
       return c.json(
         {
           error: 'Unauthorized',
@@ -50,13 +55,32 @@ export async function authenticateAPIKey(c: Context<{ Bindings: Env } & AuthCont
       );
     }
 
-    const user = result[0];
+    const session = sessionResult[0];
 
-    // Update last_accessed_at timestamp
+    // Get the user associated with this device session
+    const userResult = await db
+      .select()
+      .from(users)
+      .where(eq(users.floatplane_user_id, session.floatplane_user_id))
+      .limit(1);
+
+    if (userResult.length === 0) {
+      return c.json(
+        {
+          error: 'Unauthorized',
+          message: 'User not found',
+        },
+        401
+      );
+    }
+
+    const user = userResult[0];
+
+    // Update last_accessed_at timestamp for the device session
     await db
-      .update(users)
+      .update(deviceSessions)
       .set({ last_accessed_at: new Date().toISOString() })
-      .where(eq(users.floatplane_user_id, user.floatplane_user_id));
+      .where(eq(deviceSessions.api_key, apiKey));
 
     // Attach user to context
     c.set('user', user);
