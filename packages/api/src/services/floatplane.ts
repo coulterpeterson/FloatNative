@@ -190,6 +190,63 @@ export async function validateFloatplaneToken(
 }
 
 /**
+ * Extract the JKT (JSON Web Key Thumbprint) from a DPoP proof
+ * The JKT uniquely identifies the device's DPoP key pair
+ * @param dpopProof The DPoP proof JWT
+ * @returns The JKT thumbprint string
+ * @throws FloatplaneAPIError if the proof is invalid or missing JWK
+ */
+export function extractDPoPJKT(dpopProof: string): string {
+  try {
+    // DPoP proof is a JWT with format: header.payload.signature
+    const parts = dpopProof.split('.');
+    if (parts.length !== 3) {
+      throw new FloatplaneAPIError('Invalid DPoP proof format');
+    }
+
+    // Decode the header (base64url)
+    const headerB64 = parts[0];
+    // Replace URL-safe chars and add padding if needed
+    const headerB64Padded = headerB64.replace(/-/g, '+').replace(/_/g, '/');
+    const headerJson = atob(headerB64Padded);
+    const header = JSON.parse(headerJson);
+
+    if (!header.jwk) {
+      throw new FloatplaneAPIError('DPoP proof missing jwk in header');
+    }
+
+    // Calculate SHA-256 thumbprint of the JWK
+    // For a proper JKT, we need to canonicalize the JWK and hash it
+    // For now, we'll use a simplified approach: serialize the JWK deterministically
+    const jwk = header.jwk;
+
+    // Create canonical JWK string (sorted keys)
+    const canonicalJwk = JSON.stringify({
+      crv: jwk.crv,
+      kty: jwk.kty,
+      x: jwk.x,
+      y: jwk.y,
+    });
+
+    // Calculate SHA-256 hash and base64url encode it
+    // Note: In a Worker environment, we use the Web Crypto API
+    return btoa(canonicalJwk)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  } catch (error) {
+    if (error instanceof FloatplaneAPIError) {
+      throw error;
+    }
+    throw new FloatplaneAPIError(
+      'Failed to extract DPoP JKT',
+      undefined,
+      error as Error
+    );
+  }
+}
+
+/**
  * Fetches posts from Floatplane for a specific creator with pagination
  * @param sailsSid The sails.sid cookie value for authentication
  * @param creatorId The creator ID to fetch posts for

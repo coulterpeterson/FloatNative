@@ -97,6 +97,30 @@ export const qrSessions = sqliteTable(
   })
 );
 
+// Device Sessions table (for per-device API keys)
+export const deviceSessions = sqliteTable(
+  'device_sessions',
+  {
+    id: text('id').primaryKey(),
+    floatplane_user_id: text('floatplane_user_id')
+      .notNull()
+      .references(() => users.floatplane_user_id, { onDelete: 'cascade' }),
+    api_key: text('api_key').notNull().unique(),
+    dpop_jkt: text('dpop_jkt').notNull().unique(), // DPoP key thumbprint
+    device_info: text('device_info'),
+    created_at: text('created_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    last_accessed_at: text('last_accessed_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => ({
+    userIdIdx: index('device_sessions_user_id_idx').on(table.floatplane_user_id),
+    jktIdx: index('device_sessions_jkt_idx').on(table.dpop_jkt),
+  })
+);
+
 // Type exports for TypeScript
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -109,3 +133,6 @@ export type NewFPPost = typeof fpPosts.$inferInsert;
 
 export type QRSession = typeof qrSessions.$inferSelect;
 export type NewQRSession = typeof qrSessions.$inferInsert;
+
+export type DeviceSession = typeof deviceSessions.$inferSelect;
+export type NewDeviceSession = typeof deviceSessions.$inferInsert;
