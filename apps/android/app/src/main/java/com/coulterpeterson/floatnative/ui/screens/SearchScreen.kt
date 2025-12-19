@@ -42,7 +42,7 @@ fun SearchScreen(
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
         ) {
             // Suggestions could go here
         }
