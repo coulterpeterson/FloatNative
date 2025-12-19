@@ -19,6 +19,6 @@
 
 ## Fixes
 - [X] PiP shouldn't launch unless we're existing from a playing video
-- [] Status bar should be white in dark mode
+- [X] Status bar should be white in dark mode
 - [] Start video playback at current watch progress
 - [] Remove extra line in playlist sheet
