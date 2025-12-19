@@ -112,7 +112,7 @@ class FloatplaneAPI: ObservableObject {
         }
     }
 
-    private var isRelogging = false // Prevent multiple simultaneous re-login attempts
+    private var refreshTask: Task<Void, Error>?
 
     // MARK: - Initialization
 
@@ -252,7 +252,8 @@ class FloatplaneAPI: ObservableObject {
         endpoint: String,
         method: String = "GET",
         body: Encodable? = nil,
-        requiresAuth: Bool = false
+        requiresAuth: Bool = false,
+        retryCount: Int = 0
     ) async throws {
         guard let url = URL(string: baseURL + endpoint) else {
             throw FloatplaneAPIError.invalidURL
@@ -317,30 +318,37 @@ class FloatplaneAPI: ObservableObject {
         
         // Handle HTTP errors
         guard (200...299).contains(httpResponse.statusCode) else {
-            // Check for authentication errors (401 Unauthorized or 403 Forbidden)
+                // Check for authentication errors (401 Unauthorized or 403 Forbidden)
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                // Try OAuth Refresh first
 
-                if refreshToken != nil && !isRelogging {
-                    isRelogging = true
-                    defer { isRelogging = false }
 
-                    do {
-                        try await refreshAccessToken()
-                        return try await requestWithoutResponse(
-                            endpoint: endpoint,
-                            method: method,
-                            body: body,
-                            requiresAuth: requiresAuth
-                        )
-                    } catch {
-                        // Refresh failed, fall through to legacy or error
-                    }
+                // Check if error is due to DPoP Nonce mismatch (retry locally without refresh)
+                if let wwwAuth = headers["www-authenticate"], 
+                   wwwAuth.contains("use_dpop_nonce"),
+                   retryCount < 3 {
+
+                    return try await requestWithoutResponse(
+                        endpoint: endpoint,
+                        method: method,
+                        body: body,
+                        requiresAuth: requiresAuth,
+                        retryCount: retryCount + 1
+                    )
                 }
 
-                // OAUTH Refresh Failed
-                if refreshToken != nil {
-                     clearOAuthState()
+                // Try OAuth Refresh first (Only for 401 Unauthorized)
+                if httpResponse.statusCode == 401 && refreshToken != nil {
+                     do {
+                         try await ensureRefreshed()
+                         return try await requestWithoutResponse(
+                             endpoint: endpoint,
+                             method: method,
+                             body: body,
+                             requiresAuth: requiresAuth
+                         )
+                     } catch {
+                         throw error
+                     }
                 }
             }
 
@@ -352,7 +360,8 @@ class FloatplaneAPI: ObservableObject {
         endpoint: String,
         method: String = "GET",
         body: Encodable? = nil,
-        requiresAuth: Bool = false
+        requiresAuth: Bool = false,
+        retryCount: Int = 0
     ) async throws -> T {
         guard let url = URL(string: baseURL + endpoint) else {
             throw FloatplaneAPIError.invalidURL
@@ -431,30 +440,37 @@ class FloatplaneAPI: ObservableObject {
         
         // Handle HTTP errors
         guard (200...299).contains(httpResponse.statusCode) else {
-            // Check for authentication errors (401 Unauthorized or 403 Forbidden)
+                // Check for authentication errors (401 Unauthorized or 403 Forbidden)
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                // Try OAuth Refresh first
 
-                if refreshToken != nil && !isRelogging {
-                    isRelogging = true
-                    defer { isRelogging = false }
 
-                    do {
-                        try await refreshAccessToken()
-                        return try await request(
-                            endpoint: endpoint,
-                            method: method,
-                            body: body,
-                            requiresAuth: requiresAuth
-                        )
-                    } catch {
-                        // Refresh failed, fall through to legacy or error
-                    }
+                // Check if error is due to DPoP Nonce mismatch (retry locally without refresh)
+                if let wwwAuth = headers["www-authenticate"], 
+                   wwwAuth.contains("use_dpop_nonce"),
+                   retryCount < 3 {
+
+                    return try await request(
+                        endpoint: endpoint,
+                        method: method,
+                        body: body,
+                        requiresAuth: requiresAuth,
+                        retryCount: retryCount + 1
+                    )
                 }
 
-                // OAUTH Refresh Failed
-                if refreshToken != nil {
-                     clearOAuthState()
+                // Try OAuth Refresh first (Only for 401 Unauthorized)
+                if httpResponse.statusCode == 401 && refreshToken != nil {
+                     do {
+                         try await ensureRefreshed()
+                         return try await request(
+                             endpoint: endpoint,
+                             method: method,
+                             body: body,
+                             requiresAuth: requiresAuth
+                         )
+                     } catch {
+                         throw error
+                     }
                 }
             }
 
@@ -729,10 +745,38 @@ class FloatplaneAPI: ObservableObject {
             )
             handleOAuthResponse(response)
         } catch {
-            // If refresh fails, clear tokens
+            // Check for cancellation (don't logout if task was simply cancelled)
+            if error is CancellationError {
+                throw error
+            }
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+                throw error
+            }
+
+            // If refresh fails (and not cancelled), clear tokens
             print("❌ Token refresh failed: \(error.localizedDescription)")
             clearOAuthState()
             throw error
+        }
+    }
+
+    private func ensureRefreshed() async throws {
+        if let task = refreshTask {
+             return try await task.value
+        }
+        
+        let task = Task {
+             try await refreshAccessToken()
+        }
+        self.refreshTask = task
+        
+        do {
+             try await task.value
+             self.refreshTask = nil
+        } catch {
+             self.refreshTask = nil
+             throw error
         }
     }
 
