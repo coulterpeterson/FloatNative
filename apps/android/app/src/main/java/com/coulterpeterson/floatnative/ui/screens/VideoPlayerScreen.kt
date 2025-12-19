@@ -114,6 +114,18 @@ fun VideoPlayerScreen(
         }
     }
 
+    // Handle Player Actions
+    LaunchedEffect(Unit) {
+        viewModel.playerAction.collect { action ->
+            when (action) {
+                is com.coulterpeterson.floatnative.viewmodels.PlayerAction.Seek -> {
+                    exoPlayer.seekTo(action.position)
+                    exoPlayer.play() // Auto-play after seek
+                }
+            }
+        }
+    }
+
     // Observe state and update player
     LaunchedEffect(state) {
         if (state is VideoPlayerState.Content) {
@@ -210,7 +222,8 @@ fun VideoPlayerScreen(
                                 VideoDescription(
                                     title = "Description", 
                                     descriptionHtml = currentState.blogPost.text, 
-                                    releaseDate = currentState.blogPost.releaseDate
+                                    releaseDate = currentState.blogPost.releaseDate,
+                                    onSeek = { pos -> viewModel.seekTo(pos) }
                                 )
                                 Divider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                             }
@@ -226,7 +239,8 @@ fun VideoPlayerScreen(
                                     onReplyComment = { comment ->
                                         viewModel.startReply(comment)
                                         showCommentInput = true
-                                    }
+                                    },
+                                    onSeek = { pos -> viewModel.seekTo(pos) }
                                 )
                             }
                             

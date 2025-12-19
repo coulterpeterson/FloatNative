@@ -16,11 +16,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.text.HtmlCompat
+import android.text.style.URLSpan
+import android.text.style.ClickableSpan
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.TextPaint
+import android.util.Log
+import com.coulterpeterson.floatnative.utils.TimestampParser
 import com.coulterpeterson.floatnative.openapi.models.CommentModel
 import com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response
 import java.time.format.DateTimeFormatter
@@ -109,7 +120,8 @@ fun VideoDescription(
     title: String,
     descriptionHtml: String,
     releaseDate: java.time.OffsetDateTime,
-    views: Int? = null // Views not readily available in Post model?
+    views: Int? = null,
+    onSeek: (Long) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
@@ -148,7 +160,7 @@ fun VideoDescription(
                     }
                 },
                 update = { textView ->
-                    textView.text = HtmlCompat.fromHtml(descriptionHtml, HtmlCompat.FROM_HTML_MODE_COMPACT)
+                    textView.text = processDescription(descriptionHtml, onSeek)
                 }
             )
             
@@ -181,7 +193,8 @@ fun CommentSection(
     totalComments: Int,
     onLikeComment: (String) -> Unit,
     onDislikeComment: (String) -> Unit,
-    onReplyComment: (CommentModel) -> Unit
+    onReplyComment: (CommentModel) -> Unit,
+    onSeek: (Long) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -206,7 +219,8 @@ fun CommentSection(
                     depth = 0,
                     onLike = onLikeComment,
                     onDislike = onDislikeComment,
-                    onReply = onReplyComment
+                    onReply = onReplyComment,
+                    onSeek = onSeek
                 )
                 Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             }
@@ -220,7 +234,8 @@ fun CommentItem(
     depth: Int,
     onLike: (String) -> Unit,
     onDislike: (String) -> Unit,
-    onReply: (CommentModel) -> Unit
+    onReply: (CommentModel) -> Unit,
+    onSeek: (Long) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -257,9 +272,21 @@ fun CommentItem(
                 
                 Spacer(modifier = Modifier.height(4.dp))
                 
-                Text(
-                    text = comment.text,
-                    style = MaterialTheme.typography.bodyMedium
+                
+                val annotatedText = remember(comment.text) {
+                     buildTimestampAnnotatedString(comment.text)
+                }
+                
+                ClickableText(
+                    text = annotatedText,
+                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                    onClick = { offset ->
+                        annotatedText.getStringAnnotations(tag = "TIMESTAMP", start = offset, end = offset)
+                            .firstOrNull()?.let { annotation ->
+                                 val timeMillis = annotation.item.toLongOrNull() ?: 0L
+                                 onSeek(timeMillis)
+                            }
+                    }
                 )
                 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -335,7 +362,8 @@ fun CommentItem(
             depth = depth + 1,
             onLike = onLike,
             onDislike = onDislike,
-            onReply = onReply
+            onReply = onReply,
+            onSeek = onSeek
         )
     }
 }
@@ -352,5 +380,91 @@ fun timeAgo(date: java.time.OffsetDateTime): String {
         diff.toHours() > 0 -> "${diff.toHours()}h"
         diff.toMinutes() > 0 -> "${diff.toMinutes()}m"
         else -> "now"
+    }
+}
+
+// Helper to process HTML description: truncate links and add clickable timestamps
+private fun processDescription(html: String, onSeek: (Long) -> Unit): CharSequence {
+    // 1. Initial HTML Parse
+    val spanned = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT)
+    val builder = SpannableStringBuilder(spanned)
+
+    // 2. Truncate Links
+    val urlSpans = builder.getSpans(0, builder.length, URLSpan::class.java)
+    // Process in reverse to maintain indices
+    for (span in urlSpans.reversed()) {
+        val start = builder.getSpanStart(span)
+        val end = builder.getSpanEnd(span)
+        val url = span.url
+        
+        // Logic: strip protocol, strip www, truncate at 40
+        var displayText = url
+        displayText = displayText.replace("http://", "").replace("https://", "")
+        if (displayText.startsWith("www.")) {
+            displayText = displayText.substring(4)
+        }
+        
+        // Truncate
+        if (displayText.length > 40) {
+            displayText = displayText.take(40) + "..."
+        }
+        
+        // Replace text
+        builder.replace(start, end, displayText)
+        
+        // Re-apply span to new range
+        builder.removeSpan(span)
+        builder.setSpan(URLSpan(url), start, start + displayText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
+    
+    // 3. Linkify Timestamps
+    val text = builder.toString()
+    val matches = TimestampParser.parseTimestamps(text)
+    
+    for (match in matches) {
+        val clickableSpan = object : ClickableSpan() {
+            override fun onClick(widget: android.view.View) {
+                onSeek(match.timeMillis)
+            }
+            
+            override fun updateDrawState(ds: TextPaint) {
+                super.updateDrawState(ds)
+                ds.isUnderlineText = true
+                ds.color = android.graphics.Color.CYAN // Or theme color?
+            }
+        }
+        
+        // Check if range is valid in builder (in case modifications shifted things)
+        if (match.end <= builder.length) {
+             builder.setSpan(clickableSpan, match.start, match.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+    }
+
+    return builder
+}
+
+// Helper to build AnnotatedString for Comments with clickable timestamps
+private fun buildTimestampAnnotatedString(text: String): androidx.compose.ui.text.AnnotatedString {
+    return buildAnnotatedString {
+        append(text)
+        
+        val matches = TimestampParser.parseTimestamps(text)
+        for (match in matches) {
+            addStyle(
+                style = SpanStyle(
+                    color = Color.Cyan, // Or Primary
+                    textDecoration = TextDecoration.Underline
+                ),
+                start = match.start,
+                end = match.end
+            )
+            
+            addStringAnnotation(
+                tag = "TIMESTAMP",
+                annotation = match.timeMillis.toString(),
+                start = match.start,
+                end = match.end
+            )
+        }
     }
 }

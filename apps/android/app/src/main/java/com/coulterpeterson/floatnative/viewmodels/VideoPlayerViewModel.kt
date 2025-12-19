@@ -48,6 +48,10 @@ sealed class VideoPlayerState {
     data class Error(val message: String) : VideoPlayerState()
 }
 
+sealed class PlayerAction {
+    data class Seek(val position: Long) : PlayerAction()
+}
+
 class VideoPlayerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow<VideoPlayerState>(VideoPlayerState.Idle)
@@ -61,6 +65,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _requestPermissionEvent = MutableSharedFlow<Unit>()
     val requestPermissionEvent = _requestPermissionEvent.asSharedFlow()
+
+    private val _playerAction = MutableSharedFlow<PlayerAction>()
+    val playerAction = _playerAction.asSharedFlow()
 
     fun downloadVideo() {
         val currentState = _state.value as? VideoPlayerState.Content ?: return
@@ -604,7 +611,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    private fun resolveUrl(url: String, variant: CdnDeliveryV3Variant, group: CdnDeliveryV3Group): String {
+    fun resolveUrl(url: String, variant: CdnDeliveryV3Variant, group: CdnDeliveryV3Group): String {
         var streamUrl = url
         if (!streamUrl.startsWith("http")) {
             val origin = variant.origins?.firstOrNull() ?: group.origins?.firstOrNull()
@@ -613,6 +620,12 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             streamUrl = "$baseUrl/$relativePath"
         }
         return streamUrl
+    }
+
+    fun seekTo(position: Long) {
+        viewModelScope.launch {
+            _playerAction.emit(PlayerAction.Seek(position))
+        }
     }
 }
 
