@@ -44,9 +44,9 @@ class PlaylistDetailViewModel : ViewModel() {
                 // The iOS app: `companionAPI.getPlaylists` -> finds playlist -> gets videoIds -> fetches posts.
                 // We should probably optimize this in the future, but for now let's fetch playlist fresh.
                 
-                ensureCompanionLogin()
-                
-                val playlistResponse = FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
+                val playlistResponse = withCompanionRetry {
+                    FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
+                }
                 val playlists = playlistResponse.body()?.playlists ?: emptyList()
                 val playlist = playlists.find { it.id == playlistId }
                 
@@ -121,11 +121,12 @@ class PlaylistDetailViewModel : ViewModel() {
          
          viewModelScope.launch {
              try {
-                ensureCompanionLogin()
-                 FloatplaneApi.companionApi.removeFromPlaylist(
-                     id = playlistId,
-                     request = PlaylistRemoveRequest(videoId) // API expects the ID that is in the list
-                 )
+                 withCompanionRetry {
+                     FloatplaneApi.companionApi.removeFromPlaylist(
+                         id = playlistId,
+                         request = PlaylistRemoveRequest(videoId)
+                     )
+                 }
              } catch (e: Exception) {
                  // Revert or re-fetch
                  loadPlaylistPosts(playlistId)
@@ -135,12 +136,29 @@ class PlaylistDetailViewModel : ViewModel() {
     private suspend fun ensureCompanionLogin() {
         FloatplaneApi.ensureCompanionLogin()
     }
+    
+    /**
+     * Helper function to wrap companion API calls with automatic 401 retry logic
+     */
+    private suspend fun <T> withCompanionRetry(block: suspend () -> retrofit2.Response<T>): retrofit2.Response<T> {
+        ensureCompanionLogin()
+        val response = block()
+        
+        // If 401, retry with fresh login
+        if (response.code() == 401) {
+            FloatplaneApi.ensureCompanionLogin(forceRefresh = true)
+            return block()
+        }
+        
+        return response
+    }
 
     fun loadPlaylists() {
         viewModelScope.launch {
             try {
-                ensureCompanionLogin()
-                val response = FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
+                val response = withCompanionRetry {
+                    FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
+                }
                 if (response.isSuccessful && response.body() != null) {
                     _userPlaylists.value = response.body()!!.playlists
                 }
@@ -175,26 +193,31 @@ class PlaylistDetailViewModel : ViewModel() {
     }
 
     fun toggleWatchLater(post: ContentPostV3Response, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
+         viewModelScope.launch {
             try {
-                ensureCompanionLogin()
-                val dummyRes = FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
+                val dummyRes = withCompanionRetry {
+                    FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
+                }
                 val playlists = dummyRes.body()?.playlists ?: _userPlaylists.value
                 val watchLater = playlists.find { it.isWatchLater } ?: return@launch
                 val isAdded = watchLater.videoIds.contains(post.id)
                 var wasAdded = false
                 
                 if (isAdded) {
-                    FloatplaneApi.companionApi.removeFromPlaylist(
-                        id = watchLater.id,
-                        request = PlaylistRemoveRequest(post.id)
-                    )
+                    withCompanionRetry {
+                        FloatplaneApi.companionApi.removeFromPlaylist(
+                            id = watchLater.id,
+                            request = PlaylistRemoveRequest(post.id)
+                        )
+                    }
                     wasAdded = false
                 } else {
-                    FloatplaneApi.companionApi.addToPlaylist(
-                        id = watchLater.id,
-                        request = PlaylistAddRequest(post.id)
-                    )
+                    withCompanionRetry {
+                        FloatplaneApi.companionApi.addToPlaylist(
+                            id = watchLater.id,
+                            request = PlaylistAddRequest(post.id)
+                        )
+                    }
                     wasAdded = true
                 }
                 loadPlaylists()
@@ -208,11 +231,12 @@ class PlaylistDetailViewModel : ViewModel() {
     fun addToPlaylist(playlistId: String, videoId: String) {
         viewModelScope.launch {
             try {
-                ensureCompanionLogin()
-                FloatplaneApi.companionApi.addToPlaylist(
-                    id = playlistId,
-                    request = PlaylistAddRequest(videoId)
-                )
+                withCompanionRetry {
+                    FloatplaneApi.companionApi.addToPlaylist(
+                        id = playlistId,
+                        request = PlaylistAddRequest(videoId)
+                    )
+                }
                 loadPlaylists()
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -223,11 +247,12 @@ class PlaylistDetailViewModel : ViewModel() {
     fun removeFromPlaylistApi(playlistId: String, videoId: String) {
          viewModelScope.launch {
             try {
-                ensureCompanionLogin()
-                FloatplaneApi.companionApi.removeFromPlaylist(
-                    id = playlistId,
-                    request = PlaylistRemoveRequest(videoId)
-                )
+                withCompanionRetry {
+                    FloatplaneApi.companionApi.removeFromPlaylist(
+                        id = playlistId,
+                        request = PlaylistRemoveRequest(videoId)
+                    )
+                }
                 loadPlaylists()
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -238,13 +263,14 @@ class PlaylistDetailViewModel : ViewModel() {
     fun createPlaylist(name: String) {
         viewModelScope.launch {
             try {
-                ensureCompanionLogin()
-                FloatplaneApi.companionApi.createPlaylist(
-                    request = PlaylistCreateRequest(name)
-                )
+                withCompanionRetry {
+                    FloatplaneApi.companionApi.createPlaylist(
+                        request = PlaylistCreateRequest(name)
+                    )
+                }
                 loadPlaylists()
             } catch (e: Exception) {
-                e.printStackTrace()
+                    e.printStackTrace()
             }
         }
     }

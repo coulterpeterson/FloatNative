@@ -31,22 +31,64 @@ class PlaylistsViewModel : ViewModel() {
     private fun loadPlaylists() {
         viewModelScope.launch {
             _state.value = PlaylistsState.Loading
+            android.util.Log.d("PlaylistsViewModel", "loadPlaylists: Starting to load playlists")
             
             try {
-                ensureCompanionLogin()
+                android.util.Log.d("PlaylistsViewModel", "loadPlaylists: Calling ensureCompanionLogin")
+                val loginSuccess = FloatplaneApi.ensureCompanionLogin()
                 
+                if (!loginSuccess) {
+                    android.util.Log.e("PlaylistsViewModel", "loadPlaylists: ensureCompanionLogin failed")
+                    _state.value = PlaylistsState.Error("Failed to authenticate with companion API")
+                    return@launch
+                }
+                
+                android.util.Log.d("PlaylistsViewModel", "loadPlaylists: ensureCompanionLogin completed")
+                
+                android.util.Log.d("PlaylistsViewModel", "loadPlaylists: Calling getPlaylists API")
                 val response = FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
+                android.util.Log.d("PlaylistsViewModel", "loadPlaylists: Got response with code ${response.code()}")
+                
                 if (response.isSuccessful && response.body() != null) {
                     val playlists = response.body()!!.playlists
+                    android.util.Log.d("PlaylistsViewModel", "loadPlaylists: Success - got ${playlists.size} playlists")
                     // Set initial content without thumbnails
                     _state.value = PlaylistsState.Content(playlists)
                     
                     // Fetch thumbnails asynchronously
                     loadThumbnails(playlists)
+                } else if (response.code() == 401) {
+                    android.util.Log.w("PlaylistsViewModel", "loadPlaylists: Got 401 error, attempting re-authorization")
+                    // 401 error - retry with fresh companion login
+                    android.util.Log.d("PlaylistsViewModel", "loadPlaylists: Calling ensureCompanionLogin with forceRefresh=true")
+                    val retryLoginSuccess = FloatplaneApi.ensureCompanionLogin(forceRefresh = true)
+                    
+                    if (!retryLoginSuccess) {
+                        android.util.Log.e("PlaylistsViewModel", "loadPlaylists: Re-authorization failed")
+                        _state.value = PlaylistsState.Error("Failed to re-authenticate")
+                        return@launch
+                    }
+                    
+                    android.util.Log.d("PlaylistsViewModel", "loadPlaylists: Re-authorization complete, retrying getPlaylists")
+                    
+                    val retryResponse = FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
+                    android.util.Log.d("PlaylistsViewModel", "loadPlaylists: Retry response code: ${retryResponse.code()}")
+                    
+                    if (retryResponse.isSuccessful && retryResponse.body() != null) {
+                        val playlists = retryResponse.body()!!.playlists
+                        android.util.Log.d("PlaylistsViewModel", "loadPlaylists: Retry success - got ${playlists.size} playlists")
+                        _state.value = PlaylistsState.Content(playlists)
+                        loadThumbnails(playlists)
+                    } else {
+                        android.util.Log.e("PlaylistsViewModel", "loadPlaylists: Retry failed with code ${retryResponse.code()}")
+                        _state.value = PlaylistsState.Error("Failed to fetch playlists: ${retryResponse.code()}")
+                    }
                 } else {
+                    android.util.Log.e("PlaylistsViewModel", "loadPlaylists: Failed with code ${response.code()}")
                     _state.value = PlaylistsState.Error("Failed to fetch playlists: ${response.code()}")
                 }
             } catch (e: Exception) {
+                android.util.Log.e("PlaylistsViewModel", "loadPlaylists: Exception occurred", e)
                 _state.value = PlaylistsState.Error(e.message ?: "Unknown error")
             }
         }
@@ -104,9 +146,21 @@ class PlaylistsViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                ensureCompanionLogin()
+                FloatplaneApi.ensureCompanionLogin()
                 val response = FloatplaneApi.companionApi.deletePlaylist(playlistId)
-                if (!response.isSuccessful) {
+                if (response.code() == 401) {
+                    // 401 error - retry with fresh companion login
+                    try {
+                        FloatplaneApi.ensureCompanionLogin(forceRefresh = true)
+                        val retryResponse = FloatplaneApi.companionApi.deletePlaylist(playlistId)
+                        if (!retryResponse.isSuccessful) {
+                            // Revert on failure
+                            _state.value = currentState
+                        }
+                    } catch (e: Exception) {
+                        _state.value = currentState // Revert
+                    }
+                } else if (!response.isSuccessful) {
                     // Revert
                      _state.value = currentState // Or fetch fresh
                      // Could show ephemeral error
@@ -120,25 +174,5 @@ class PlaylistsViewModel : ViewModel() {
     // Refresh function needed for swipe-to-refresh
     fun refresh() {
         loadPlaylists()
-    }
-    
-    private suspend fun ensureCompanionLogin() {
-        val tokenManager = FloatplaneApi.tokenManager
-        if (tokenManager.companionApiKey == null) {
-            val accessToken = tokenManager.accessToken
-            if (accessToken != null) {
-                 val userSelfUrl = "https://www.floatplane.com/api/v3/user/self"
-                 val dpopProof = FloatplaneApi.dpopManager.generateProof("GET", userSelfUrl, accessToken)
-                 val loginRequest = com.coulterpeterson.floatnative.api.CompanionLoginRequest(accessToken, dpopProof)
-                 val loginResponse = FloatplaneApi.companionApi.login(loginRequest)
-                 if (loginResponse.isSuccessful && loginResponse.body() != null) {
-                     tokenManager.companionApiKey = loginResponse.body()!!.apiKey
-                 } else {
-                     throw Exception("Companion Login Failed: ${loginResponse.code()}")
-                 }
-            } else {
-                 throw Exception("Not logged in to Floatplane")
-            }
-        }
     }
 }

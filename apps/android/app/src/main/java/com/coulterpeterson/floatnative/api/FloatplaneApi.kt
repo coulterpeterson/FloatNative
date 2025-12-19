@@ -179,26 +179,98 @@ object FloatplaneApi {
         }
     }
 
-    suspend fun ensureCompanionLogin() {
-        if (tokenManager.companionApiKey != null) return
+    suspend fun ensureCompanionLogin(forceRefresh: Boolean = false): Boolean {
+        android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Called with forceRefresh=$forceRefresh")
+        
+        // If force refresh, clear the old API key
+        if (forceRefresh) {
+            android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Clearing old API key")
+            tokenManager.companionApiKey = null
+        }
+        
+        if (tokenManager.companionApiKey != null) {
+            android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: API key already exists, skipping")
+            return true
+        }
 
-        val accessToken = tokenManager.accessToken ?: return
+        var accessToken = tokenManager.accessToken 
+        if (accessToken == null) {
+            android.util.Log.e("FloatplaneApi", "ensureCompanionLogin: No access token available")
+            return false
+        }
+        
+        android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Generating DPoP proof")
         // Generate DPoP for user/self
         val userSelfUrl = "https://www.floatplane.com/api/v3/user/self"
-        val loginProof = dpopManager.generateProof("GET", userSelfUrl, accessToken)
+        var loginProof = dpopManager.generateProof("GET", userSelfUrl, accessToken)
         
-        val loginRequest = CompanionLoginRequest(
+        var loginRequest = CompanionLoginRequest(
             accessToken = accessToken,
             dpopProof = loginProof
         )
         
-        try {
-            val response = companionApi.login(loginRequest)
-            if (response.isSuccessful && response.body() != null) {
-                tokenManager.companionApiKey = response.body()!!.apiKey
+        // Log the request details (first 100 chars of token and proof for security)
+        android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Access token (first 100 chars): ${accessToken.take(100)}...")
+        android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: DPoP proof (first 100 chars): ${loginProof.take(100)}...")
+        android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: DPoP proof length: ${loginProof.length}")
+        android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Access token length: ${accessToken.length}")
+        
+        android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Calling companion login API")
+        var response = companionApi.login(loginRequest)
+        android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Got response with code ${response.code()}")
+        
+        // If 401, the access token might be expired - try refreshing it
+        if (response.code() == 401 && tokenManager.refreshToken != null) {
+            android.util.Log.w("FloatplaneApi", "ensureCompanionLogin: Got 401, attempting to refresh access token")
+            try {
+                // Refresh the access token
+                val refreshToken = tokenManager.refreshToken!!
+                val tokenEndpoint = "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/token"
+                val dpop = dpopManager.generateProof("POST", tokenEndpoint)
+                
+                android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Calling token refresh")
+                val tokenResponse = oauthApi.getToken(
+                    dpop = dpop,
+                    grantType = "refresh_token",
+                    clientId = "floatnative",
+                    refreshToken = refreshToken
+                )
+                
+                // Update tokens
+                tokenManager.accessToken = tokenResponse.access_token
+                tokenManager.refreshToken = tokenResponse.refresh_token
+                accessToken = tokenResponse.access_token
+                
+                android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Access token refreshed, retrying companion login")
+                
+                // Retry companion login with new access token
+                loginProof = dpopManager.generateProof("GET", userSelfUrl, accessToken)
+                loginRequest = CompanionLoginRequest(
+                    accessToken = accessToken,
+                    dpopProof = loginProof
+                )
+                
+                // Log the retry request details
+                android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: RETRY - Access token (first 100 chars): ${accessToken.take(100)}...")
+                android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: RETRY - DPoP proof (first 100 chars): ${loginProof.take(100)}...")
+                android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: RETRY - DPoP proof length: ${loginProof.length}")
+                android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: RETRY - Access token length: ${accessToken.length}")
+                
+                response = companionApi.login(loginRequest)
+                android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Retry response code: ${response.code()}")
+            } catch (e: Exception) {
+                android.util.Log.e("FloatplaneApi", "ensureCompanionLogin: Failed to refresh access token", e)
+                return false
             }
-        } catch (e: Exception) {
-            android.util.Log.e("FloatplaneApi", "Failed to ensure companion login", e)
+        }
+        
+        if (response.isSuccessful && response.body() != null) {
+            tokenManager.companionApiKey = response.body()!!.apiKey
+            android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Successfully obtained API key")
+            return true
+        } else {
+            android.util.Log.e("FloatplaneApi", "ensureCompanionLogin: Failed with code ${response.code()}")
+            return false
         }
     }
 }
