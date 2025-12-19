@@ -8,7 +8,7 @@
 - [X] Format landscape video player 
 - [X] Enable background play
 - [X] Enable PiP 
-- [] Style login screen after the ios version
+- [X] Style login screen after the ios version
 - [X] Add actual FloatNative logo to app
 - [] Implement live support
 - [] Change support link to discord server

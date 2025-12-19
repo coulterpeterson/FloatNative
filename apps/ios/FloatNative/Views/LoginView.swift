@@ -93,7 +93,7 @@ struct LoginView: View {
                         #else
                         // iOS: OAuth Login
                         VStack(spacing: 32) {
-                            Text("Welcome to Floatplane")
+                            Text("Welcome to FloatNative")
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .foregroundStyle(colorScheme == .dark ? .white : .primary)
