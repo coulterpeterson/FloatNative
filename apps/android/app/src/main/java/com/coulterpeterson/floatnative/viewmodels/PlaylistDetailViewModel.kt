@@ -3,8 +3,14 @@ package com.coulterpeterson.floatnative.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response
+import com.coulterpeterson.floatnative.openapi.models.GetProgressRequest
 import com.coulterpeterson.floatnative.api.FloatplaneApi
 import com.coulterpeterson.floatnative.api.PlaylistRemoveRequest
+import com.coulterpeterson.floatnative.api.PlaylistAddRequest
+import com.coulterpeterson.floatnative.api.PlaylistCreateRequest
+import com.coulterpeterson.floatnative.api.Playlist
+import com.coulterpeterson.floatnative.openapi.models.UpdateProgressRequest
+import com.coulterpeterson.floatnative.openapi.models.ImageModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -21,6 +27,12 @@ sealed class PlaylistDetailState {
 class PlaylistDetailViewModel : ViewModel() {
     private val _state = MutableStateFlow<PlaylistDetailState>(PlaylistDetailState.Initial)
     val state = _state.asStateFlow()
+
+    private val _userPlaylists = MutableStateFlow<List<Playlist>>(emptyList())
+    val userPlaylists = _userPlaylists.asStateFlow()
+
+    private val _watchProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val watchProgress = _watchProgress.asStateFlow()
 
     fun loadPlaylistPosts(playlistId: String) {
         viewModelScope.launch {
@@ -78,6 +90,7 @@ class PlaylistDetailViewModel : ViewModel() {
                 val sortedPosts = posts.sortedByDescending { it.releaseDate }
                 
                 _state.value = PlaylistDetailState.Content(sortedPosts)
+                fetchWatchProgress(sortedPosts)
                 
             } catch (e: Exception) {
                 _state.value = PlaylistDetailState.Error(e.message ?: "Unknown error")
@@ -119,13 +132,150 @@ class PlaylistDetailViewModel : ViewModel() {
              }
          }
     }
-    
     private suspend fun ensureCompanionLogin() {
-        val tokenManager = FloatplaneApi.tokenManager
-        if (tokenManager.companionApiKey == null) {
-             try {
-                 com.coulterpeterson.floatnative.api.FloatplaneApi.ensureCompanionLogin()
-             } catch(e: Exception) { }
+        FloatplaneApi.ensureCompanionLogin()
+    }
+
+    fun loadPlaylists() {
+        viewModelScope.launch {
+            try {
+                ensureCompanionLogin()
+                val response = FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
+                if (response.isSuccessful && response.body() != null) {
+                    _userPlaylists.value = response.body()!!.playlists
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun markAsWatched(post: ContentPostV3Response) {
+        viewModelScope.launch {
+            try {
+                 // Optimistic update
+                 _watchProgress.value = _watchProgress.value + (post.id to 1.0f)
+
+                 // ContentPostV3Response doesn't explicitly have videoDuration in root, but metadata has it.
+                 // also videoAttachments is List<VideoAttachmentModel>?
+                 val videoId = post.videoAttachments?.firstOrNull()?.id ?: return@launch
+                 val durationSeconds = post.metadata.videoDuration.toInt()
+                 
+                 FloatplaneApi.contentV3.updateProgress(
+                     updateProgressRequest = UpdateProgressRequest(
+                         id = videoId,
+                         contentType = UpdateProgressRequest.ContentType.video,
+                         progress = durationSeconds
+                     )
+                 )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun toggleWatchLater(post: ContentPostV3Response, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                ensureCompanionLogin()
+                val dummyRes = FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
+                val playlists = dummyRes.body()?.playlists ?: _userPlaylists.value
+                val watchLater = playlists.find { it.isWatchLater } ?: return@launch
+                val isAdded = watchLater.videoIds.contains(post.id)
+                var wasAdded = false
+                
+                if (isAdded) {
+                    FloatplaneApi.companionApi.removeFromPlaylist(
+                        id = watchLater.id,
+                        request = PlaylistRemoveRequest(post.id)
+                    )
+                    wasAdded = false
+                } else {
+                    FloatplaneApi.companionApi.addToPlaylist(
+                        id = watchLater.id,
+                        request = PlaylistAddRequest(post.id)
+                    )
+                    wasAdded = true
+                }
+                loadPlaylists()
+                onResult(wasAdded)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun addToPlaylist(playlistId: String, videoId: String) {
+        viewModelScope.launch {
+            try {
+                ensureCompanionLogin()
+                FloatplaneApi.companionApi.addToPlaylist(
+                    id = playlistId,
+                    request = PlaylistAddRequest(videoId)
+                )
+                loadPlaylists()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun removeFromPlaylistApi(playlistId: String, videoId: String) {
+         viewModelScope.launch {
+            try {
+                ensureCompanionLogin()
+                FloatplaneApi.companionApi.removeFromPlaylist(
+                    id = playlistId,
+                    request = PlaylistRemoveRequest(videoId)
+                )
+                loadPlaylists()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun createPlaylist(name: String) {
+        viewModelScope.launch {
+            try {
+                ensureCompanionLogin()
+                FloatplaneApi.companionApi.createPlaylist(
+                    request = PlaylistCreateRequest(name)
+                )
+                loadPlaylists()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    private fun fetchWatchProgress(posts: List<ContentPostV3Response>) {
+        val videoPosts = posts.filter { it.metadata.hasVideo }
+        if (videoPosts.isEmpty()) return
+
+        val ids = videoPosts.map { it.id }
+        viewModelScope.launch {
+            try {
+                // Batch requests in chunks of 20
+                ids.chunked(20).forEach { batchIds ->
+                    val response = FloatplaneApi.contentV3.getProgress(
+                        getProgressRequest = GetProgressRequest(
+                            ids = batchIds,
+                            contentType = GetProgressRequest.ContentType.blogPost
+                        )
+                    )
+                    
+                    if (response.isSuccessful && response.body() != null) {
+                        val progressMap = response.body()!!.associate { 
+                             it.id to (it.progress.toFloat() / 100f).coerceIn(0f, 1f)
+                        }
+                        
+                        _watchProgress.value = _watchProgress.value + progressMap
+                    }
+                }
+            } catch (e: Exception) {
+               e.printStackTrace()
+            }
         }
     }
 }

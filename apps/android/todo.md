@@ -2,7 +2,8 @@
 - [X] Add link truncation to description and timestamp linking to description/comments
 - [X] Add playlist management sheet to video player with button in actions bar
 - [X] Flesh out playlists screens 
-- [] Add 3 dot menu to video feed for 'mark as watched', 'watch later', and 'save to playlist' actions
+- [X] Add 3 dot menu to video feed for 'mark as watched', 'watch later', and 'save to playlist' actions
+- [X] Add watch progress and video duration badges
 - [] Test native and companion search functionality (and the enhanced LTI search toggle)
 - [] Format landscape video player 
 - [] Enable background play
@@ -15,3 +16,6 @@
 - [] Android TV styles/versions of screens
 - [] Chromecast support that triggers the Android TV version to open to that video(?)
 - [] Pollsplane integration on the VODs(?)
+
+## Fixes
+- [] Remove extra line in playlist sheet

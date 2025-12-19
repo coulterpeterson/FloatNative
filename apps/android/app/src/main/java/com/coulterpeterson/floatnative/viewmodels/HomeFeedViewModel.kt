@@ -11,6 +11,7 @@ import com.coulterpeterson.floatnative.api.PlaylistAddRequest
 import com.coulterpeterson.floatnative.api.PlaylistRemoveRequest
 import com.coulterpeterson.floatnative.api.PlaylistCreateRequest
 import com.coulterpeterson.floatnative.openapi.models.UpdateProgressRequest
+import com.coulterpeterson.floatnative.openapi.models.GetProgressRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -108,11 +109,14 @@ class HomeFeedViewModel : ViewModel() {
                         if (response.isSuccessful && response.body() != null) {
                             val feedData = response.body()!!
                             val newPosts = feedData.blogPosts
-                            if (newPosts != null) {
+                            if (newPosts.isNullOrEmpty()) {
+                                _state.value = HomeFeedState.Content(posts = emptyList())
+                            } else {
                                 currentPosts.addAll(newPosts)
+                                lastCursors = feedData.lastElements
+                                _state.value = HomeFeedState.Content(currentPosts.toList())
+                                fetchWatchProgress(newPosts)
                             }
-                            lastCursors = feedData.lastElements
-                            _state.value = HomeFeedState.Content(currentPosts.toList())
                         } else {
                             _state.value = HomeFeedState.Error("Failed to load feed")
                         }
@@ -128,6 +132,7 @@ class HomeFeedViewModel : ViewModel() {
                             currentPosts.addAll(newPosts)
                             lastFetchAfter = newPosts.size
                             _state.value = HomeFeedState.Content(currentPosts.toList())
+                            fetchWatchProgress(newPosts)
                         } else {
                             _state.value = HomeFeedState.Error("Failed to load creator feed")
                         }
@@ -144,6 +149,7 @@ class HomeFeedViewModel : ViewModel() {
                             currentPosts.addAll(newPosts)
                             lastFetchAfter = newPosts.size
                             _state.value = HomeFeedState.Content(currentPosts.toList())
+                            fetchWatchProgress(newPosts)
                         } else {
                             _state.value = HomeFeedState.Error("Failed to load channel feed")
                         }
@@ -213,6 +219,7 @@ class HomeFeedViewModel : ViewModel() {
                             
                             if (!newPosts.isNullOrEmpty()) {
                                 handleNewPosts(newPosts)
+                                fetchWatchProgress(newPosts)
                             }
                             lastCursors = feedData.lastElements
                         }
@@ -228,6 +235,7 @@ class HomeFeedViewModel : ViewModel() {
                             if (newPosts.isNotEmpty()) {
                                 handleNewPosts(newPosts)
                                 lastFetchAfter += newPosts.size
+                                fetchWatchProgress(newPosts)
                             }
                         }
                     }
@@ -243,6 +251,7 @@ class HomeFeedViewModel : ViewModel() {
                              if (newPosts.isNotEmpty()) {
                                 handleNewPosts(newPosts)
                                 lastFetchAfter += newPosts.size
+                                fetchWatchProgress(newPosts)
                             }
                         }
                     }
@@ -270,6 +279,9 @@ class HomeFeedViewModel : ViewModel() {
     private val _userPlaylists = MutableStateFlow<List<Playlist>>(emptyList())
     val userPlaylists = _userPlaylists.asStateFlow()
 
+    private val _watchProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val watchProgress = _watchProgress.asStateFlow()
+
     fun loadPlaylists() {
         viewModelScope.launch {
             try {
@@ -287,6 +299,9 @@ class HomeFeedViewModel : ViewModel() {
     fun markAsWatched(post: BlogPostModelV3) {
         viewModelScope.launch {
             try {
+                 // Optimistic update
+                 _watchProgress.value = _watchProgress.value + (post.id to 1.0f)
+                 
                  val videoId = post.videoAttachments?.firstOrNull() ?: return@launch
                  // duration is BigDecimal, progress expects Int (seconds)
                  val durationSeconds = post.metadata.videoDuration.toInt()
@@ -299,6 +314,7 @@ class HomeFeedViewModel : ViewModel() {
                      )
                  )
             } catch (e: Exception) {
+                // Revert optimistic update? For now sticking with user request for immediate feedback
                 e.printStackTrace()
             }
         }
@@ -374,11 +390,36 @@ class HomeFeedViewModel : ViewModel() {
     }
 
     private suspend fun ensureCompanionLogin() {
-        val tokenManager = FloatplaneApi.tokenManager
-        if (tokenManager.companionApiKey == null) {
-             try {
-                 com.coulterpeterson.floatnative.api.FloatplaneApi.ensureCompanionLogin()
-             } catch(e: Exception) { }
+        FloatplaneApi.ensureCompanionLogin()
+    }
+
+    private fun fetchWatchProgress(posts: List<BlogPostModelV3>) {
+        val videoPosts = posts.filter { it.metadata.hasVideo == true }
+        if (videoPosts.isEmpty()) return
+
+        val ids = videoPosts.map { it.id }
+        viewModelScope.launch {
+            try {
+                // Batch requests in chunks of 20
+                ids.chunked(20).forEach { batchIds ->
+                    val response = FloatplaneApi.contentV3.getProgress(
+                        getProgressRequest = GetProgressRequest(
+                            ids = batchIds,
+                            contentType = GetProgressRequest.ContentType.blogPost
+                        )
+                    )
+                    
+                    if (response.isSuccessful && response.body() != null) {
+                        val progressMap = response.body()!!.associate { 
+                             it.id to (it.progress.toFloat() / 100f).coerceIn(0f, 1f)
+                        }
+                        
+                        _watchProgress.value = _watchProgress.value + progressMap
+                    }
+                }
+            } catch (e: Exception) {
+               e.printStackTrace()
+            }
         }
     }
 }

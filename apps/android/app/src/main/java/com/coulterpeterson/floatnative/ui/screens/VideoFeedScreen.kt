@@ -60,6 +60,7 @@ fun VideoFeedScreen(
     val filter by viewModel.filter.collectAsState()
     // State for playlists and sheet
     val userPlaylists by viewModel.userPlaylists.collectAsState()
+    val watchProgress by viewModel.watchProgress.collectAsState()
     var showPlaylistSheet by remember { mutableStateOf(false) }
     var selectedPostForMenu by remember { mutableStateOf<com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -149,6 +150,7 @@ fun VideoFeedScreen(
 
                              VideoCard(
                                 post = post,
+                                progress = watchProgress[post.id] ?: 0f,
                                 onClick = {
                                     onPlayVideo(post.id)
                                 },

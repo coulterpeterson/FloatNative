@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
 import coil.compose.AsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -22,6 +23,7 @@ fun PlaylistVideoCard(
     post: ContentPostV3Response,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
+    progress: Float = 0f,
     menuItems: (@Composable ColumnScope.(onDismiss: () -> Unit) -> Unit)? = null
 ) {
     Card(
@@ -43,8 +45,50 @@ fun PlaylistVideoCard(
                     model = post.thumbnail?.path?.toString(),
                     contentDescription = post.title,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
                 )
+                
+                // Duration Badge
+                if (post.metadata.videoDuration.toLong() > 0) {
+                    Surface(
+                        color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.8f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                        modifier = Modifier
+                            .align(androidx.compose.ui.Alignment.BottomEnd)
+                            .padding(6.dp)
+                    ) {
+                        Text(
+                            text = formatDuration(post.metadata.videoDuration.toLong()),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = androidx.compose.ui.graphics.Color.White,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                // Progress Bar
+                if (progress > 0f) {
+                     Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .align(androidx.compose.ui.Alignment.BottomStart)
+                            .padding(bottom = 0.dp)
+                     ) {
+                         // Background
+                         Box(
+                             modifier = Modifier
+                                 .fillMaxSize()
+                                 .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.3f))
+                         )
+                         // Progress
+                         Box(
+                             modifier = Modifier
+                                 .fillMaxWidth(fraction = progress.coerceIn(0f, 1f))
+                                 .fillMaxHeight()
+                                 .background(androidx.compose.ui.graphics.Color.Red)
+                         )
+                     }
+                }
             }
 
             // Metadata

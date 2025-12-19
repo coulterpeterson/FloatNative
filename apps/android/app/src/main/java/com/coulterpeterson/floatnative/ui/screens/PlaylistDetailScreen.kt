@@ -27,7 +27,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.coulterpeterson.floatnative.ui.components.PlaylistVideoCard
 import com.coulterpeterson.floatnative.viewmodels.PlaylistDetailState
 import com.coulterpeterson.floatnative.viewmodels.PlaylistDetailViewModel
-
+import com.coulterpeterson.floatnative.ui.components.PlaylistSelectionSheet
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.padding
 
@@ -45,9 +49,20 @@ fun PlaylistDetailScreen(
     }
 
     val state by viewModel.state.collectAsState()
+    val watchProgress by viewModel.watchProgress.collectAsState()
     
     // State to manage which video's menu is open (No longer needed with internal menu)
-    var openMenuVideoId by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    // var openMenuVideoId by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    
+    val userPlaylists by viewModel.userPlaylists.collectAsState()
+    var showPlaylistSheet by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var selectedPostForMenu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response?>(null) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = LocalContext.current
+    
+    LaunchedEffect(Unit) {
+        viewModel.loadPlaylists()
+    }
 
     // Scaffold removed to reuse MainScreen TopBar
     /*
@@ -92,26 +107,65 @@ fun PlaylistDetailScreen(
                                 Box {
                                     PlaylistVideoCard(
                                         post = post,
+                                        progress = watchProgress[post.id] ?: 0f,
                                         onClick = { onPlayVideo(post.id) },
-                                        menuItems = { onDismiss -> 
+                                         menuItems = { onDismiss -> 
+                                             DropdownMenuItem(
+                                                text = { Text("Mark as Watched") },
+                                                onClick = {
+                                                    viewModel.markAsWatched(post)
+                                                    onDismiss()
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Save to Playlist") },
+                                                onClick = {
+                                                    selectedPostForMenu = post
+                                                    showPlaylistSheet = true
+                                                    onDismiss()
+                                                }
+                                            )
                                              DropdownMenuItem(
                                                 text = { Text("Remove from Playlist") },
                                                 onClick = {
                                                     viewModel.removeVideoFromPlaylist(playlistId, post.id)
                                                     onDismiss()
-                                                    openMenuVideoId = null // cleanup unused state logic
                                                 },
                                                 leadingIcon = {
                                                     Icon(Icons.Default.Delete, contentDescription = null)
                                                 }
                                             )
-                                        }
+                                         }
                                     )
                                 }
                             }
                         }
                     }
                 }
+            }
+
+            if (showPlaylistSheet && selectedPostForMenu != null) {
+                 ModalBottomSheet(
+                    onDismissRequest = { showPlaylistSheet = false },
+                     sheetState = sheetState
+                 ) {
+                     PlaylistSelectionSheet(
+                         playlists = userPlaylists,
+                         videoId = selectedPostForMenu!!.id,
+                         onToggleWatchLater = { 
+                              selectedPostForMenu?.let { p ->
+                                  viewModel.toggleWatchLater(p) { wasAdded ->
+                                      val msg = if (wasAdded) "Added to Watch Later" else "Removed from Watch Later"
+                                      Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() 
+                                  }
+                              }
+                         },
+                         onAddToPlaylist = { id -> viewModel.addToPlaylist(id, selectedPostForMenu!!.id) },
+                         onRemoveFromPlaylist = { id -> viewModel.removeFromPlaylistApi(id, selectedPostForMenu!!.id) },
+                         onCreatePlaylist = { name -> viewModel.createPlaylist(name) },
+                         onDismiss = { showPlaylistSheet = false }
+                     )
+                 }
             }
         }
     // }
