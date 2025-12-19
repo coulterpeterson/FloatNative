@@ -40,6 +40,26 @@ data class PlaylistCreateRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class PlaylistAddRequest(
+    @Json(name = "video_id") val videoId: String
+)
+
+@JsonClass(generateAdapter = true)
+data class PlaylistRemoveRequest(
+    @Json(name = "video_id") val videoId: String
+)
+
+@JsonClass(generateAdapter = true)
+data class WatchLaterAddRequest(
+    @Json(name = "video_id") val videoId: String
+)
+
+@JsonClass(generateAdapter = true)
+data class WatchLaterResponse(
+    val message: String
+)
+
+@JsonClass(generateAdapter = true)
 data class LTTSearchResponse(
     val query: String,
     val count: Int,

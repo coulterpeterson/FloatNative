@@ -49,6 +49,7 @@ fun VideoActionButtons(
     onDislikeClick: () -> Unit,
     onDownloadClick: () -> Unit,
     onQualityClick: () -> Unit,
+    onPlaylistClick: () -> Unit,
     qualityLabel: String
 ) {
     Row(
@@ -73,6 +74,13 @@ fun VideoActionButtons(
             onClick = onDislikeClick
         )
 
+        // Playlist Button (Swapped with Download)
+        ActionButton(
+            icon = Icons.Default.List, 
+            label = "Playlist", // Renamed from Save
+            onClick = onPlaylistClick
+        )
+
         // Download Button
         ActionButton(
             icon = Icons.Default.Download,
@@ -80,7 +88,7 @@ fun VideoActionButtons(
             onClick = onDownloadClick
         )
 
-        // Quality Button (Replaces Share)
+        // Quality Button
         ActionButton(
             icon = Icons.Default.Settings,
             label = qualityLabel,
@@ -465,6 +473,169 @@ private fun buildTimestampAnnotatedString(text: String): androidx.compose.ui.tex
                 start = match.start,
                 end = match.end
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PlaylistSelectionSheet(
+    playlists: List<com.coulterpeterson.floatnative.api.Playlist>,
+    videoId: String,
+    onToggleWatchLater: () -> Unit,
+    onAddToPlaylist: (String) -> Unit,
+    onRemoveFromPlaylist: (String) -> Unit,
+    onCreatePlaylist: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var newPlaylistName by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .navigationBarsPadding()
+            .imePadding()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Save to...",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = "Close")
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Watch Later
+        val watchLater = playlists.find { it.isWatchLater }
+        val isWatchLaterSelected = watchLater?.videoIds?.contains(videoId) == true
+        PlaylistItemRow(
+            name = "Watch Later",
+            isSelected = isWatchLaterSelected,
+            isLocked = true,
+            onCheckedChange = { onToggleWatchLater() }
+        )
+        
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Playlists List
+        LazyColumn {
+            // Other Playlists
+            items(playlists.filter { !it.isWatchLater }) { playlist ->
+                PlaylistItemRow(
+                    name = playlist.name,
+                    isSelected = playlist.videoIds.contains(videoId),
+                    onCheckedChange = { isSelected ->
+                        if (isSelected) {
+                            onAddToPlaylist(playlist.id)
+                        } else {
+                            onRemoveFromPlaylist(playlist.id)
+                        }
+                    }
+                )
+            }
+            
+            item {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            }
+            
+            // Create New (Always at bottom)
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showCreateDialog = true }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Create")
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("Create new playlist", style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            
+            // Bottom padding for aesthetics
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+    
+    if (showCreateDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateDialog = false },
+            title = { Text("Create new playlist") },
+            text = {
+                OutlinedTextField(
+                    value = newPlaylistName,
+                    onValueChange = { newPlaylistName = it },
+                    label = { Text("Playlist name") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newPlaylistName.isNotBlank()) {
+                            onCreatePlaylist(newPlaylistName)
+                            showCreateDialog = false
+                            newPlaylistName = ""
+                        }
+                    }
+                ) {
+                    Text("Create")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun PlaylistItemRow(
+    name: String,
+    isSelected: Boolean,
+    isLocked: Boolean = false,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp), // Reduce padding slightly so touch target is mainly the row
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = isSelected,
+            onCheckedChange = onCheckedChange
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .clickable { onCheckedChange(!isSelected) }
+                .padding(vertical = 12.dp),
+             verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(name, style = MaterialTheme.typography.bodyLarge)
+            
+            if (isLocked) {
+                 Spacer(modifier = Modifier.weight(1f)) // Push lock to end
+                 Icon(Icons.Default.Lock, contentDescription = "Private", modifier = Modifier.size(16.dp))
+            }
         }
     }
 }

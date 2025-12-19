@@ -43,7 +43,10 @@ sealed class VideoPlayerState {
         val currentQuality: CdnDeliveryV3Variant? = null,
         val group: CdnDeliveryV3Group? = null,
         val currentUser: UserModel? = null,
-        val replyingToComment: CommentModel? = null
+        val replyingToComment: CommentModel? = null,
+        // Playlist State
+        val userPlaylists: List<com.coulterpeterson.floatnative.api.Playlist> = emptyList(),
+        val showPlaylistSheet: Boolean = false
     ) : VideoPlayerState()
     data class Error(val message: String) : VideoPlayerState()
 }
@@ -625,6 +628,153 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     fun seekTo(position: Long) {
         viewModelScope.launch {
             _playerAction.emit(PlayerAction.Seek(position))
+        }
+    }
+
+    fun togglePlaylistSheet(show: Boolean) {
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+        _state.value = currentState.copy(showPlaylistSheet = show)
+        if (show) {
+            fetchPlaylists()
+        }
+    }
+
+    private fun fetchPlaylists() {
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+        viewModelScope.launch {
+            try {
+                // Ensure logged in (fire and forget check, simple for now)
+                FloatplaneApi.ensureCompanionLogin()
+                
+                val response = FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
+                if (response.isSuccessful && response.body() != null) {
+                    val playlists = response.body()!!.playlists
+                    val updatedState = (_state.value as? VideoPlayerState.Content)?.copy(userPlaylists = playlists)
+                    if (updatedState != null) _state.value = updatedState
+                }
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+    }
+
+    fun createPlaylist(name: String) {
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+        viewModelScope.launch {
+            try {
+                val response = FloatplaneApi.companionApi.createPlaylist(com.coulterpeterson.floatnative.api.PlaylistCreateRequest(name))
+                if (response.isSuccessful && response.body() != null) {
+                    // Refresh playlists
+                    fetchPlaylists()
+                }
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+    }
+
+    fun addToPlaylist(playlistId: String) {
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+        val videoId = currentState.blogPost.videoAttachments?.firstOrNull()?.id ?: return
+
+        // Optimistic update
+        val updatedPlaylists = currentState.userPlaylists.map { playlist ->
+            if (playlist.id == playlistId) {
+                playlist.copy(videoIds = playlist.videoIds + videoId)
+            } else {
+                playlist
+            }
+        }
+        _state.value = currentState.copy(userPlaylists = updatedPlaylists)
+
+        viewModelScope.launch {
+            try {
+                FloatplaneApi.companionApi.addToPlaylist(
+                    id = playlistId,
+                    request = com.coulterpeterson.floatnative.api.PlaylistAddRequest(videoId)
+                )
+            } catch (e: Exception) {
+                // Revert?
+                fetchPlaylists()
+            }
+        }
+    }
+
+    fun removeFromPlaylist(playlistId: String) {
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+        val videoId = currentState.blogPost.videoAttachments?.firstOrNull()?.id ?: return
+
+        // Optimistic update
+        val updatedPlaylists = currentState.userPlaylists.map { playlist ->
+            if (playlist.id == playlistId) {
+                playlist.copy(videoIds = playlist.videoIds - videoId)
+            } else {
+                playlist
+            }
+        }
+        _state.value = currentState.copy(userPlaylists = updatedPlaylists)
+
+        viewModelScope.launch {
+            try {
+                FloatplaneApi.companionApi.removeFromPlaylist(
+                    id = playlistId,
+                    request = com.coulterpeterson.floatnative.api.PlaylistRemoveRequest(videoId)
+                )
+            } catch (e: Exception) {
+                fetchPlaylists() // Revert
+            }
+        }
+    }
+
+    fun toggleWatchLater() {
+        // Watch Later needs special handling for "Add" vs "Remove"?
+        // The API has specific addToWatchLater endpoint, but delete is generic?
+        // Wait, current API `addToWatchLater` is POST/PATCH. 
+        // Is there `removeFromWatchLater`? 
+        // The iOS code shows `addToWatchLater`. 
+        // For remove, it seems we might need to find the "Watch Later" playlist ID and use generic remove?
+        // Let's check `userPlaylists` for `isWatchLater = true`.
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+        val videoId = currentState.blogPost.videoAttachments?.firstOrNull()?.id ?: return
+        val watchLaterPlaylist = currentState.userPlaylists.find { it.isWatchLater }
+        
+        if (watchLaterPlaylist == null) {
+            // If we don't have it, try adding via special endpoint which might init it?
+             viewModelScope.launch {
+                try {
+                    FloatplaneApi.companionApi.addToWatchLater(com.coulterpeterson.floatnative.api.WatchLaterAddRequest(videoId))
+                    fetchPlaylists()
+                } catch (e: Exception) {}
+             }
+             return
+        }
+
+        val isInWatchLater = watchLaterPlaylist.videoIds.contains(videoId)
+        
+        if (isInWatchLater) {
+            removeFromPlaylist(watchLaterPlaylist.id)
+        } else {
+            // Use special endpoint for adding to watch later as it might be safer/server logic?
+            // Or just use generic addToPlaylist(watchLaterPlaylist.id)
+            // iOS uses `addToWatchLater` explicitly.
+            
+            // Optimistic update
+             val updatedPlaylists = currentState.userPlaylists.map { playlist ->
+                if (playlist.id == watchLaterPlaylist.id) {
+                    playlist.copy(videoIds = playlist.videoIds + videoId)
+                } else {
+                    playlist
+                }
+            }
+            _state.value = currentState.copy(userPlaylists = updatedPlaylists)
+            
+            viewModelScope.launch {
+                try {
+                    FloatplaneApi.companionApi.addToWatchLater(com.coulterpeterson.floatnative.api.WatchLaterAddRequest(videoId))
+                } catch (e: Exception) {
+                    fetchPlaylists()
+                }
+            }
         }
     }
 }

@@ -212,6 +212,7 @@ fun VideoPlayerScreen(
                                     onDislikeClick = { viewModel.toggleDislike() },
                                     onDownloadClick = { viewModel.downloadVideo() },
                                     onQualityClick = { showQualityDialog = true },
+                                    onPlaylistClick = { viewModel.togglePlaylistSheet(true) },
                                     qualityLabel = currentState.currentQuality?.label ?: "Auto"
                                 )
                                 Divider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
@@ -373,6 +374,25 @@ fun VideoPlayerScreen(
             }
         }
     }
+    // Playlist Sheet
+    val contentState = state as? VideoPlayerState.Content
+    if (contentState?.showPlaylistSheet == true) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.togglePlaylistSheet(false) },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            com.coulterpeterson.floatnative.ui.components.PlaylistSelectionSheet(
+                playlists = contentState.userPlaylists,
+                videoId = contentState.blogPost.videoAttachments?.firstOrNull()?.id ?: "",
+                onToggleWatchLater = { viewModel.toggleWatchLater() },
+                onAddToPlaylist = { id -> viewModel.addToPlaylist(id) },
+                onRemoveFromPlaylist = { id -> viewModel.removeFromPlaylist(id) },
+                onCreatePlaylist = { name -> viewModel.createPlaylist(name) },
+                onDismiss = { viewModel.togglePlaylistSheet(false) }
+            )
+        }
+    }
+
     if (downloadState) {
         Dialog(onDismissRequest = { /* Prevent dismiss */ }) {
             Card(

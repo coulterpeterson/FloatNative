@@ -178,4 +178,27 @@ object FloatplaneApi {
              android.util.Log.e("FloatplaneApi", "Companion Login Failed: ${companionResponse.code()}")
         }
     }
+
+    suspend fun ensureCompanionLogin() {
+        if (tokenManager.companionApiKey != null) return
+
+        val accessToken = tokenManager.accessToken ?: return
+        // Generate DPoP for user/self
+        val userSelfUrl = "https://www.floatplane.com/api/v3/user/self"
+        val loginProof = dpopManager.generateProof("GET", userSelfUrl, accessToken)
+        
+        val loginRequest = CompanionLoginRequest(
+            accessToken = accessToken,
+            dpopProof = loginProof
+        )
+        
+        try {
+            val response = companionApi.login(loginRequest)
+            if (response.isSuccessful && response.body() != null) {
+                tokenManager.companionApiKey = response.body()!!.apiKey
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("FloatplaneApi", "Failed to ensure companion login", e)
+        }
+    }
 }

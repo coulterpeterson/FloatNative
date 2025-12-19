@@ -23,5 +23,15 @@ interface CompanionApi {
     @POST("/auth/logout")
     suspend fun logout(): Response<Unit>
 
-    // Add other endpoints as needed (add/remove video, etc.)
+    @retrofit2.http.PATCH("/watch-later/add")
+    suspend fun addToWatchLater(@Body request: WatchLaterAddRequest): Response<WatchLaterResponse>
+
+    @retrofit2.http.DELETE("/playlists/{id}")
+    suspend fun deletePlaylist(@retrofit2.http.Path("id") id: String): Response<Unit>
+
+    @retrofit2.http.PATCH("/playlists/{id}/add")
+    suspend fun addToPlaylist(@retrofit2.http.Path("id") id: String, @Body request: PlaylistAddRequest): Response<Playlist>
+
+    @retrofit2.http.PATCH("/playlists/{id}/remove")
+    suspend fun removeFromPlaylist(@retrofit2.http.Path("id") id: String, @Body request: PlaylistRemoveRequest): Response<Playlist>
 }
