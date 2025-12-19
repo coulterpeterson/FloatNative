@@ -280,6 +280,24 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                         group = group
                     )
                     
+                    // Fetch Video Progress (Fire and Forget / Parallel)
+                    launch {
+                        try {
+                            val videoContentResponse = FloatplaneApi.contentV3.getVideoContent(videoId)
+                            if (videoContentResponse.isSuccessful && videoContentResponse.body() != null) {
+                                val videoContent = videoContentResponse.body()!!
+                                val progressSeconds = videoContent.progress
+                                if (progressSeconds != null && progressSeconds > 0) {
+                                    // Seek to progress (convert to ms)
+                                    // We use the playerAction flow to ensure it happens on the player
+                                    _playerAction.emit(PlayerAction.Seek(progressSeconds.toLong() * 1000L))
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Ignore progress fetch failure
+                        }
+                    }
+                    
                     // Load comments after initial content load
                     loadComments(postId)
                     
