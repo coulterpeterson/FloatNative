@@ -158,16 +158,33 @@ fun VideoDescription(
         Spacer(modifier = Modifier.height(12.dp))
 
         if (isExpanded) {
+            // Capture theme colors in Composable context
+            val textColor = MaterialTheme.colorScheme.onSurface
+            val linkColor = MaterialTheme.colorScheme.primary
+            
+            // Convert Compose Color to Android Color
+            val androidTextColor = android.graphics.Color.argb(
+                (textColor.alpha * 255).toInt(),
+                (textColor.red * 255).toInt(),
+                (textColor.green * 255).toInt(),
+                (textColor.blue * 255).toInt()
+            )
+            
+            val androidLinkColor = android.graphics.Color.argb(
+                (linkColor.alpha * 255).toInt(),
+                (linkColor.red * 255).toInt(),
+                (linkColor.green * 255).toInt(),
+                (linkColor.blue * 255).toInt()
+            )
+            
             AndroidView(
                 factory = { context ->
-                    TextView(context).apply {
-                        setTextColor(android.graphics.Color.WHITE) // TODO: Use theme color
-                        setLinkTextColor(android.graphics.Color.CYAN)
-                        // Make links clickable
-                        movementMethod = android.text.method.LinkMovementMethod.getInstance()
-                    }
+                    TextView(context)
                 },
                 update = { textView ->
+                    textView.setTextColor(androidTextColor)
+                    textView.setLinkTextColor(androidLinkColor)
+                    textView.movementMethod = android.text.method.LinkMovementMethod.getInstance()
                     textView.text = processDescription(descriptionHtml, onSeek)
                 }
             )

@@ -19,7 +19,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -44,6 +46,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import android.app.Activity
 import com.coulterpeterson.floatnative.LocalPipMode
+import coil.compose.AsyncImage
+import androidx.compose.foundation.shape.CircleShape
 
 @OptIn(UnstableApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -222,18 +226,38 @@ fun VideoPlayerScreen(
                         ) {
                             // Title & Metadata
                             item {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text(
-                                        text = currentState.blogPost.title,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Channel Logo
+                                    val channelIcon = currentState.blogPost.channel.icon?.childImages?.firstOrNull()?.path 
+                                        ?: currentState.blogPost.channel.icon?.path
+                                    
+                                    AsyncImage(
+                                        model = channelIcon?.toString(),
+                                        contentDescription = currentState.blogPost.channel.title,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
                                     )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "${currentState.blogPost.channel.title} • ${DateUtils.getRelativeTimeSpanString(currentState.blogPost.releaseDate.toInstant().toEpochMilli())}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = currentState.blogPost.title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "${currentState.blogPost.channel.title} • ${DateUtils.getRelativeTimeSpanString(currentState.blogPost.releaseDate.toInstant().toEpochMilli())}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                             
