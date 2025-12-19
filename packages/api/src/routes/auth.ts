@@ -1,7 +1,7 @@
 import { Hono, Context } from 'hono';
 import { eq } from 'drizzle-orm';
 import { users, deviceSessions } from '../db/schema';
-import { validateFloatplaneCookie, validateFloatplaneToken, extractDPoPJKT, FloatplaneAPIError } from '../services/floatplane';
+import { validateFloatplaneCookie, validateFloatplaneToken, validateFloatplaneTokenLocally, extractDPoPJKT, FloatplaneAPIError } from '../services/floatplane';
 import { generateAPIKey } from '../utils/auth';
 import { getOrCreateWatchLater } from '../services/playlist';
 import type { Env } from '../db';
@@ -59,17 +59,15 @@ auth.post('/login', rateLimit('AUTH_STRICT_LIMITER', byIP), async (c) => {
       );
     }
 
-    // Validate Floatplane token and get user ID
+    // Validate Floatplane token locally by decoding JWT
+    // We can't call Floatplane's API because the token is DPoP-bound to the device
+    // and we don't have the device's private key to generate valid DPoP proofs
     let floatplaneUserId: string;
     try {
-      floatplaneUserId = await validateFloatplaneToken(
-        access_token,
-        c.env.FLOATPLANE_API_URL,
-        dpop_proof
-      );
+      floatplaneUserId = validateFloatplaneTokenLocally(access_token);
     } catch (error) {
       if (error instanceof FloatplaneAPIError) {
-        if (error.statusCode === 401 || error.statusCode === 403) {
+        if (error.statusCode === 401) {
           return c.json(
             {
               error: 'Unauthorized',
@@ -78,13 +76,13 @@ auth.post('/login', rateLimit('AUTH_STRICT_LIMITER', byIP), async (c) => {
             401
           );
         }
-        logError(c, error, 'Floatplane API error');
+        logError(c, error, 'JWT validation error');
         return c.json(
           {
-            error: 'Bad Gateway',
-            message: 'Failed to validate Floatplane credentials',
+            error: 'Bad Request',
+            message: 'Failed to validate Floatplane token',
           },
-          502
+          400
         );
       }
       throw error;
