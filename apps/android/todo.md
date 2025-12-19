@@ -8,9 +8,9 @@
 - [X] Format landscape video player 
 - [X] Enable background play
 - [X] Enable PiP 
-- [] Implement live support
-- [X] Add actual FloatNative logo to app
 - [] Style login screen after the ios version
+- [X] Add actual FloatNative logo to app
+- [] Implement live support
 - [] Change support link to discord server
 - [] Tablet grid styles
 - [] Android TV styles/versions of screens
@@ -21,4 +21,4 @@
 - [X] PiP shouldn't launch unless we're existing from a playing video
 - [X] Status bar should be white in dark mode
 - [X] Start video playback at current watch progress
-- [] Remove extra line in playlist sheet
+- [X] Remove extra line in playlist sheet

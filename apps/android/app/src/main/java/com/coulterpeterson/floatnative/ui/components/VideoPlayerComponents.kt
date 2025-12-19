@@ -525,7 +525,7 @@ fun PlaylistSelectionSheet(
             onCheckedChange = { onToggleWatchLater() }
         )
         
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
 
         // Playlists List
         LazyColumn {
