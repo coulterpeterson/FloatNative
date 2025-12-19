@@ -23,6 +23,11 @@ import kotlinx.coroutines.withContext
 import androidx.core.content.FileProvider
 import okhttp3.Request
 import java.io.InputStream
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
 sealed class VideoPlayerState {
     object Idle : VideoPlayerState()
@@ -71,6 +76,27 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _playerAction = MutableSharedFlow<PlayerAction>()
     val playerAction = _playerAction.asSharedFlow()
+
+    @androidx.annotation.OptIn(UnstableApi::class)
+    val player: ExoPlayer by lazy {
+        val context = getApplication<Application>()
+        val dataSourceFactory = OkHttpDataSource.Factory(
+            FloatplaneApi.okHttpClient
+        )
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build()
+            .apply {
+                playWhenReady = true
+            }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        player.release()
+    }
 
     fun downloadVideo() {
         val currentState = _state.value as? VideoPlayerState.Content ?: return

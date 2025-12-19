@@ -4,8 +4,8 @@
 - [X] Flesh out playlists screens 
 - [X] Add 3 dot menu to video feed for 'mark as watched', 'watch later', and 'save to playlist' actions
 - [X] Add watch progress and video duration badges
-- [] Test native and companion search functionality (and the enhanced LTI search toggle)
-- [] Format landscape video player 
+- [X] Test native and companion search functionality (and the enhanced LTI search toggle)
+- [X] Format landscape video player 
 - [] Enable background play
 - [] Enable PiP 
 - [] Implement live support

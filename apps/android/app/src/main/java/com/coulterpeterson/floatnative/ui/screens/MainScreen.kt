@@ -38,17 +38,16 @@ fun MainScreen(
     onNavigateToSettings: () -> Unit = {}
 ) {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isVideo = currentRoute == "video/{postId}"
+    
+    val isPlaylist = currentRoute?.startsWith("playlist/") == true
 
     Scaffold(
         topBar = {
-            val navBackStackEntry by navController.currentBackStackEntryAsState()
-            val currentRoute = navBackStackEntry?.destination?.route
-            val configuration = LocalConfiguration.current
-            val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-            val isVideo = currentRoute == "video/{postId}"
-            
-            val isPlaylist = currentRoute?.startsWith("playlist/") == true
-            
             // Hide TopBar in fullscreen video (landscape)
             if (isVideo && isLandscape) {
                 // No TopBar
@@ -113,7 +112,8 @@ fun MainScreen(
             }
         },
         bottomBar = {
-            NavigationBar {
+            if (!(isVideo && isLandscape)) {
+                NavigationBar {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
 
@@ -133,6 +133,7 @@ fun MainScreen(
                         }
                     )
                 }
+                    }
             }
         }
     ) { innerPadding ->

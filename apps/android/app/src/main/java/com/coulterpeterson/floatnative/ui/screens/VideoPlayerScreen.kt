@@ -39,6 +39,10 @@ import com.coulterpeterson.floatnative.ui.components.VideoActionButtons
 import com.coulterpeterson.floatnative.ui.components.VideoDescription
 import com.coulterpeterson.floatnative.viewmodels.VideoPlayerState
 import com.coulterpeterson.floatnative.viewmodels.VideoPlayerViewModel
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import android.app.Activity
 
 @OptIn(UnstableApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +57,19 @@ fun VideoPlayerScreen(
     val configuration = LocalConfiguration.current
     // Very simple check for landscape
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    
+    val window = (context as? Activity)?.window
+    LaunchedEffect(isLandscape, window) {
+        if (window != null) {
+            val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+            insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            if (isLandscape) {
+                insetsController.hide(WindowInsetsCompat.Type.systemBars())
+            } else {
+                insetsController.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
     
     var showQualityDialog by remember { mutableStateOf(false) }
     var showCommentInput by remember { mutableStateOf(false) }
@@ -71,27 +88,8 @@ fun VideoPlayerScreen(
         }
     }
 
-    // Initialize ExoPlayer
-    val exoPlayer = remember {
-        val dataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(
-            com.coulterpeterson.floatnative.api.FloatplaneApi.okHttpClient
-        )
-        val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(dataSourceFactory)
-
-        ExoPlayer.Builder(context)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build()
-            .apply {
-                playWhenReady = true
-            }
-    }
-
-    // Cleanup on dispose
-    DisposableEffect(Unit) {
-        onDispose {
-            exoPlayer.release()
-        }
-    }
+    // ExoPlayer is now managed by ViewModel to survive configuration changes
+    val exoPlayer = viewModel.player
 
     // Load video
     LaunchedEffect(postId) {
