@@ -47,12 +47,24 @@ fun MainScreen(
             val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
             val isVideo = currentRoute == "video/{postId}"
             
+            val isPlaylist = currentRoute?.startsWith("playlist/") == true
+            
             // Hide TopBar in fullscreen video (landscape)
             if (isVideo && isLandscape) {
                 // No TopBar
             } else if (currentRoute == Screen.History.route) {
                 TopAppBar(
                     title = { Text("Watch History") },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                )
+            } else if (isPlaylist) {
+                val playlistName = navBackStackEntry?.arguments?.getString("name") ?: "Playlist"
+                TopAppBar(
+                    title = { Text(playlistName) },
                     navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -197,11 +209,32 @@ fun MainScreen(
             }
             composable(Screen.Playlists.route) { 
                 PlaylistsScreen(
-                    onPlaylistClick = { playlistId ->
-                        // TODO: Navigate to Playlist Detail
+                    onPlaylistClick = { playlistId, playlistName ->
+                         navController.navigate("playlist/$playlistId?name=$playlistName")
                     }
                 ) 
             }
+            
+            composable(
+                route = "playlist/{playlistId}?name={name}",
+                arguments = listOf(
+                    navArgument("playlistId") { type = NavType.StringType },
+                    navArgument("name") { type = NavType.StringType; defaultValue = "Playlist" }
+                )
+            ) { backStackEntry ->
+                val playlistId = backStackEntry.arguments?.getString("playlistId") ?: return@composable
+                val playlistName = backStackEntry.arguments?.getString("name") ?: "Playlist"
+                
+                com.coulterpeterson.floatnative.ui.screens.PlaylistDetailScreen(
+                    playlistId = playlistId,
+                    playlistName = playlistName,
+                    onBackClick = { navController.popBackStack() },
+                    onPlayVideo = { videoId ->
+                        navController.navigate("video/$videoId")
+                    }
+                )
+            }
+
             composable(Screen.History.route) { 
                 HistoryScreen(
                     onVideoClick = { postId ->

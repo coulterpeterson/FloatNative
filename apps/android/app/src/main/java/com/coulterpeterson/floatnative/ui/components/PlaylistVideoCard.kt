@@ -10,25 +10,30 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response
+import com.coulterpeterson.floatnative.openapi.models.ImageModel
 
 @Composable
-fun VideoCard(
-    post: BlogPostModelV3,
+fun PlaylistVideoCard(
+    post: ContentPostV3Response,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
-    onMoreClick: (() -> Unit)? = null
+    menuItems: (@Composable ColumnScope.(onDismiss: () -> Unit) -> Unit)? = null
 ) {
     Card(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .padding(8.dp), // Check design system spacing
+            .padding(8.dp),
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
     ) {
         Column {
-            // Thumbnail
+            // ... (Thumb and Metadata start same)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -45,11 +50,7 @@ fun VideoCard(
             // Metadata
             Row(modifier = Modifier.padding(12.dp)) {
                 // Avatar
-                // iOS shows channel icon if available, else creator icon.
-                // Both channel and creator are non-nullable in BlogPostModelV3, but we use safe calls just in case.
-                
-                // Helper to get icon from ImageModel
-                fun getIconPath(imageModel: com.coulterpeterson.floatnative.openapi.models.ImageModel?): String? {
+                fun getIconPath(imageModel: ImageModel?): String? {
                     if (imageModel == null) return null
                     return (imageModel.childImages?.firstOrNull()?.path ?: imageModel.path).toString()
                 }
@@ -90,12 +91,21 @@ fun VideoCard(
                     )
                 }
                 
-                if (onMoreClick != null) {
-                    IconButton(onClick = onMoreClick) {
-                        Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.MoreVert,
-                            contentDescription = "More"
-                        )
+                if (menuItems != null) {
+                    Box {
+                        var expanded by remember { mutableStateOf(false) }
+                        IconButton(onClick = { expanded = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More"
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            menuItems(this) { expanded = false }
+                        }
                     }
                 }
             }
