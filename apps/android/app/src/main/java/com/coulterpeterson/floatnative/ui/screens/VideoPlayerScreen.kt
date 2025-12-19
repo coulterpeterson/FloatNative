@@ -43,6 +43,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import android.app.Activity
+import com.coulterpeterson.floatnative.LocalPipMode
 
 @OptIn(UnstableApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +56,10 @@ fun VideoPlayerScreen(
     val state by viewModel.state.collectAsState()
     val downloadState by viewModel.downloadState.collectAsState()
     val configuration = LocalConfiguration.current
-    // Very simple check for landscape
+    // Check PiP mode
+    val isInPipMode = LocalPipMode.current
+    
+    // Landscape or PiP means fullscreen player usually
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     val window = (context as? Activity)?.window
@@ -138,13 +142,37 @@ fun VideoPlayerScreen(
             }
         }
     }
+
+    // Monitor Video Size for PiP Aspect Ratio
+    DisposableEffect(exoPlayer) {
+        val listener = object : androidx.media3.common.Player.Listener {
+            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                super.onVideoSizeChanged(videoSize)
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    val ratio = android.util.Rational(videoSize.width, videoSize.height)
+                    (context as? com.coulterpeterson.floatnative.MainActivity)?.updatePipParams(ratio)
+                }
+            }
+        }
+        exoPlayer.addListener(listener)
+        // Check initial size
+        val format = exoPlayer.videoFormat
+        if (format != null && format.width > 0 && format.height > 0) {
+             val ratio = android.util.Rational(format.width, format.height)
+             (context as? com.coulterpeterson.floatnative.MainActivity)?.updatePipParams(ratio)
+        }
+        
+        onDispose {
+            exoPlayer.removeListener(listener)
+        }
+    }
     
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        if (isLandscape) {
-            // Fullscreen Player
+        if (isInPipMode || isLandscape) {
+            // Fullscreen Player (Landscape or PiP)
             Box(modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)) {
@@ -420,6 +448,7 @@ fun VideoPlayerView(exoPlayer: ExoPlayer) {
         factory = { ctx ->
             PlayerView(ctx).apply {
                 player = exoPlayer
+                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                 layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT

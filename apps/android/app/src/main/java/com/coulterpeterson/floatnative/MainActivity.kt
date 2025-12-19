@@ -15,8 +15,32 @@ import com.coulterpeterson.floatnative.ui.navigation.AppNavigation
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+
+val LocalPipMode = compositionLocalOf { false }
 
 class MainActivity : ComponentActivity() {
+    private var isInPipMode by mutableStateOf(false)
+    // Default aspect ratio 16:9
+    var pipParams: android.app.PictureInPictureParams.Builder? = null
+    
+    fun updatePipParams(aspectRatio: android.util.Rational?) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val ratio = aspectRatio ?: android.util.Rational(16, 9)
+            // Clamp ratio to valid Android limits if necessary (Android handles 2.39:1 to 1:2.39 mostly)
+            // Standard limit is often inclusive.
+            
+            val builder = android.app.PictureInPictureParams.Builder()
+                .setAspectRatio(ratio)
+            
+            pipParams = builder
+            setPictureInPictureParams(builder.build())
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -34,28 +58,55 @@ class MainActivity : ComponentActivity() {
             }
 
             FloatNativeTheme(darkTheme = isDarkTheme) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    val isTv = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
-                    
-                    val token = com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.accessToken
-                    val startDestination = if (!token.isNullOrEmpty()) {
-                        com.coulterpeterson.floatnative.ui.navigation.Screen.Home.route
-                    } else {
-                        com.coulterpeterson.floatnative.ui.navigation.Screen.Login.route
-                    }
+                CompositionLocalProvider(LocalPipMode provides isInPipMode) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        val isTv = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
+                        
+                        val token = com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.accessToken
+                        val startDestination = if (!token.isNullOrEmpty()) {
+                            com.coulterpeterson.floatnative.ui.navigation.Screen.Home.route
+                        } else {
+                            com.coulterpeterson.floatnative.ui.navigation.Screen.Login.route
+                        }
 
-                    if (isTv) {
-                        com.coulterpeterson.floatnative.ui.navigation.TvAppNavigation(startDestination = startDestination)
-                    } else {
-                         // I will abort this specific replace, modify TokenManager to have a Flow, then come back.
-                         AppNavigation(startDestination = startDestination)
+                        if (isTv) {
+                            com.coulterpeterson.floatnative.ui.navigation.TvAppNavigation(startDestination = startDestination)
+                        } else {
+                             // I will abort this specific replace, modify TokenManager to have a Flow, then come back.
+                             AppNavigation(startDestination = startDestination)
+                        }
                     }
                 }
             }
         }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            // Enter PiP mode if we are playing video? 
+            // For now, we assume if the user leaves, we try to enter PiP.
+            // A more robust check would be to consult the navigation graph or ViewModel.
+            // But this is a good baseline.
+            // Use stored params if available, otherwise default
+            // setPictureInPictureParams should have been called by VideoScreen already, 
+            // but we can call enter with builder.
+            // If we use enterPictureInPictureMode(params), it uses THOSE params.
+            // If we use pipParams var, we can use that.
+            
+            val params = pipParams?.build() ?: android.app.PictureInPictureParams.Builder()
+                .setAspectRatio(android.util.Rational(16, 9))
+                .build()
+            enterPictureInPictureMode(params)
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        isInPipMode = isInPictureInPictureMode
     }
     
     override fun onNewIntent(intent: android.content.Intent?) {

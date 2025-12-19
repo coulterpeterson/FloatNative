@@ -6,8 +6,8 @@
 - [X] Add watch progress and video duration badges
 - [X] Test native and companion search functionality (and the enhanced LTI search toggle)
 - [X] Format landscape video player 
-- [] Enable background play
-- [] Enable PiP 
+- [X] Enable background play
+- [X] Enable PiP 
 - [] Implement live support
 - [] Add actual FloatNative logo to app
 - [] Style login screen after the ios version
@@ -18,4 +18,5 @@
 - [] Pollsplane integration on the VODs(?)
 
 ## Fixes
+- [] Start video playback at current watch progress
 - [] Remove extra line in playlist sheet
