@@ -312,11 +312,26 @@ export async function fetchCreatorPosts(
   limit: number = 20,
   offset: number = 0
 ): Promise<FloatplanePost[]> {
+  const requestStartTime = Date.now();
+  const actualLimit = Math.min(limit, 20);
+
   try {
     const url = new URL(`${floatplaneApiUrl}/content/creator`);
     url.searchParams.set('id', creatorId);
-    url.searchParams.set('limit', Math.min(limit, 20).toString());
+    url.searchParams.set('limit', actualLimit.toString());
     url.searchParams.set('fetchAfter', offset.toString());
+
+    // Log API request attempt with structured metadata
+    console.log({
+      level: 'info',
+      message: 'Floatplane API request started',
+      endpoint: '/content/creator',
+      creatorId,
+      limit: actualLimit,
+      offset,
+      timestamp: new Date().toISOString(),
+      api_url: floatplaneApiUrl,
+    });
 
     const response = await fetch(url.toString(), {
       headers: {
@@ -329,18 +344,71 @@ export async function fetchCreatorPosts(
       },
     });
 
+    const requestDuration = Date.now() - requestStartTime;
+
     if (!response.ok) {
+      // Log failed API response with detailed metadata
+      console.error({
+        level: 'error',
+        message: 'Floatplane API request failed',
+        endpoint: '/content/creator',
+        creatorId,
+        limit: actualLimit,
+        offset,
+        statusCode: response.status,
+        statusText: response.statusText,
+        duration_ms: requestDuration,
+        timestamp: new Date().toISOString(),
+        api_url: floatplaneApiUrl,
+      });
+
       throw new FloatplaneAPIError(
         `Failed to fetch creator posts: ${response.statusText}`,
         response.status
       );
     }
 
-    return (await response.json()) as FloatplanePost[];
+    const posts = (await response.json()) as FloatplanePost[];
+
+    // Log successful API response with result metadata
+    console.log({
+      level: 'info',
+      message: 'Floatplane API request successful',
+      endpoint: '/content/creator',
+      creatorId,
+      limit: actualLimit,
+      offset,
+      statusCode: response.status,
+      posts_returned: posts.length,
+      duration_ms: requestDuration,
+      timestamp: new Date().toISOString(),
+      api_url: floatplaneApiUrl,
+    });
+
+    return posts;
   } catch (error) {
+    const requestDuration = Date.now() - requestStartTime;
+
     if (error instanceof FloatplaneAPIError) {
+      // Already logged above, just re-throw
       throw error;
     }
+
+    // Log unexpected errors with full context
+    console.error({
+      level: 'error',
+      message: 'Floatplane API request exception',
+      endpoint: '/content/creator',
+      creatorId,
+      limit: actualLimit,
+      offset,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      error_name: error instanceof Error ? error.name : 'Unknown',
+      stack: error instanceof Error ? error.stack : undefined,
+      duration_ms: requestDuration,
+      timestamp: new Date().toISOString(),
+      api_url: floatplaneApiUrl,
+    });
 
     throw new FloatplaneAPIError('Failed to fetch creator posts', undefined, error as Error);
   }
