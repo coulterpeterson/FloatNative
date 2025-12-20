@@ -253,7 +253,8 @@ class FloatplaneAPI: ObservableObject {
         method: String = "GET",
         body: Encodable? = nil,
         requiresAuth: Bool = false,
-        retryCount: Int = 0
+        retryCount: Int = 0,
+        allowRefreshOn403: Bool = false
     ) async throws {
         guard let url = URL(string: baseURL + endpoint) else {
             throw FloatplaneAPIError.invalidURL
@@ -336,15 +337,16 @@ class FloatplaneAPI: ObservableObject {
                     )
                 }
 
-                // Try OAuth Refresh first (Only for 401 Unauthorized)
-                if httpResponse.statusCode == 401 && refreshToken != nil {
+                // Try OAuth Refresh for 401 Unauthorized, or for 403 Forbidden if explicitly allowed (e.g., initial API calls)
+                if (httpResponse.statusCode == 401 || (httpResponse.statusCode == 403 && allowRefreshOn403)) && refreshToken != nil {
                      do {
                          try await ensureRefreshed()
                          return try await requestWithoutResponse(
                              endpoint: endpoint,
                              method: method,
                              body: body,
-                             requiresAuth: requiresAuth
+                             requiresAuth: requiresAuth,
+                             allowRefreshOn403: allowRefreshOn403
                          )
                      } catch {
                          throw error
@@ -361,7 +363,8 @@ class FloatplaneAPI: ObservableObject {
         method: String = "GET",
         body: Encodable? = nil,
         requiresAuth: Bool = false,
-        retryCount: Int = 0
+        retryCount: Int = 0,
+        allowRefreshOn403: Bool = false
     ) async throws -> T {
         guard let url = URL(string: baseURL + endpoint) else {
             throw FloatplaneAPIError.invalidURL
@@ -458,15 +461,16 @@ class FloatplaneAPI: ObservableObject {
                     )
                 }
 
-                // Try OAuth Refresh first (Only for 401 Unauthorized)
-                if httpResponse.statusCode == 401 && refreshToken != nil {
+                // Try OAuth Refresh for 401 Unauthorized, or for 403 Forbidden if explicitly allowed (e.g., initial API calls)
+                if (httpResponse.statusCode == 401 || (httpResponse.statusCode == 403 && allowRefreshOn403)) && refreshToken != nil {
                      do {
                          try await ensureRefreshed()
                          return try await request(
                              endpoint: endpoint,
                              method: method,
                              body: body,
-                             requiresAuth: requiresAuth
+                             requiresAuth: requiresAuth,
+                             allowRefreshOn403: allowRefreshOn403
                          )
                      } catch {
                          throw error
@@ -887,7 +891,8 @@ class FloatplaneAPI: ObservableObject {
     func getSubscriptions() async throws -> [Subscription] {
         try await request(
             endpoint: "/api/v3/user/subscriptions",
-            requiresAuth: true
+            requiresAuth: true,
+            allowRefreshOn403: true
         )
     }
 
@@ -1031,7 +1036,7 @@ class FloatplaneAPI: ObservableObject {
         }
 
         let endpoint = "/api/v3/content/creator/list?\(params.joined(separator: "&"))"
-        return try await request(endpoint: endpoint, requiresAuth: true)
+        return try await request(endpoint: endpoint, requiresAuth: true, allowRefreshOn403: true)
     }
 
     /// Get single blog post
