@@ -144,10 +144,10 @@ struct CustomVideoPlayer: UIViewControllerRepresentable {
     #endif
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
-        // Check if we should reuse existing playerViewController (for PiP restoration ONLY)
-        // Don't reuse during normal layout changes (like rotation) to avoid black screen
-        if AVPlayerManager.shared.hasPIPSession,
-           let existingController = AVPlayerManager.shared.playerViewController,
+        // Check if we should reuse existing playerViewController
+        // Reuse during: PiP restoration, fullscreen transitions, and layout changes (like rotation)
+        // This prevents black screen issues when AVPlayerViewController changes presentation mode
+        if let existingController = AVPlayerManager.shared.playerViewController,
            existingController.player === player,
            let existingDelegate = AVPlayerManager.shared.playerViewControllerDelegate {
 

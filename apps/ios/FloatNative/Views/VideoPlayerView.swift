@@ -68,13 +68,9 @@ struct VideoPlayerView: View {
                 Color.adaptiveBackground
                     .ignoresSafeArea()
 
-                if isLandscape {
-                    // Fullscreen video in landscape
-                    fullscreenVideoPlayer
-                } else {
-                    // Normal portrait layout
-                    portraitLayout
-                }
+                // Persistent Layout (Always use portrait layout structure)
+                // When rotating to landscape, we trigger native fullscreen instead of swapping views
+                portraitLayout
 
                 // Error state
                 if let error = errorMessage {
@@ -115,19 +111,29 @@ struct VideoPlayerView: View {
             #if !os(tvOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .navigationBarBackButtonHidden(false)
+            .navigationBarBackButtonHidden(false) // Always show back button in "portrait" view
             #if !os(tvOS)
-            .statusBar(hidden: isLandscape) // Hide status bar in landscape
+            .statusBar(hidden: false) // Always show status bar in "portrait" view
             #endif
-            .toolbar(isLandscape ? .hidden : .visible, for: .tabBar) // Hide tab bar in landscape
+            .toolbar(isLandscape ? .hidden : .visible, for: .tabBar)
             .globalMenu()
+            // We listen to device orientation change because GeometryReader doesn't update
+            // reliably when the native player is in fullscreen mode (covering this view).
+            .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+                let orientation = UIDevice.current.orientation
+                
+                if orientation.isLandscape {
+                    AVPlayerManager.shared.enterFullScreen()
+                } else if orientation == .portrait {
+                    // Only exit fullscreen on standard portrait, ignore upside down
+                    AVPlayerManager.shared.exitFullScreen()
+                }
+            }
         }
         .onAppear {
             // Initialize like/dislike counts from post
             currentLikes = post.likes
             currentDislikes = post.dislikes
-            print("📱   Picture attachments: \(post.pictureAttachments ?? [])")
-            print("📱   Gallery attachments: \(post.galleryAttachments ?? [])")
         }
         .task {
             await loadVideo()
@@ -166,38 +172,28 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // If we're not in PiP mode, pause and cleanup the player
-            // This prevents background audio when quickly navigating back
-            if !playerManager.hasPIPSession {
+            // Check if player view controller still exists and has the same player
+            // If it does, we're likely in a transition (fullscreen, PiP, rotation) and shouldn't reset
+            let controllerExists = playerManager.playerViewController != nil
+            let playerMatches = playerManager.player != nil &&
+                              playerManager.playerViewController?.player === playerManager.player
+
+            // Controller is active if:
+            // 1. We're in a PiP session, OR
+            // 2. Controller exists with our player (even if temporarily not in window during transition)
+            let isControllerActive = playerManager.hasPIPSession ||
+                                    (controllerExists && playerMatches)
+
+            // Only reset player if the controller is truly gone (not just presented modally)
+            // This prevents resetting during PiP and native fullscreen transitions
+            if !isControllerActive {
                 playerManager.pause()
-                // Reset player to stop any ongoing loading that might auto-play
                 playerManager.reset()
             }
-            // Note: PiP is automatically handled by AVPlayerViewController
-            // It will continue playing when in PiP mode (if user has enabled it)
         }
     }
 
     // MARK: - Layout Views
-
-    private var fullscreenVideoPlayer: some View {
-        ZStack {
-            if let player = playerManager.player {
-                CustomVideoPlayer(player: player, showsPlaybackControls: true)
-                    .ignoresSafeArea()
-            } else {
-                Rectangle()
-                    .fill(Color.black)
-                    .ignoresSafeArea()
-                    .overlay {
-                        if isLoading {
-                            ProgressView()
-                                .tint(.white)
-                        }
-                    }
-            }
-        }
-    }
 
     private var portraitLayout: some View {
         VStack(spacing: 0) {
@@ -388,17 +384,16 @@ struct VideoPlayerView: View {
             return
         }
 
-        print("📱 [VideoPlayerView.loadVideo] Video ID: \(videoId)")
+        // Check if we should reuse existing player
+        // Reuse if: same video is already loaded (PiP session OR returning from fullscreen)
+        let isSameVideo = playerManager.currentPost?.id == post.id &&
+                         playerManager.player != nil
+        let hasActiveController = playerManager.playerViewController != nil
 
-        // Check if we should reuse existing PiP player
-        // Use hasPIPSession instead of isPIPActive so we reuse even when paused
-        let shouldReusePlayer = playerManager.hasPIPSession &&
-                               playerManager.currentPost?.id == post.id &&
-                               playerManager.player != nil
+        let shouldReusePlayer = isSameVideo && (playerManager.hasPIPSession || hasActiveController)
 
         if shouldReusePlayer {
-            print("📱 [VideoPlayerView.loadVideo] Reusing existing PiP player")
-            // Reusing existing PiP player - don't create new one
+            // Reusing existing player - don't create new one
             await MainActor.run {
                 WatchHistoryManager.shared.addToHistory(postId: post.id, videoId: videoId)
                 isLoading = false
