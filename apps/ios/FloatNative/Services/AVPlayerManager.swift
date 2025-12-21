@@ -622,6 +622,12 @@ class AVPlayerManager: NSObject, ObservableObject {
         let selector = NSSelectorFromString("exitFullScreenAnimated:completionHandler:")
         if playerViewController.responds(to: selector) {
             playerViewController.perform(selector, with: animated, with: nil)
+        } else {
+            // Fallback: Try private API selector for older/other versions if the standard one fails
+            let privateSelector = NSSelectorFromString("_transitionFromFullScreenAnimated:completionHandler:")
+            if playerViewController.responds(to: privateSelector) {
+                playerViewController.perform(privateSelector, with: animated, with: nil)
+            }
         }
     }
 

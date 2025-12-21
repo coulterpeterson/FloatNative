@@ -117,16 +117,17 @@ struct VideoPlayerView: View {
             #endif
             .toolbar(isLandscape ? .hidden : .visible, for: .tabBar)
             .globalMenu()
-            .onChange(of: geometry.size) { newSize in
-                let newIsLandscape = newSize.width > newSize.height
-                if newIsLandscape {
-                    // Trigger native fullscreen
+            // We listen to device orientation change because GeometryReader doesn't update
+            // reliably when the native player is in fullscreen mode (covering this view).
+            .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+                let orientation = UIDevice.current.orientation
+                
+                if orientation.isLandscape {
                     AVPlayerManager.shared.enterFullScreen()
+                } else if orientation == .portrait {
+                    // Only exit fullscreen on standard portrait, ignore upside down
+                    AVPlayerManager.shared.exitFullScreen()
                 }
-                // Note: We generally don't force exit fullscreen on rotation back to portrait
-                // because the native player handles its own dismissal animation and state.
-                // However, if the user rotates back while in native fullscreen, the valid behavior
-                // is usually determined by the native player.
             }
         }
         .onAppear {
