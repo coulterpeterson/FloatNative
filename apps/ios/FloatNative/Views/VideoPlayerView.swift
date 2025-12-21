@@ -421,22 +421,29 @@ struct VideoPlayerView: View {
         }
 
         print("📱 [VideoPlayerView.loadVideo] Video ID: \(videoId)")
+        print("📱 [VideoPlayerView.loadVideo] Current player exists: \(playerManager.player != nil)")
+        print("📱 [VideoPlayerView.loadVideo] Current post ID: \(String(describing: playerManager.currentPost?.id))")
+        print("📱 [VideoPlayerView.loadVideo] Controller exists: \(playerManager.playerViewController != nil)")
 
-        // Check if we should reuse existing PiP player
-        // Use hasPIPSession instead of isPIPActive so we reuse even when paused
-        let shouldReusePlayer = playerManager.hasPIPSession &&
-                               playerManager.currentPost?.id == post.id &&
-                               playerManager.player != nil
+        // Check if we should reuse existing player
+        // Reuse if: same video is already loaded (PiP session OR returning from fullscreen)
+        let isSameVideo = playerManager.currentPost?.id == post.id &&
+                         playerManager.player != nil
+        let hasActiveController = playerManager.playerViewController != nil
+
+        let shouldReusePlayer = isSameVideo && (playerManager.hasPIPSession || hasActiveController)
 
         if shouldReusePlayer {
-            print("📱 [VideoPlayerView.loadVideo] Reusing existing PiP player")
-            // Reusing existing PiP player - don't create new one
+            print("📱 [VideoPlayerView.loadVideo] ✅ Reusing existing player (same video already loaded)")
+            // Reusing existing player - don't create new one
             await MainActor.run {
                 WatchHistoryManager.shared.addToHistory(postId: post.id, videoId: videoId)
                 isLoading = false
             }
             return
         }
+
+        print("📱 [VideoPlayerView.loadVideo] ⚠️ Loading new video (isSameVideo: \(isSameVideo), hasPIPSession: \(playerManager.hasPIPSession), hasActiveController: \(hasActiveController))")
 
         // Loading a different video - clean up old PiP session if it exists
         if playerManager.hasPIPSession {
