@@ -446,11 +446,19 @@ struct VideoPlayerView: View {
                 WatchHistoryManager.shared.addToHistory(postId: post.id, videoId: videoId)
                 isLoading = false
 
-                // If player was paused during transition, resume playback
-                // This handles the case where AVPlayerViewController pauses during fullscreen exit
-                if let player = playerManager.player, player.rate == 0 && !playerManager.isPlaying {
-                    print("📱 [VideoPlayerView.loadVideo] ⚠️ Player was paused during transition - resuming playback")
-                    playerManager.play()
+                // Force playback to resume after fullscreen transition
+                // Even if rate=1.0, the HLS stream might be interrupted and needs a "kick"
+                // to actually resume (not just have rate=1.0)
+                if playerManager.player != nil {
+                    print("📱 [VideoPlayerView.loadVideo] 🔄 Forcing play() to resume after fullscreen transition")
+                    // Small delay to ensure view hierarchy is stable
+                    Task {
+                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                        await MainActor.run {
+                            playerManager.play()
+                            print("📱 [VideoPlayerView.loadVideo] ✅ play() called after delay")
+                        }
+                    }
                 }
             }
             return
