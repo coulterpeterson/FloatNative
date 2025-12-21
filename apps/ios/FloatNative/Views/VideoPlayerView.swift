@@ -124,6 +124,8 @@ struct VideoPlayerView: View {
         }
         .onAppear {
             print("🎬 [VideoPlayerView] onAppear called")
+            print("🎬 [VideoPlayerView] isPlaying: \(playerManager.isPlaying)")
+            print("🎬 [VideoPlayerView] player.rate: \(playerManager.player?.rate ?? 0)")
             // Initialize like/dislike counts from post
             currentLikes = post.likes
             currentDislikes = post.dislikes
@@ -163,6 +165,8 @@ struct VideoPlayerView: View {
             print("🎬 [VideoPlayerView] onDisappear called")
             print("🎬 [VideoPlayerView] hasPIPSession: \(playerManager.hasPIPSession)")
             print("🎬 [VideoPlayerView] isPIPActive: \(playerManager.isPIPActive)")
+            print("🎬 [VideoPlayerView] isPlaying: \(playerManager.isPlaying)")
+            print("🎬 [VideoPlayerView] player.rate: \(playerManager.player?.rate ?? 0)")
             print("🎬 [VideoPlayerView] playerViewController exists: \(playerManager.playerViewController != nil)")
             print("🎬 [VideoPlayerView] playerViewController.view.window: \(String(describing: playerManager.playerViewController?.view.window))")
             print("🎬 [VideoPlayerView] playerViewController.presentingViewController: \(String(describing: playerManager.playerViewController?.presentingViewController))")
@@ -435,10 +439,19 @@ struct VideoPlayerView: View {
 
         if shouldReusePlayer {
             print("📱 [VideoPlayerView.loadVideo] ✅ Reusing existing player (same video already loaded)")
+            print("📱 [VideoPlayerView.loadVideo] Player state - isPlaying: \(playerManager.isPlaying), rate: \(playerManager.player?.rate ?? 0)")
+
             // Reusing existing player - don't create new one
             await MainActor.run {
                 WatchHistoryManager.shared.addToHistory(postId: post.id, videoId: videoId)
                 isLoading = false
+
+                // If player was paused during transition, resume playback
+                // This handles the case where AVPlayerViewController pauses during fullscreen exit
+                if let player = playerManager.player, player.rate == 0 && !playerManager.isPlaying {
+                    print("📱 [VideoPlayerView.loadVideo] ⚠️ Player was paused during transition - resuming playback")
+                    playerManager.play()
+                }
             }
             return
         }
