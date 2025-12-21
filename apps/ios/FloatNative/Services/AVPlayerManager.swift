@@ -608,8 +608,6 @@ class AVPlayerManager: NSObject, ObservableObject {
     }
 
     func reset() {
-        print("🎬 [AVPlayerManager] reset() called")
-        print("🎬 [AVPlayerManager] Stack trace: \(Thread.callStackSymbols.prefix(5).joined(separator: "\n"))")
         cleanupPlayer()
         currentVideoId = nil
         currentVideoTitle = nil

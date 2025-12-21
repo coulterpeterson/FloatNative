@@ -123,14 +123,9 @@ struct VideoPlayerView: View {
             .globalMenu()
         }
         .onAppear {
-            print("🎬 [VideoPlayerView] onAppear called")
-            print("🎬 [VideoPlayerView] isPlaying: \(playerManager.isPlaying)")
-            print("🎬 [VideoPlayerView] player.rate: \(playerManager.player?.rate ?? 0)")
             // Initialize like/dislike counts from post
             currentLikes = post.likes
             currentDislikes = post.dislikes
-            print("📱   Picture attachments: \(post.pictureAttachments ?? [])")
-            print("📱   Gallery attachments: \(post.galleryAttachments ?? [])")
         }
         .task {
             await loadVideo()
@@ -162,17 +157,6 @@ struct VideoPlayerView: View {
             duration: 3.0
         )
         .onDisappear {
-            print("🎬 [VideoPlayerView] onDisappear called")
-            print("🎬 [VideoPlayerView] hasPIPSession: \(playerManager.hasPIPSession)")
-            print("🎬 [VideoPlayerView] isPIPActive: \(playerManager.isPIPActive)")
-            print("🎬 [VideoPlayerView] isPlaying: \(playerManager.isPlaying)")
-            print("🎬 [VideoPlayerView] player.rate: \(playerManager.player?.rate ?? 0)")
-            print("🎬 [VideoPlayerView] playerViewController exists: \(playerManager.playerViewController != nil)")
-            print("🎬 [VideoPlayerView] playerViewController.view.window: \(String(describing: playerManager.playerViewController?.view.window))")
-            print("🎬 [VideoPlayerView] playerViewController.presentingViewController: \(String(describing: playerManager.playerViewController?.presentingViewController))")
-            print("🎬 [VideoPlayerView] playerViewController.isBeingPresented: \(playerManager.playerViewController?.isBeingPresented ?? false)")
-            print("🎬 [VideoPlayerView] playerViewController.isBeingDismissed: \(playerManager.playerViewController?.isBeingDismissed ?? false)")
-
             // Save progress when leaving the view (skip for livestreams)
             if !isLivestream {
                 Task {
@@ -185,9 +169,6 @@ struct VideoPlayerView: View {
             let controllerExists = playerManager.playerViewController != nil
             let playerMatches = playerManager.player != nil &&
                               playerManager.playerViewController?.player === playerManager.player
-            let hasWindow = playerManager.playerViewController?.view.window != nil
-            let isBeingPresented = playerManager.playerViewController?.isBeingPresented ?? false
-            let hasPresenting = playerManager.playerViewController?.presentingViewController != nil
 
             // Controller is active if:
             // 1. We're in a PiP session, OR
@@ -195,22 +176,12 @@ struct VideoPlayerView: View {
             let isControllerActive = playerManager.hasPIPSession ||
                                     (controllerExists && playerMatches)
 
-            print("🎬 [VideoPlayerView] controllerExists: \(controllerExists), playerMatches: \(playerMatches)")
-            print("🎬 [VideoPlayerView] hasWindow: \(hasWindow), isBeingPresented: \(isBeingPresented), hasPresenting: \(hasPresenting)")
-            print("🎬 [VideoPlayerView] isControllerActive: \(isControllerActive)")
-
             // Only reset player if the controller is truly gone (not just presented modally)
             // This prevents resetting during PiP and native fullscreen transitions
             if !isControllerActive {
-                print("🎬 [VideoPlayerView] ⚠️ Controller is NOT active - pausing and resetting player!")
                 playerManager.pause()
-                // Reset player to stop any ongoing loading that might auto-play
                 playerManager.reset()
-            } else {
-                print("🎬 [VideoPlayerView] ✅ Controller is still active - keeping player alive")
             }
-            // Note: PiP and fullscreen are automatically handled by AVPlayerViewController
-            // The player will continue when the controller is active
         }
     }
 
@@ -424,11 +395,6 @@ struct VideoPlayerView: View {
             return
         }
 
-        print("📱 [VideoPlayerView.loadVideo] Video ID: \(videoId)")
-        print("📱 [VideoPlayerView.loadVideo] Current player exists: \(playerManager.player != nil)")
-        print("📱 [VideoPlayerView.loadVideo] Current post ID: \(String(describing: playerManager.currentPost?.id))")
-        print("📱 [VideoPlayerView.loadVideo] Controller exists: \(playerManager.playerViewController != nil)")
-
         // Check if we should reuse existing player
         // Reuse if: same video is already loaded (PiP session OR returning from fullscreen)
         let isSameVideo = playerManager.currentPost?.id == post.id &&
@@ -438,33 +404,13 @@ struct VideoPlayerView: View {
         let shouldReusePlayer = isSameVideo && (playerManager.hasPIPSession || hasActiveController)
 
         if shouldReusePlayer {
-            print("📱 [VideoPlayerView.loadVideo] ✅ Reusing existing player (same video already loaded)")
-            print("📱 [VideoPlayerView.loadVideo] Player state - isPlaying: \(playerManager.isPlaying), rate: \(playerManager.player?.rate ?? 0)")
-
             // Reusing existing player - don't create new one
             await MainActor.run {
                 WatchHistoryManager.shared.addToHistory(postId: post.id, videoId: videoId)
                 isLoading = false
-
-                // Force playback to resume after fullscreen transition
-                // Even if rate=1.0, the HLS stream might be interrupted and needs a "kick"
-                // to actually resume (not just have rate=1.0)
-                if playerManager.player != nil {
-                    print("📱 [VideoPlayerView.loadVideo] 🔄 Forcing play() to resume after fullscreen transition")
-                    // Small delay to ensure view hierarchy is stable
-                    Task {
-                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-                        await MainActor.run {
-                            playerManager.play()
-                            print("📱 [VideoPlayerView.loadVideo] ✅ play() called after delay")
-                        }
-                    }
-                }
             }
             return
         }
-
-        print("📱 [VideoPlayerView.loadVideo] ⚠️ Loading new video (isSameVideo: \(isSameVideo), hasPIPSession: \(playerManager.hasPIPSession), hasActiveController: \(hasActiveController))")
 
         // Loading a different video - clean up old PiP session if it exists
         if playerManager.hasPIPSession {

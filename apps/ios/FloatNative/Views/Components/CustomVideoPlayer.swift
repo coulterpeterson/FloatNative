@@ -144,8 +144,6 @@ struct CustomVideoPlayer: UIViewControllerRepresentable {
     #endif
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
-        print("🎬 [CustomVideoPlayer] makeUIViewController called")
-
         // Check if we should reuse existing playerViewController
         // Reuse during: PiP restoration, fullscreen transitions, and layout changes (like rotation)
         // This prevents black screen issues when AVPlayerViewController changes presentation mode
@@ -153,14 +151,11 @@ struct CustomVideoPlayer: UIViewControllerRepresentable {
            existingController.player === player,
            let existingDelegate = AVPlayerManager.shared.playerViewControllerDelegate {
 
-            print("🎬 [CustomVideoPlayer] ✅ REUSING existing controller (player: \(player))")
             // Reuse the existing delegate (Coordinator) to maintain callback connection
             existingController.delegate = existingDelegate as? AVPlayerViewControllerDelegate
             existingController.showsPlaybackControls = showsPlaybackControls
             return existingController
         }
-
-        print("🎬 [CustomVideoPlayer] ⚠️ CREATING NEW controller (player: \(player))")
 
 
         #if os(tvOS)
@@ -197,11 +192,8 @@ struct CustomVideoPlayer: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        print("🎬 [CustomVideoPlayer] updateUIViewController called")
-
         // Update player if it changed
         if uiViewController.player !== player {
-            print("🎬 [CustomVideoPlayer] ⚠️ Player instance changed! Updating controller's player")
             uiViewController.player = player
         }
 
