@@ -123,6 +123,7 @@ struct VideoPlayerView: View {
             .globalMenu()
         }
         .onAppear {
+            print("🎬 [VideoPlayerView] onAppear called")
             // Initialize like/dislike counts from post
             currentLikes = post.likes
             currentDislikes = post.dislikes
@@ -159,6 +160,10 @@ struct VideoPlayerView: View {
             duration: 3.0
         )
         .onDisappear {
+            print("🎬 [VideoPlayerView] onDisappear called")
+            print("🎬 [VideoPlayerView] hasPIPSession: \(playerManager.hasPIPSession)")
+            print("🎬 [VideoPlayerView] isPIPActive: \(playerManager.isPIPActive)")
+
             // Save progress when leaving the view (skip for livestreams)
             if !isLivestream {
                 Task {
@@ -169,9 +174,12 @@ struct VideoPlayerView: View {
             // If we're not in PiP mode, pause and cleanup the player
             // This prevents background audio when quickly navigating back
             if !playerManager.hasPIPSession {
+                print("🎬 [VideoPlayerView] ⚠️ NOT in PiP session - pausing and resetting player!")
                 playerManager.pause()
                 // Reset player to stop any ongoing loading that might auto-play
                 playerManager.reset()
+            } else {
+                print("🎬 [VideoPlayerView] ✅ In PiP session - keeping player alive")
             }
             // Note: PiP is automatically handled by AVPlayerViewController
             // It will continue playing when in PiP mode (if user has enabled it)
