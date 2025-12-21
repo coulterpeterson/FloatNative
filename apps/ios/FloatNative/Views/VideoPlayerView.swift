@@ -163,6 +163,11 @@ struct VideoPlayerView: View {
             print("🎬 [VideoPlayerView] onDisappear called")
             print("🎬 [VideoPlayerView] hasPIPSession: \(playerManager.hasPIPSession)")
             print("🎬 [VideoPlayerView] isPIPActive: \(playerManager.isPIPActive)")
+            print("🎬 [VideoPlayerView] playerViewController exists: \(playerManager.playerViewController != nil)")
+            print("🎬 [VideoPlayerView] playerViewController.view.window: \(String(describing: playerManager.playerViewController?.view.window))")
+            print("🎬 [VideoPlayerView] playerViewController.presentingViewController: \(String(describing: playerManager.playerViewController?.presentingViewController))")
+            print("🎬 [VideoPlayerView] playerViewController.isBeingPresented: \(playerManager.playerViewController?.isBeingPresented ?? false)")
+            print("🎬 [VideoPlayerView] playerViewController.isBeingDismissed: \(playerManager.playerViewController?.isBeingDismissed ?? false)")
 
             // Save progress when leaving the view (skip for livestreams)
             if !isLivestream {
@@ -171,11 +176,19 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // Check if player view controller is still being displayed
+            // Check if player view controller is still being displayed or transitioning
             // This includes: PiP mode, native fullscreen mode, or inline presentation
-            let isControllerActive = playerManager.hasPIPSession ||
-                                    playerManager.playerViewController?.view.window != nil
+            let hasWindow = playerManager.playerViewController?.view.window != nil
+            let isBeingPresented = playerManager.playerViewController?.isBeingPresented ?? false
+            let hasPresenting = playerManager.playerViewController?.presentingViewController != nil
+            let controllerExists = playerManager.playerViewController != nil
 
+            let isControllerActive = playerManager.hasPIPSession ||
+                                    hasWindow ||
+                                    isBeingPresented ||
+                                    hasPresenting
+
+            print("🎬 [VideoPlayerView] hasWindow: \(hasWindow), isBeingPresented: \(isBeingPresented), hasPresenting: \(hasPresenting), controllerExists: \(controllerExists)")
             print("🎬 [VideoPlayerView] isControllerActive: \(isControllerActive)")
 
             // Only reset player if the controller is truly gone (not just presented modally)
