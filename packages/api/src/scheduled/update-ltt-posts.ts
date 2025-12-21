@@ -120,23 +120,19 @@ export async function updateLTTPosts(env: Env): Promise<void> {
         error: error.message,
         statusCode: error.statusCode,
         timestamp: new Date().toISOString(),
+        action_required: 'Update FLOATPLANE_SAILS_SID secret',
+        instructions: 'Run: pnpm wrangler secret put FLOATPLANE_SAILS_SID',
       });
 
-      // Send email alert if configured
-      if (env.MAILGUN_API_KEY && env.MAILGUN_DOMAIN && env.ALERT_EMAIL) {
-        await sendFloatplaneTokenAlert(
-          env.MAILGUN_API_KEY,
-          env.MAILGUN_DOMAIN,
-          env.ALERT_EMAIL,
-          error.message
-        );
-      } else {
-        console.warn({
-          level: 'warn',
-          message: 'Email alert not sent - MAILGUN_API_KEY, MAILGUN_DOMAIN, or ALERT_EMAIL not configured',
-          timestamp: new Date().toISOString(),
-        });
-      }
+      // Email alerts temporarily disabled - check Cloudflare Workers Observability logs instead
+      // if (env.MAILGUN_API_KEY && env.MAILGUN_DOMAIN && env.ALERT_EMAIL) {
+      //   await sendFloatplaneTokenAlert(
+      //     env.MAILGUN_API_KEY,
+      //     env.MAILGUN_DOMAIN,
+      //     env.ALERT_EMAIL,
+      //     error.message
+      //   );
+      // }
     }
 
     console.error({
