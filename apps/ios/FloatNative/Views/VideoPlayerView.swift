@@ -119,6 +119,7 @@ struct VideoPlayerView: View {
             .globalMenu()
             // We listen to device orientation change because GeometryReader doesn't update
             // reliably when the native player is in fullscreen mode (covering this view).
+            #if !os(tvOS)
             .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
                 let orientation = UIDevice.current.orientation
                 
@@ -129,6 +130,7 @@ struct VideoPlayerView: View {
                     AVPlayerManager.shared.exitFullScreen()
                 }
             }
+            #endif
         }
         .onAppear {
             // Initialize like/dislike counts from post
