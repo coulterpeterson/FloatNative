@@ -171,18 +171,25 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // If we're not in PiP mode, pause and cleanup the player
-            // This prevents background audio when quickly navigating back
-            if !playerManager.hasPIPSession {
-                print("🎬 [VideoPlayerView] ⚠️ NOT in PiP session - pausing and resetting player!")
+            // Check if player view controller is still being displayed
+            // This includes: PiP mode, native fullscreen mode, or inline presentation
+            let isControllerActive = playerManager.hasPIPSession ||
+                                    playerManager.playerViewController?.view.window != nil
+
+            print("🎬 [VideoPlayerView] isControllerActive: \(isControllerActive)")
+
+            // Only reset player if the controller is truly gone (not just presented modally)
+            // This prevents resetting during PiP and native fullscreen transitions
+            if !isControllerActive {
+                print("🎬 [VideoPlayerView] ⚠️ Controller is NOT active - pausing and resetting player!")
                 playerManager.pause()
                 // Reset player to stop any ongoing loading that might auto-play
                 playerManager.reset()
             } else {
-                print("🎬 [VideoPlayerView] ✅ In PiP session - keeping player alive")
+                print("🎬 [VideoPlayerView] ✅ Controller is still active - keeping player alive")
             }
-            // Note: PiP is automatically handled by AVPlayerViewController
-            // It will continue playing when in PiP mode (if user has enabled it)
+            // Note: PiP and fullscreen are automatically handled by AVPlayerViewController
+            // The player will continue when the controller is active
         }
     }
 
