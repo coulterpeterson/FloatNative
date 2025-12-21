@@ -176,19 +176,23 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // Check if player view controller is still being displayed or transitioning
-            // This includes: PiP mode, native fullscreen mode, or inline presentation
+            // Check if player view controller still exists and has the same player
+            // If it does, we're likely in a transition (fullscreen, PiP, rotation) and shouldn't reset
+            let controllerExists = playerManager.playerViewController != nil
+            let playerMatches = playerManager.player != nil &&
+                              playerManager.playerViewController?.player === playerManager.player
             let hasWindow = playerManager.playerViewController?.view.window != nil
             let isBeingPresented = playerManager.playerViewController?.isBeingPresented ?? false
             let hasPresenting = playerManager.playerViewController?.presentingViewController != nil
-            let controllerExists = playerManager.playerViewController != nil
 
+            // Controller is active if:
+            // 1. We're in a PiP session, OR
+            // 2. Controller exists with our player (even if temporarily not in window during transition)
             let isControllerActive = playerManager.hasPIPSession ||
-                                    hasWindow ||
-                                    isBeingPresented ||
-                                    hasPresenting
+                                    (controllerExists && playerMatches)
 
-            print("🎬 [VideoPlayerView] hasWindow: \(hasWindow), isBeingPresented: \(isBeingPresented), hasPresenting: \(hasPresenting), controllerExists: \(controllerExists)")
+            print("🎬 [VideoPlayerView] controllerExists: \(controllerExists), playerMatches: \(playerMatches)")
+            print("🎬 [VideoPlayerView] hasWindow: \(hasWindow), isBeingPresented: \(isBeingPresented), hasPresenting: \(hasPresenting)")
             print("🎬 [VideoPlayerView] isControllerActive: \(isControllerActive)")
 
             // Only reset player if the controller is truly gone (not just presented modally)
