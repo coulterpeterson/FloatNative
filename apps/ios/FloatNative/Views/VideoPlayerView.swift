@@ -68,13 +68,9 @@ struct VideoPlayerView: View {
                 Color.adaptiveBackground
                     .ignoresSafeArea()
 
-                if isLandscape {
-                    // Fullscreen video in landscape
-                    fullscreenVideoPlayer
-                } else {
-                    // Normal portrait layout
-                    portraitLayout
-                }
+                // Persistent Layout (Always use portrait layout structure)
+                // When rotating to landscape, we trigger native fullscreen instead of swapping views
+                portraitLayout
 
                 // Error state
                 if let error = errorMessage {
@@ -115,12 +111,23 @@ struct VideoPlayerView: View {
             #if !os(tvOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .navigationBarBackButtonHidden(false)
+            .navigationBarBackButtonHidden(false) // Always show back button in "portrait" view
             #if !os(tvOS)
-            .statusBar(hidden: isLandscape) // Hide status bar in landscape
+            .statusBar(hidden: false) // Always show status bar in "portrait" view
             #endif
-            .toolbar(isLandscape ? .hidden : .visible, for: .tabBar) // Hide tab bar in landscape
+            .toolbar(isLandscape ? .hidden : .visible, for: .tabBar)
             .globalMenu()
+            .onChange(of: geometry.size) { newSize in
+                let newIsLandscape = newSize.width > newSize.height
+                if newIsLandscape {
+                    // Trigger native fullscreen
+                    AVPlayerManager.shared.enterFullScreen()
+                }
+                // Note: We generally don't force exit fullscreen on rotation back to portrait
+                // because the native player handles its own dismissal animation and state.
+                // However, if the user rotates back while in native fullscreen, the valid behavior
+                // is usually determined by the native player.
+            }
         }
         .onAppear {
             // Initialize like/dislike counts from post
@@ -186,25 +193,6 @@ struct VideoPlayerView: View {
     }
 
     // MARK: - Layout Views
-
-    private var fullscreenVideoPlayer: some View {
-        ZStack {
-            if let player = playerManager.player {
-                CustomVideoPlayer(player: player, showsPlaybackControls: true)
-                    .ignoresSafeArea()
-            } else {
-                Rectangle()
-                    .fill(Color.black)
-                    .ignoresSafeArea()
-                    .overlay {
-                        if isLoading {
-                            ProgressView()
-                                .tint(.white)
-                        }
-                    }
-            }
-        }
-    }
 
     private var portraitLayout: some View {
         VStack(spacing: 0) {

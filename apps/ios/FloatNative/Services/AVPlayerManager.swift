@@ -607,6 +607,24 @@ class AVPlayerManager: NSObject, ObservableObject {
         player = nil
     }
 
+    // MARK: - Fullscreen Control
+
+    func enterFullScreen(animated: Bool = true) {
+        guard let playerViewController = playerViewController else { return }
+        let selector = NSSelectorFromString("enterFullScreenAnimated:completionHandler:")
+        if playerViewController.responds(to: selector) {
+            playerViewController.perform(selector, with: animated, with: nil)
+        }
+    }
+
+    func exitFullScreen(animated: Bool = true) {
+        guard let playerViewController = playerViewController else { return }
+        let selector = NSSelectorFromString("exitFullScreenAnimated:completionHandler:")
+        if playerViewController.responds(to: selector) {
+            playerViewController.perform(selector, with: animated, with: nil)
+        }
+    }
+
     func reset() {
         cleanupPlayer()
         currentVideoId = nil
