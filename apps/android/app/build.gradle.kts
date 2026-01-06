@@ -93,4 +93,7 @@ dependencies {
     implementation("androidx.media3:media3-datasource-okhttp:1.2.0")
     implementation("androidx.media3:media3-exoplayer-hls:1.2.0")
     implementation(libs.androidx.media3.common)
+    
+    // QR Code
+    implementation("com.google.zxing:core:3.5.3")
 }

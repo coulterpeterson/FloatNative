@@ -274,4 +274,27 @@ object FloatplaneApi {
             return false
         }
     }
+    
+    // --- TV Device Auth ---
+
+    suspend fun startDeviceAuth(): DeviceCodeResponse {
+        return oauthApi.startDeviceAuth(
+             clientId = "floatnative",
+             scope = "openid offline_access"
+        )
+    }
+
+    suspend fun pollDeviceToken(deviceCode: String): OAuthTokenResponse {
+        val tokenEndpoint = "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/token"
+        
+        // Generate DPoP for the token endpoint
+        val dpop = dpopManager.generateProof("POST", tokenEndpoint)
+        
+        return oauthApi.getToken(
+            dpop = dpop,
+            grantType = "urn:ietf:params:oauth:grant-type:device_code",
+            clientId = "floatnative",
+            deviceCode = deviceCode
+        )
+    }
 }
