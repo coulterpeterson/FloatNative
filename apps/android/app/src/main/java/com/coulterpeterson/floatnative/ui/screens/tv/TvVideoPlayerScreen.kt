@@ -95,7 +95,29 @@ fun TvVideoPlayerScreen(
 
                 AndroidView(
                     factory = { ctx ->
-                        PlayerView(ctx).apply {
+                        // Anonymous subclass to intercept key events before they are consumed involving
+                        // focus or child views. This ensures we can "wake up" the controls even if the 
+                        // focus state is ambiguous when controls are hidden.
+                        object : PlayerView(ctx) {
+                             override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+                                // Intercept D-pad keys when controller is hidden to show it
+                                if (event.action == android.view.KeyEvent.ACTION_DOWN && !isControllerFullyVisible) {
+                                    when (event.keyCode) {
+                                        android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                                        android.view.KeyEvent.KEYCODE_ENTER,
+                                        android.view.KeyEvent.KEYCODE_DPAD_UP,
+                                        android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+                                        android.view.KeyEvent.KEYCODE_DPAD_LEFT,
+                                        android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                                            showController()
+                                            // Consume the event to prevent accidental action (like pausing) upon waking the UI
+                                            return true
+                                        }
+                                    }
+                                }
+                                return super.dispatchKeyEvent(event)
+                            }
+                        }.apply {
                             player = exoPlayer
                             resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                             layoutParams = FrameLayout.LayoutParams(
@@ -106,35 +128,19 @@ fun TvVideoPlayerScreen(
                             useController = true
                             keepScreenOn = true
                             
+                            // Use our custom layout
+                            setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_ALWAYS)
+                            setControllerVisibilityListener(androidx.media3.ui.PlayerView.ControllerVisibilityListener { visibility ->
+                                if (visibility == android.view.View.GONE) {
+                                  requestFocus()
+                                }
+                            })
+
                             // Ensure the view takes focus to handle D-pad events
                             isFocusable = true
                             isFocusableInTouchMode = true 
+                            descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
                             requestFocus()
-
-                            setOnKeyListener { _, keyCode, event ->
-                                if (event.action == android.view.KeyEvent.ACTION_DOWN) {
-                                    when (keyCode) {
-                                        android.view.KeyEvent.KEYCODE_DPAD_CENTER,
-                                        android.view.KeyEvent.KEYCODE_ENTER,
-                                        android.view.KeyEvent.KEYCODE_DPAD_UP,
-                                        android.view.KeyEvent.KEYCODE_DPAD_DOWN,
-                                        android.view.KeyEvent.KEYCODE_DPAD_LEFT,
-                                        android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                            if (!isControllerFullyVisible) {
-                                                showController()
-                                                // If we just showed the controller, we might want to consume the event
-                                                // so it doesn't accidentally trigger an action on a button immediately.
-                                                // However, for navigation keys (arrows), we usually want them to navigate immediately if possible.
-                                                // Standard behavior is often: first press shows UI, subsequent navigate.
-                                                // ExoPlayer's default behavior often handles this if useController=true.
-                                                // But since the user says it's not working, let's force show and maybe consume if it was hidden.
-                                                return@setOnKeyListener true
-                                            }
-                                        }
-                                    }
-                                }
-                                false
-                            }
                         }
                     },
                     update = { playerView ->

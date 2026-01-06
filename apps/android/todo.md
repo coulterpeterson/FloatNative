@@ -19,7 +19,7 @@
   - [X] Video feed
   - [X] Video player
   - [] Video feed long-press actions
-  - [] Video player custom controls
+  - [X] Video player custom controls
   - [] Video player sidebar slideout
   - [] Remaining screens
 - [] Chromecast support that triggers the Android TV version to open to that video(?)
