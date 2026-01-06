@@ -10,10 +10,18 @@
 - [X] Enable PiP 
 - [X] Style login screen after the ios version
 - [X] Add actual FloatNative logo to app
-- [] Implement live support
 - [X] Change support link to discord server
 - [X] Tablet grid styles
+- [] Ensure watch progress calls are implemented
+- [] Implement live support
 - [] Android TV styles/versions of screens
+  - [X] Login screen
+  - [X] Video feed
+  - [X] Video player
+  - [] Video feed long-press actions
+  - [] Video player custom controls
+  - [] Video player sidebar slideout
+  - [] Remaining screens
 - [] Chromecast support that triggers the Android TV version to open to that video(?)
 - [] Pollsplane integration on the VODs(?)
 
