@@ -87,11 +87,9 @@ fun TvSearchScreen(
                         TvVideoCard(
                             post = post,
                             onClick = {
-                                val videoId = post.videoAttachments?.firstOrNull()?.let { 
-                                    if (it is VideoAttachmentModel) it.id else null
-                                } ?: return@TvVideoCard
-                                
-                                onPlayVideo(videoId)
+                                if (!post.videoAttachments.isNullOrEmpty()) {
+                                    onPlayVideo(post.id)
+                                }
                             }
                         )
                     }

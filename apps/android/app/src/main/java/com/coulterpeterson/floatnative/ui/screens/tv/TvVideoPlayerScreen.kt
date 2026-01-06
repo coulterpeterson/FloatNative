@@ -93,6 +93,11 @@ fun TvVideoPlayerScreen(
                             // Enable default controls which handle D-pad focus
                             useController = true 
                             keepScreenOn = true
+                            
+                            // Ensure the view takes focus to handle D-pad events
+                            isFocusable = true
+                            isFocusableInTouchMode = true 
+                            requestFocus()
                         }
                     },
                     modifier = Modifier.fillMaxSize()

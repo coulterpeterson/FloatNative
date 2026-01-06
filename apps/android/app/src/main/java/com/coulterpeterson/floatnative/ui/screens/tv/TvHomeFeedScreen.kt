@@ -153,11 +153,11 @@ fun TvHomeFeedScreen(
                        TvVideoCard(
                            post = post,
                            onClick = {
-                                val videoId = post.videoAttachments?.firstOrNull()?.let { 
-                                    if (it is com.coulterpeterson.floatnative.openapi.models.VideoAttachmentModel) it.id else null
-                                } ?: return@TvVideoCard
-                                
-                               onPlayVideo(videoId)
+                                // VideoPlayerViewModel expects a BlogPost ID, NOT a VideoAttachment ID.
+                                // It will fetch the post and extract the video attached to it.
+                                if (!post.videoAttachments.isNullOrEmpty()) {
+                                    onPlayVideo(post.id)
+                                }
                            }
                        ) 
                     }
