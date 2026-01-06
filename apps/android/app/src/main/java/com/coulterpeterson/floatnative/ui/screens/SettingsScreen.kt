@@ -177,16 +177,15 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 ListItem(
-                    headlineContent = { Text("Send Feedback") },
+                    headlineContent = { Text("Join the Discord to Share Feedback") },
                     modifier = Modifier.clickable {
-                        // TODO: Use actual support URL
-                        uriHandler.openUri("https://www.floatplane.com/support") 
+                        uriHandler.openUri("https://discord.gg/VvgCsKBwpP") 
                     }
                 )
                 ListItem(
-                    headlineContent = { Text("Subscribe to YouTube") },
+                    headlineContent = { Text("Subscribe to Coulter Peterson on YouTube") },
                     modifier = Modifier.clickable {
-                        uriHandler.openUri("https://www.youtube.com/channel/UCphFFY8duoCDcn1-0y1W8cg") // Floatplane Channel? Or LTT? Using placeholder.
+                        uriHandler.openUri("https://www.youtube.com/@CoulterPeterson")
                     }
                 )
             }

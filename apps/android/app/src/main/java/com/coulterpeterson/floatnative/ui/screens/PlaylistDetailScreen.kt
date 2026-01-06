@@ -2,8 +2,12 @@ package com.coulterpeterson.floatnative.ui.screens
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -102,7 +106,22 @@ fun PlaylistDetailScreen(
                             modifier = Modifier.align(Alignment.Center)
                         )
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        // Responsive Grid Logic
+                        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                        val screenWidth = configuration.screenWidthDp.dp
+                        val columns = when {
+                            screenWidth >= 840.dp -> 3 // Landscape Tablet
+                            screenWidth >= 600.dp -> 2 // Portrait Tablet
+                            else -> 1 // Phone
+                        }
+
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(columns),
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
+                        ) {
                             items(currentState.posts) { post ->
                                 Box {
                                     PlaylistVideoCard(

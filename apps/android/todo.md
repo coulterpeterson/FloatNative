@@ -11,8 +11,8 @@
 - [X] Style login screen after the ios version
 - [X] Add actual FloatNative logo to app
 - [] Implement live support
-- [] Change support link to discord server
-- [] Tablet grid styles
+- [X] Change support link to discord server
+- [X] Tablet grid styles
 - [] Android TV styles/versions of screens
 - [] Chromecast support that triggers the Android TV version to open to that video(?)
 - [] Pollsplane integration on the VODs(?)

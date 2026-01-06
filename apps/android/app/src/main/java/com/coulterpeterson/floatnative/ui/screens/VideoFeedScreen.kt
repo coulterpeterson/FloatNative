@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.List
@@ -143,7 +147,22 @@ fun VideoFeedScreen(
                     }
                 }
                 is HomeFeedState.Content -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    // Responsive Grid Logic
+                    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                    val screenWidth = configuration.screenWidthDp.dp
+                    val columns = when {
+                        screenWidth >= 840.dp -> 3 // Landscape Tablet
+                        screenWidth >= 600.dp -> 2 // Portrait Tablet
+                        else -> 1 // Phone
+                    }
+
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(columns),
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
+                    ) {
                         items(currentState.posts) { post ->
                              val watchLaterPlaylist = userPlaylists.find { it.isWatchLater }
                              val isInWatchLater = watchLaterPlaylist?.videoIds?.contains(post.id) == true
@@ -184,14 +203,15 @@ fun VideoFeedScreen(
                             )
                         }
                         
-                        item {
+                        item(span = { GridItemSpan(columns) }) {
                             // Load More Trigger
                             val isLoadingMore by viewModel.isLoadingMore.collectAsState()
                             
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    // .padding(16.dp) // Padding handled by grid contentPadding
+                                    .padding(vertical = 16.dp), // Still need some vertical padding potentially
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (isLoadingMore) {

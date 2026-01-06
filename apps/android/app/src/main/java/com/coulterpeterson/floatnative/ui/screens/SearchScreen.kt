@@ -3,6 +3,9 @@ package com.coulterpeterson.floatnative.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -81,10 +84,21 @@ fun SearchScreen(
                     )
                 }
                 is SearchState.Content -> {
-                    LazyColumn(
+                    // Responsive Grid Logic
+                    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                    val screenWidth = configuration.screenWidthDp.dp
+                    val columns = when {
+                        screenWidth >= 840.dp -> 3 // Landscape Tablet
+                        screenWidth >= 600.dp -> 2 // Portrait Tablet
+                        else -> 1 // Phone
+                    }
+
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(columns),
                         contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(currentState.results) { blogPost ->
                             VideoCard(
