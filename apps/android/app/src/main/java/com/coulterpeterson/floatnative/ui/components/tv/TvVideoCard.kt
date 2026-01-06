@@ -1,21 +1,36 @@
 package com.coulterpeterson.floatnative.ui.components.tv
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Card
+import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3
+import com.coulterpeterson.floatnative.openapi.models.ImageModel
+import com.coulterpeterson.floatnative.utils.DateUtils
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -24,39 +39,118 @@ fun TvVideoCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Note: FloatplaneAPI puts absolute URL in path usually if coming from V3? 
-    // Actually V3 usually returns relative path for attachments.
-    // VideoCard.kt (mobile) likely constructs it.
-    // Assuming simple concatenation for now:
-    val thumbnailUrl = post.thumbnail?.path?.toString() // Cast to String
+    // Thumbnail Logic
+    val thumbnailUrl = post.thumbnail?.path?.toString()
     val fullThumbnailUrl = if (thumbnailUrl?.startsWith("http") == true) thumbnailUrl else "https://pbs.floatplane.com${thumbnailUrl}"
 
+    // Icon Logic
+    fun getIconPath(imageModel: ImageModel?): String? {
+        if (imageModel == null) return null
+        return (imageModel.childImages?.firstOrNull()?.path ?: imageModel.path).toString()
+    }
+    val channelIcon = getIconPath(post.channel.icon)
+    val creatorIcon = getIconPath(post.creator.icon)
+    val iconUrl = channelIcon ?: creatorIcon
+
+    // Duration Logic
+    val duration = post.metadata.videoDuration.toLong()
+    
     Card(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth(),
+        shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        scale = CardDefaults.scale(focusedScale = 1.05f),
+        colors = CardDefaults.colors(
+            containerColor = Color.Transparent, // Let image define shape, text is below
+            focusedContainerColor = Color.Transparent
+        )
     ) {
         Column {
-            AsyncImage(
-                model = fullThumbnailUrl,
-                contentDescription = post.title,
+            // 1. Thumbnail Area with Duration
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f),
-                contentScale = ContentScale.Crop
-            )
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(12.dp))
+            ) {
+                AsyncImage(
+                    model = fullThumbnailUrl,
+                    contentDescription = post.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                
+                // Duration Chip
+                if (duration > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(8.dp)
+                            .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = DateUtils.formatDuration(duration),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                        )
+                    }
+                }
+            }
             
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = post.title ?: "Untitled",
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = post.creator?.title ?: "Unknown Creator",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // 2. Info Area
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // Creator Icon
+                /* 
+                   Using a placeholder box or the image if available.
+                   TV design often shows large thumbnails, icon is secondary but adds 'friendliness'.
+                */
+                if (iconUrl != null) {
+                    AsyncImage(
+                        model = iconUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+                
+                // Text Details
+                Column {
+                    Text(
+                        text = post.title ?: "Untitled",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White, // Explicit White
+                        maxLines = 2
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = post.channel.title,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.LightGray // High contrast grey
+                        )
+                    }
+                    
+                    // Release Date Line
+                    val dateStr = post.releaseDate.toString()
+                    val relativeTime = DateUtils.getRelativeTime(dateStr)
+                    
+                    Text(
+                        text = relativeTime,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.LightGray.copy(alpha = 0.8f)
+                    )
+                }
             }
         }
     }

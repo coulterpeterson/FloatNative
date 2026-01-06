@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -24,7 +25,25 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import com.coulterpeterson.floatnative.viewmodels.HomeFeedViewModel
 import com.coulterpeterson.floatnative.viewmodels.HomeFeedState
 import com.coulterpeterson.floatnative.ui.components.tv.TvVideoCard
-import com.coulterpeterson.floatnative.openapi.models.VideoAttachmentModel
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.tv.material3.Surface
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Settings
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -34,57 +53,117 @@ fun TvHomeFeedScreen(
     viewModel: HomeFeedViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    
+    // Top Navigation Items
+    val navItems = listOf("Home", "Creators", "Playlists", "Search", "History", "Settings")
+    var selectedNavIndex by remember { mutableIntStateOf(0) }
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        contentPadding = PaddingValues(32.dp),
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-        modifier = Modifier.fillMaxSize()
-    ) {
-        item(span = { GridItemSpan(3) }) {
-             androidx.compose.foundation.layout.Row(
-                 horizontalArrangement = Arrangement.SpaceBetween,
-                 verticalAlignment = Alignment.CenterVertically,
-                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-             ) {
-                 Text(
-                     text = "Home",
-                     style = MaterialTheme.typography.headlineLarge
-                 )
-                 
-                 androidx.tv.material3.Button(onClick = onSearchClick) {
-                     Text("Search")
-                 }
-             }
-        }
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0F0F0F))) { // Dark background
         
-        when (val s = state) {
-            is HomeFeedState.Loading -> {
-                item(span = { GridItemSpan(3) }) {
-                    Text("Loading...")
+        // 1. Top Navigation Bar (Pill shapes)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 32.dp, bottom = 32.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            navItems.forEachIndexed { index, title ->
+                val isSelected = index == selectedNavIndex
+                
+                val onClick = {
+                    if (title == "Search") {
+                        onSearchClick()
+                    } else {
+                        selectedNavIndex = index
+                    }
+                }
+
+                Surface(
+                    onClick = onClick,
+                    shape = androidx.tv.material3.ClickableSurfaceDefaults.shape(
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
+                    ),
+                    colors = androidx.tv.material3.ClickableSurfaceDefaults.colors(
+                        // Selected: White background, Black text (High Contrast)
+                        // Unselected: Transparent background, White text
+                        containerColor = if (isSelected) Color(0xFFE0E0E0) else Color.Transparent,
+                        contentColor = if (isSelected) Color.Black else Color.White,
+                        
+                        // Focused: White background (brighter), Black text
+                        focusedContainerColor = Color.White,
+                        focusedContentColor = Color.Black
+                    ),
+                    scale = androidx.tv.material3.ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.tv.material3.Icon(
+                            imageVector = when(title) {
+                                "Home" -> androidx.compose.material.icons.Icons.Default.Home
+                                "Creators" -> androidx.compose.material.icons.Icons.Default.Person
+                                "Playlists" -> androidx.compose.material.icons.Icons.Default.List
+                                "Search" -> androidx.compose.material.icons.Icons.Default.Search
+                                "History" -> androidx.compose.material.icons.Icons.Default.DateRange
+                                "Settings" -> androidx.compose.material.icons.Icons.Default.Settings
+                                else -> androidx.compose.material.icons.Icons.Default.Home
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
-            is HomeFeedState.Error -> {
-                item(span = { GridItemSpan(3) }) {
-                    Text("Error: ${s.message}", color = MaterialTheme.colorScheme.error)
+        }
+
+        // 2. Content Grid
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(4), 
+            contentPadding = PaddingValues(horizontal = 50.dp, vertical = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            when (val s = state) {
+                is HomeFeedState.Loading -> {
+                     item(span = { GridItemSpan(4) }) {
+                        Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                            Text("Loading content...", color = Color.White)
+                        }
+                    }
                 }
-            }
-            is HomeFeedState.Content -> {
-                items(s.posts) { post ->
-                   TvVideoCard(
-                       post = post,
-                       onClick = {
-                            val videoId = post.videoAttachments?.firstOrNull()?.let { 
-                                if (it is VideoAttachmentModel) it.id else null
-                            } ?: return@TvVideoCard
-                            
-                           onPlayVideo(videoId)
-                       }
-                   ) 
+                is HomeFeedState.Error -> {
+                    item(span = { GridItemSpan(4) }) {
+                         Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                            Text("Error: ${s.message}", color = MaterialTheme.colorScheme.error)
+                         }
+                    }
                 }
+                is HomeFeedState.Content -> {
+                    items(s.posts) { post ->
+                       TvVideoCard(
+                           post = post,
+                           onClick = {
+                                val videoId = post.videoAttachments?.firstOrNull()?.let { 
+                                    if (it is com.coulterpeterson.floatnative.openapi.models.VideoAttachmentModel) it.id else null
+                                } ?: return@TvVideoCard
+                                
+                               onPlayVideo(videoId)
+                           }
+                       ) 
+                    }
+                }
+                else -> {}
             }
-            else -> {}
         }
     }
 }
