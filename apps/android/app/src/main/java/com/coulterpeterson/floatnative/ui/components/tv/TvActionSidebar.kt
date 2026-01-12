@@ -36,9 +36,18 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.foundation.shape.RoundedCornerShape
+import coil.compose.AsyncImage
+import androidx.tv.foundation.PivotOffsets
+import androidx.tv.foundation.lazy.list.TvLazyColumn
+import androidx.tv.foundation.lazy.list.rememberTvLazyListState
 import androidx.tv.material3.*
 import com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response
 import com.coulterpeterson.floatnative.viewmodels.SidebarState
@@ -53,7 +62,7 @@ data class SidebarActions(
     val isInWatchLater: Boolean
 )
 
-@OptIn(ExperimentalTvMaterial3Api::class)
+@OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun TvActionSidebar(
     state: SidebarState,
@@ -69,11 +78,9 @@ fun TvActionSidebar(
     var initialReleaseHandled by remember { mutableStateOf(false) }
 
     fun Modifier.consumeFirstKeyRelease(): Modifier = this.onPreviewKeyEvent { event ->
-        android.util.Log.d("SidebarButton", "PreviewKeyEvent: type=${event.type} key=${event.key} handled=$initialReleaseHandled")
         if (!initialReleaseHandled) {
              if (event.type == KeyEventType.KeyUp && 
                  (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter)) {
-                 android.util.Log.d("SidebarButton", "Consuming initial release (Preview)")
                  initialReleaseHandled = true
                  return@onPreviewKeyEvent true // Consume the release event
              }
@@ -84,6 +91,10 @@ fun TvActionSidebar(
         }
         false
     }
+
+    // Thumbnail Logic
+    val thumbnailUrl = state.post.thumbnail?.path?.toString()
+    val fullThumbnailUrl = if (thumbnailUrl?.startsWith("http") == true) thumbnailUrl else "https://pbs.floatplane.com${thumbnailUrl}"
 
     // Content
     Box(
@@ -102,79 +113,107 @@ fun TvActionSidebar(
                 .background(Color(0xFF1E1E1E))
                 .clickable(enabled = false, onClick = {}) // Consume clicks
         ) {
-            Column(
+            TvLazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp)
-                    .consumeFirstKeyRelease(),
+                    .consumeFirstKeyRelease()
+                    .focusProperties { exit = { FocusRequester.Cancel } }, // Trap focus locally
+                pivotOffsets = PivotOffsets(0.7f),
+                contentPadding = PaddingValues(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Header (Optional: Title/Thumbnail)
-                Text(
-                    text = state.post.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
+                // Header
+                item {
+                    AsyncImage(
+                        model = fullThumbnailUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                
+                item {
+                    Text(
+                        text = state.post.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        maxLines = 2,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
 
                 // Actions
-                SidebarButton(
-                    text = "Play",
-                    icon = Icons.Default.PlayArrow,
-                    onClick = {
-                        android.util.Log.d("SidebarButton", "Play Clicked")
-                        actions.onPlay()
-                        onDismiss()
-                    },
-                    modifier = Modifier.focusRequester(focusRequester)
-                )
+                item {
+                    SidebarButton(
+                        text = "Play",
+                        icon = Icons.Default.PlayArrow,
+                        onClick = {
+                            actions.onPlay()
+                            onDismiss()
+                        },
+                        modifier = Modifier.focusRequester(focusRequester)
+                    )
+                }
 
                 // Like
-                val isLiked = state.interaction == ContentPostV3Response.UserInteraction.like
-                SidebarButton(
-                    text = if (isLiked) "Liked" else "Like", // Or just "Like" with filled icon
-                    icon = if (isLiked) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
-                    onClick = actions.onLike
-                )
+                item {
+                    val isLiked = state.interaction == ContentPostV3Response.UserInteraction.like
+                    SidebarButton(
+                        text = if (isLiked) "Liked" else "Like", // Or just "Like" with filled icon
+                        icon = if (isLiked) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
+                        onClick = actions.onLike
+                    )
+                }
 
                 // Dislike
-                val isDisliked = state.interaction == ContentPostV3Response.UserInteraction.dislike
-                SidebarButton(
-                    text = "Dislike",
-                    icon = if (isDisliked) Icons.Default.ThumbDown else Icons.Outlined.ThumbDown,
-                    onClick = actions.onDislike
-                )
+                item {
+                    val isDisliked = state.interaction == ContentPostV3Response.UserInteraction.dislike
+                    SidebarButton(
+                        text = "Dislike",
+                        icon = if (isDisliked) Icons.Default.ThumbDown else Icons.Outlined.ThumbDown,
+                        onClick = actions.onDislike
+                    )
+                }
 
                 // Watch Later
-                val isInWatchLater = actions.isInWatchLater
-                SidebarButton(
-                    text = if (isInWatchLater) "Remove from Watch Later" else "Save to Watch Later",
-                    icon = if (isInWatchLater) Icons.Default.Check else Icons.Default.WatchLater, // Check or WatchLater icon
-                    onClick = {
-                         actions.onWatchLater()
-                         onDismiss()
-                    }
-                )
+                item {
+                    val isInWatchLater = actions.isInWatchLater
+                    SidebarButton(
+                        text = if (isInWatchLater) "Remove from Watch Later" else "Save to Watch Later",
+                        icon = if (isInWatchLater) Icons.Default.Check else Icons.Default.WatchLater, // Check or WatchLater icon
+                        onClick = {
+                             actions.onWatchLater()
+                             onDismiss()
+                        }
+                    )
+                }
                 
                 // Mark as Watched
-                SidebarButton(
-                    text = "Mark as Watched",
-                    icon = Icons.Default.CheckCircle,
-                    onClick = {
-                        actions.onMarkWatched()
-                        onDismiss()
-                    }
-                )
+                item {
+                    SidebarButton(
+                        text = "Mark as Watched",
+                        icon = Icons.Default.CheckCircle,
+                        onClick = {
+                            actions.onMarkWatched()
+                            onDismiss()
+                        }
+                    )
+                }
 
                 // Save to Playlist
-                SidebarButton(
-                    text = "Save to Playlist",
-                    icon = Icons.Default.List,
-                    onClick = {
-                        actions.onAddToPlaylist()
-                        onDismiss()
-                    }
-                )
+                item {
+                    SidebarButton(
+                        text = "Save to Playlist",
+                        icon = Icons.Default.List,
+                        onClick = {
+                            actions.onAddToPlaylist()
+                            onDismiss()
+                        }
+                    )
+                }
             }
         }
     }
