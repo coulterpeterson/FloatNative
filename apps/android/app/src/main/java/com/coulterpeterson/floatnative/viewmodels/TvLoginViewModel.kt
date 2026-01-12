@@ -41,7 +41,11 @@ class TvLoginViewModel : ViewModel() {
                 // Start polling
                 pollForToken(response.device_code, response.interval)
             } catch (e: Exception) {
-                _state.value = TvLoginState.Error("Failed to start login: ${e.message}")
+                if (e is javax.net.ssl.SSLHandshakeException || e is java.security.cert.CertificateException) {
+                     _state.value = TvLoginState.Error("Login Failed: SSL/Cert Error. Please check your device date & time settings.")
+                } else {
+                    _state.value = TvLoginState.Error("Failed to start login: ${e.message}")
+                }
             }
         }
     }

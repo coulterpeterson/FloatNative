@@ -29,9 +29,16 @@ class TokenManager(context: Context) {
         private const val KEY_COMPANION_API_KEY = "companion_api_key"
     }
 
+    // Auth State Flow
+    private val _authStateFlow = MutableStateFlow(retrieve(KEY_ACCESS_TOKEN))
+    val authStateFlow = _authStateFlow.asStateFlow()
+
     var accessToken: String?
         get() = retrieve(KEY_ACCESS_TOKEN)
-        set(value) = save(KEY_ACCESS_TOKEN, value)
+        set(value) {
+            save(KEY_ACCESS_TOKEN, value)
+            _authStateFlow.value = value
+        }
 
     var refreshToken: String?
         get() = retrieve(KEY_REFRESH_TOKEN)
@@ -59,6 +66,7 @@ class TokenManager(context: Context) {
 
     fun clearAll() {
         prefs.edit().clear().apply()
+        _authStateFlow.value = null
     }
 
     private fun save(key: String, value: String?) {

@@ -22,9 +22,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import com.coulterpeterson.floatnative.viewmodels.HomeFeedViewModel
 import com.coulterpeterson.floatnative.viewmodels.HomeFeedState
 import com.coulterpeterson.floatnative.ui.components.tv.TvVideoCard
+import com.coulterpeterson.floatnative.ui.components.tv.TvActionSidebar
+import com.coulterpeterson.floatnative.ui.components.tv.SidebarActions
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,15 +56,19 @@ import androidx.compose.material.icons.filled.Settings
 fun TvHomeFeedScreen(
     onPlayVideo: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
-    viewModel: HomeFeedViewModel = viewModel()
+    viewModel: com.coulterpeterson.floatnative.viewmodels.HomeFeedViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val sidebarState by viewModel.sidebarState.collectAsState()
+    val userPlaylists by viewModel.userPlaylists.collectAsState()
+    val context = LocalContext.current
     
     // Top Navigation Items
     val navItems = listOf("Home", "Creators", "Playlists", "Search", "History", "Settings")
     var selectedNavIndex by remember { mutableIntStateOf(0) }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0F0F0F))) { // Dark background
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0F0F0F))) { // Dark background
+        Column(modifier = Modifier.fillMaxSize()) {
         
         // 1. Top Navigation Bar (Pill shapes)
         Row(
@@ -158,11 +168,55 @@ fun TvHomeFeedScreen(
                                 if (!post.videoAttachments.isNullOrEmpty()) {
                                     onPlayVideo(post.id)
                                 }
+                           },
+                           onLongClick = {
+                               viewModel.openSidebar(post)
                            }
                        ) 
                     }
                 }
                 else -> {}
+            }
+        }
+        } // End Column
+
+        // Sidebar Overlay
+        androidx.compose.animation.AnimatedVisibility(
+            visible = sidebarState != null,
+            enter = androidx.compose.animation.slideInHorizontally { it },
+            exit = androidx.compose.animation.slideOutHorizontally { it },
+            modifier = Modifier.align(Alignment.CenterEnd) 
+        ) {
+            val currentSidebarState = sidebarState
+            if (currentSidebarState != null) {
+                // Determine Watch Later status
+                val watchLaterPlaylist = userPlaylists.find { it.isWatchLater }
+                val isInWatchLater = watchLaterPlaylist?.videoIds?.contains(currentSidebarState.post.id) == true
+
+                TvActionSidebar(
+                    state = currentSidebarState,
+                    actions = SidebarActions(
+                        onPlay = { 
+                            if (!currentSidebarState.post.videoAttachments.isNullOrEmpty()) {
+                                onPlayVideo(currentSidebarState.post.id)
+                            }
+                        },
+                        onLike = { viewModel.toggleSidebarLike() },
+                        onDislike = { viewModel.toggleSidebarDislike() },
+                        onWatchLater = { 
+                             viewModel.toggleWatchLater(currentSidebarState.post) { wasAdded ->
+                                 val msg = if (wasAdded) "Added to Watch Later" else "Removed from Watch Later"
+                                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                             }
+                        },
+                        onMarkWatched = { viewModel.markAsWatched(currentSidebarState.post) },
+                        onAddToPlaylist = { 
+                            Toast.makeText(context, "Playlist selection coming soon to TV", Toast.LENGTH_SHORT).show()
+                        },
+                        isInWatchLater = isInWatchLater
+                    ),
+                    onDismiss = { viewModel.closeSidebar() }
+                )
             }
         }
     }

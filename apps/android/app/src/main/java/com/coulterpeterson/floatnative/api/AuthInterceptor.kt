@@ -42,8 +42,61 @@ class AuthInterceptor(
         }
 
         builder.header("User-Agent", "FloatNative/1.0 (Android)")
+        
+        var response: Response? = null
+        try {
+            response = chain.proceed(builder.build())
+        } catch (e: Exception) {
+            // Check for SSL Handshake or Peer Unverified exceptions which might indicate
+            // clock skew or cert issues that a fresh token *might* help with (user request),
+            // or network glitches we want to retry once.
+            if (e is javax.net.ssl.SSLHandshakeException || e is javax.net.ssl.SSLPeerUnverifiedException) {
+                val refreshToken = tokenManager.refreshToken
+                if (refreshToken != null) {
+                    synchronized(this) {
+                        try {
+                            // Attempt to refresh token
+                            val authApi = authApiProvider()
+                            val tokenEndpoint = "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/token"
+                            val refreshProof = dpopManager.generateProof("POST", tokenEndpoint)
 
-        val response = chain.proceed(builder.build())
+                            // Run blocking because Interceptor is synchronous
+                            val tokenResponse = runBlocking {
+                                authApi.getToken(
+                                    dpop = refreshProof,
+                                    grantType = "refresh_token",
+                                    clientId = "floatnative",
+                                    refreshToken = refreshToken
+                                )
+                            }
+                            
+                            // Save new tokens
+                            tokenManager.accessToken = tokenResponse.access_token
+                            tokenManager.refreshToken = tokenResponse.refresh_token
+
+                            // Retry original request with new token
+                            val method = originalRequest.method
+                            val url = originalRequest.url.toString()
+                            val proof = dpopManager.generateProof(method, url, tokenResponse.access_token)
+
+                            return chain.proceed(
+                                originalRequest.newBuilder()
+                                    .header("DPoP", proof)
+                                    .header("Authorization", "DPoP ${tokenResponse.access_token}")
+                                    .build()
+                            )
+                        } catch (refreshEx: Exception) {
+                            android.util.Log.e("AuthInterceptor", "Refresh failed during SSL recovery. Forcing logout.", refreshEx)
+                            // Force logout so user can try to log in again (as requested)
+                            tokenManager.clearAll()
+                            throw e
+                        }
+                    }
+                }
+            }
+            // If not SSL error or no refresh token, rethrow
+            throw e
+        }
 
         // 2. Extract Cookie from Response (if logging in via legacy or hybrid)
         val cookies = response.headers("Set-Cookie")

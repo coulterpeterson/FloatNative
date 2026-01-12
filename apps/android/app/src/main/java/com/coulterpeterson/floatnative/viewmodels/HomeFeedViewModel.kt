@@ -23,6 +23,12 @@ sealed class HomeFeedState {
     data class Error(val message: String) : HomeFeedState()
 }
 
+data class SidebarState(
+    val post: BlogPostModelV3,
+    val interaction: com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction? = null,
+    val isLoadingInteraction: Boolean = false
+)
+
 class HomeFeedViewModel : ViewModel() {
 
     private val _state = MutableStateFlow<HomeFeedState>(HomeFeedState.Initial)
@@ -46,6 +52,9 @@ class HomeFeedViewModel : ViewModel() {
 
     private val _filter = MutableStateFlow<FeedFilter>(FeedFilter.All)
     val filter = _filter.asStateFlow()
+
+    private val _sidebarState = MutableStateFlow<SidebarState?>(null)
+    val sidebarState = _sidebarState.asStateFlow()
 
     private var lastFetchAfter: Int = 0 // For single creator/channel offset pagination
 
@@ -445,6 +454,80 @@ class HomeFeedViewModel : ViewModel() {
             } catch (e: Exception) {
                e.printStackTrace()
             }
+        }
+    }
+
+    fun openSidebar(post: BlogPostModelV3) {
+        _sidebarState.value = SidebarState(post = post, isLoadingInteraction = true)
+        viewModelScope.launch {
+            try {
+                val response = FloatplaneApi.contentV3.getBlogPost(post.id)
+                if (response.isSuccessful && response.body() != null) {
+                    val fullPost = response.body()!!
+                    val interaction = fullPost.userInteraction?.firstOrNull()
+                    val currentState = _sidebarState.value
+                    if (currentState != null && currentState.post.id == post.id) {
+                         _sidebarState.value = currentState.copy(
+                             interaction = interaction,
+                             isLoadingInteraction = false
+                         )
+                    }
+                } else {
+                     val currentState = _sidebarState.value
+                     if (currentState != null && currentState.post.id == post.id) {
+                         _sidebarState.value = currentState.copy(isLoadingInteraction = false)
+                     }
+                }
+            } catch (e: Exception) {
+                 val currentState = _sidebarState.value
+                 if (currentState != null && currentState.post.id == post.id) {
+                     _sidebarState.value = currentState.copy(isLoadingInteraction = false)
+                 }
+            }
+        }
+    }
+
+    fun closeSidebar() {
+        _sidebarState.value = null
+    }
+
+    fun toggleSidebarLike() {
+        val currentState = _sidebarState.value ?: return
+        val currentInteraction = currentState.interaction
+
+        val newInteraction = if (currentInteraction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.like) null else com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.like
+
+        _sidebarState.value = currentState.copy(interaction = newInteraction)
+
+        viewModelScope.launch {
+            try {
+                FloatplaneApi.contentV3.likeContent(
+                    com.coulterpeterson.floatnative.openapi.models.ContentLikeV3Request(
+                        id = currentState.post.id,
+                        contentType = com.coulterpeterson.floatnative.openapi.models.ContentLikeV3Request.ContentType.blogPost
+                    )
+                )
+            } catch (e: Exception) { }
+        }
+    }
+
+    fun toggleSidebarDislike() {
+        val currentState = _sidebarState.value ?: return
+        val currentInteraction = currentState.interaction
+
+        val newInteraction = if (currentInteraction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.dislike) null else com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.dislike
+
+        _sidebarState.value = currentState.copy(interaction = newInteraction)
+
+        viewModelScope.launch {
+            try {
+                FloatplaneApi.contentV3.dislikeContent(
+                    com.coulterpeterson.floatnative.openapi.models.ContentLikeV3Request(
+                        id = currentState.post.id,
+                        contentType = com.coulterpeterson.floatnative.openapi.models.ContentLikeV3Request.ContentType.blogPost
+                    )
+                )
+            } catch (e: Exception) { }
         }
     }
 }

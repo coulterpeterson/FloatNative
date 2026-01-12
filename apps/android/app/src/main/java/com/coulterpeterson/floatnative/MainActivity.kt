@@ -81,17 +81,37 @@ class MainActivity : ComponentActivity() {
                     ) {
                         val isTv = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
                         
-                        val token = com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.accessToken
-                        val startDestination = if (!token.isNullOrEmpty()) {
-                            com.coulterpeterson.floatnative.ui.navigation.Screen.Home.route
-                        } else {
-                            com.coulterpeterson.floatnative.ui.navigation.Screen.Login.route
+                        // Observe Auth State for dynamic logout
+                        val authToken by com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.authStateFlow.collectAsState()
+                        
+                        // Initial start destination
+                        val startDestination = androidx.compose.runtime.remember(Unit) {
+                            val initialToken = com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.accessToken
+                            if (!initialToken.isNullOrEmpty()) {
+                                "home" // Hardcoded to match TvScreen.Home.route / Screen.Home.route commonality
+                            } else {
+                                "login"
+                            }
                         }
 
                         if (isTv) {
-                            com.coulterpeterson.floatnative.ui.navigation.TvAppNavigation(startDestination = startDestination)
+                            val navController = androidx.navigation.compose.rememberNavController()
+                            
+                            // Watch for logout
+                            LaunchedEffect(authToken) {
+                                if (authToken == null) {
+                                    navController.navigate("login") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
+                            }
+                            
+                            com.coulterpeterson.floatnative.ui.navigation.TvAppNavigation(
+                                startDestination = startDestination,
+                                navController = navController
+                            )
                         } else {
-                             // I will abort this specific replace, modify TokenManager to have a Flow, then come back.
+                             // Phone navigation
                              AppNavigation(startDestination = startDestination)
                         }
                     }

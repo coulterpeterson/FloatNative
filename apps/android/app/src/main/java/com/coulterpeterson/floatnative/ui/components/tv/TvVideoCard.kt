@@ -37,7 +37,8 @@ import com.coulterpeterson.floatnative.utils.DateUtils
 fun TvVideoCard(
     post: BlogPostModelV3,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null
 ) {
     // Thumbnail Logic
     val thumbnailUrl = post.thumbnail?.path?.toString()
@@ -57,6 +58,7 @@ fun TvVideoCard(
     
     Card(
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = modifier.fillMaxWidth(),
         shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),
         scale = CardDefaults.scale(focusedScale = 1.05f),
