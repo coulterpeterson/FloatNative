@@ -22,8 +22,18 @@ import androidx.compose.material.icons.filled.WatchLater
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -54,6 +64,26 @@ fun TvActionSidebar(
     BackHandler(onBack = onDismiss)
 
     val focusRequester = remember { FocusRequester() }
+    
+    // Track if the initial long-press release has been handled
+    var initialReleaseHandled by remember { mutableStateOf(false) }
+
+    fun Modifier.consumeFirstKeyRelease(): Modifier = this.onPreviewKeyEvent { event ->
+        android.util.Log.d("SidebarButton", "PreviewKeyEvent: type=${event.type} key=${event.key} handled=$initialReleaseHandled")
+        if (!initialReleaseHandled) {
+             if (event.type == KeyEventType.KeyUp && 
+                 (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter)) {
+                 android.util.Log.d("SidebarButton", "Consuming initial release (Preview)")
+                 initialReleaseHandled = true
+                 return@onPreviewKeyEvent true // Consume the release event
+             }
+             // We DO NOT consume other events here, let them pass to children
+             // Unless it's the specific release we want to block.
+             // Wait, if we are holding the button, we might see repeats?
+             // Actually, if we consume the Release, the Click won't happen (usually triggered on Up).
+        }
+        false
+    }
 
     // Content
     Box(
@@ -75,7 +105,8 @@ fun TvActionSidebar(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
+                    .padding(24.dp)
+                    .consumeFirstKeyRelease(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Header (Optional: Title/Thumbnail)
@@ -91,6 +122,7 @@ fun TvActionSidebar(
                     text = "Play",
                     icon = Icons.Default.PlayArrow,
                     onClick = {
+                        android.util.Log.d("SidebarButton", "Play Clicked")
                         actions.onPlay()
                         onDismiss()
                     },

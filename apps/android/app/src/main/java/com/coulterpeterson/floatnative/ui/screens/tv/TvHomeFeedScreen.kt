@@ -165,7 +165,7 @@ fun TvHomeFeedScreen(
                            onClick = {
                                 // VideoPlayerViewModel expects a BlogPost ID, NOT a VideoAttachment ID.
                                 // It will fetch the post and extract the video attached to it.
-                                if (!post.videoAttachments.isNullOrEmpty()) {
+                                if (viewModel.sidebarState.value == null && !post.videoAttachments.isNullOrEmpty()) {
                                     onPlayVideo(post.id)
                                 }
                            },
