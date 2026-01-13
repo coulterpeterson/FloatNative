@@ -2,9 +2,15 @@ package com.coulterpeterson.floatnative.ui.components.tv
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -66,7 +72,7 @@ data class SidebarActions(
     val userPlaylists: List<com.coulterpeterson.floatnative.api.Playlist>
 )
 
-@OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class, androidx.compose.animation.ExperimentalAnimationApi::class)
 @Composable
 fun TvActionSidebar(
     state: SidebarState,
@@ -82,7 +88,15 @@ fun TvActionSidebar(
         }
     }
 
-    val focusRequester = remember { FocusRequester() }
+    val playFocusRequester = remember { FocusRequester() }
+    val saveToPlaylistFocusRequester = remember { FocusRequester() }
+    val firstPlaylistFocusRequester = remember { FocusRequester() }
+    
+    val mainListState = rememberTvLazyListState()
+    val playlistListState = rememberTvLazyListState()
+
+    // State to track previous view for focus restoration logic
+    var lastView by remember { mutableStateOf(state.currentView) }
     
     // Track if the initial long-press release has been handled
     var initialReleaseHandled by remember { mutableStateOf(false) }
@@ -119,158 +133,210 @@ fun TvActionSidebar(
                 .background(Color(0xFF1E1E1E))
                 .clickable(enabled = false, onClick = {}) // Consume clicks
         ) {
-            AnimatedVisibility(
-                visible = state.currentView == com.coulterpeterson.floatnative.viewmodels.SidebarView.Main,
-                enter = slideInHorizontally { -it },
-                exit = slideOutHorizontally { -it },
-                modifier = Modifier.fillMaxSize()
-            ) {
-                 TvLazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .consumeFirstKeyRelease()
-                        .focusProperties { exit = { FocusRequester.Cancel } }, // Trap focus locally
-                    pivotOffsets = PivotOffsets(0.7f),
-                    contentPadding = PaddingValues(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Header
-                    item {
-                        AsyncImage(
-                            model = fullThumbnailUrl,
-                            contentDescription = null,
+            androidx.compose.animation.AnimatedContent(
+                targetState = state.currentView,
+                transitionSpec = {
+                    if (targetState == com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists) {
+                         // Main -> Playlists: Slide In from Right
+                         (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
+                             slideOutHorizontally { width -> -width } + fadeOut())
+                    } else {
+                         // Playlists -> Main: Slide In from Left
+                         (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
+                             slideOutHorizontally { width -> width } + fadeOut())
+                    }
+                },
+                label = "SidebarTransition"
+            ) { targetView ->
+                when (targetView) {
+                    com.coulterpeterson.floatnative.viewmodels.SidebarView.Main -> {
+                         // Local Focus Management for Main View
+                         LaunchedEffect(Unit) {
+                             if (lastView == com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists) {
+                                  try {
+                                      // Scroll to Save button (last item ~ index 7) to ensure it's composed
+                                      mainListState.scrollToItem(7) 
+                                      saveToPlaylistFocusRequester.requestFocus()
+                                  } catch (e: Exception) { 
+                                       // If specific focus fails, standard restoration kicks in
+                                  }
+                             } else {
+                                  try {
+                                      mainListState.scrollToItem(2) // Play button index
+                                      playFocusRequester.requestFocus()
+                                  } catch (e: Exception) { }
+                             }
+                             lastView = com.coulterpeterson.floatnative.viewmodels.SidebarView.Main
+                         }
+
+                         TvLazyColumn(
+                            state = mainListState,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(16f / 9f)
-                                .clip(RoundedCornerShape(12.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                    
-                    item {
-                        Text(
-                            text = state.post.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
-                            maxLines = 2,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                    }
-
-                    // Actions
-                    item {
-                        SidebarButton(
-                            text = "Play",
-                            icon = Icons.Default.PlayArrow,
-                            onClick = {
-                                actions.onPlay()
-                                onDismiss()
-                            },
-                            modifier = Modifier.focusRequester(focusRequester)
-                        )
-                    }
-
-                    // Like
-                    item {
-                        val isLiked = state.interaction == ContentPostV3Response.UserInteraction.like
-                        SidebarButton(
-                            text = if (isLiked) "Liked" else "Like",
-                            icon = if (isLiked) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
-                            onClick = actions.onLike
-                        )
-                    }
-
-                    // Dislike
-                    item {
-                        val isDisliked = state.interaction == ContentPostV3Response.UserInteraction.dislike
-                        SidebarButton(
-                            text = "Dislike",
-                            icon = if (isDisliked) Icons.Default.ThumbDown else Icons.Outlined.ThumbDown,
-                            onClick = actions.onDislike
-                        )
-                    }
-
-                    // Watch Later
-                    item {
-                        val isInWatchLater = actions.isInWatchLater
-                        SidebarButton(
-                            text = if (isInWatchLater) "Remove from Watch Later" else "Save to Watch Later",
-                            icon = if (isInWatchLater) Icons.Default.Check else Icons.Default.WatchLater, 
-                            onClick = {
-                                 actions.onWatchLater()
-                                 onDismiss()
+                                .fillMaxSize()
+                                .consumeFirstKeyRelease()
+                                .focusProperties { exit = { FocusRequester.Cancel } }, 
+                            pivotOffsets = PivotOffsets(0.7f),
+                            contentPadding = PaddingValues(24.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            // Header (0)
+                            item {
+                                AsyncImage(
+                                    model = fullThumbnailUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(16f / 9f)
+                                        .clip(RoundedCornerShape(12.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
                             }
-                        )
-                    }
-                    
-                    // Mark as Watched
-                    item {
-                        SidebarButton(
-                            text = "Mark as Watched",
-                            icon = Icons.Default.CheckCircle,
-                            onClick = {
-                                actions.onMarkWatched()
-                                onDismiss()
+                            
+                            // Title (1)
+                            item {
+                                Text(
+                                    text = state.post.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Color.White,
+                                    maxLines = 2,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
                             }
-                        )
-                    }
 
-                    // Save to Playlist
-                    item {
-                        SidebarButton(
-                            text = "Save to Playlist",
-                            icon = Icons.Default.List,
-                            onClick = actions.onShowPlaylists
-                        )
-                    }
-                }
-            }
+                            // Actions - Play (2)
+                            item {
+                                SidebarButton(
+                                    text = "Play",
+                                    icon = Icons.Default.PlayArrow,
+                                    onClick = {
+                                        actions.onPlay()
+                                        onDismiss()
+                                    },
+                                    modifier = Modifier.focusRequester(playFocusRequester)
+                                )
+                            }
 
-            // Playlist Sub-View
-            AnimatedVisibility(
-                visible = state.currentView == com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists,
-                enter = slideInHorizontally { it },
-                exit = slideOutHorizontally { it },
-                modifier = Modifier.fillMaxSize()
-            ) {
-                 TvLazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .focusProperties { exit = { FocusRequester.Cancel } }, 
-                    contentPadding = PaddingValues(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    item {
-                        Text(
-                            text = "Save to Playlist",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-                    }
+                            // Like (3)
+                            item {
+                                val isLiked = state.interaction == ContentPostV3Response.UserInteraction.like
+                                SidebarButton(
+                                    text = if (isLiked) "Liked" else "Like",
+                                    icon = if (isLiked) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
+                                    onClick = actions.onLike
+                                )
+                            }
 
-                    items(actions.userPlaylists.size) { index ->
-                        val playlist = actions.userPlaylists[index]
-                        // Don't show Watch Later here, handled separately
-                        if (!playlist.isWatchLater) {
-                            val isAdded = playlist.videoIds.contains(state.post.id)
-                            SidebarButton(
-                                text = playlist.name,
-                                icon = if (isAdded) Icons.Default.CheckCircle else Icons.Default.Add,
-                                onClick = { actions.onTogglePlaylist(playlist) }
-                            )
+                            // Dislike (4)
+                            item {
+                                val isDisliked = state.interaction == ContentPostV3Response.UserInteraction.dislike
+                                SidebarButton(
+                                    text = "Dislike",
+                                    icon = if (isDisliked) Icons.Default.ThumbDown else Icons.Outlined.ThumbDown,
+                                    onClick = actions.onDislike
+                                )
+                            }
+
+                            // Watch Later (5)
+                            item {
+                                val isInWatchLater = actions.isInWatchLater
+                                SidebarButton(
+                                    text = if (isInWatchLater) "Remove from Watch Later" else "Save to Watch Later",
+                                    icon = if (isInWatchLater) Icons.Default.Check else Icons.Default.WatchLater, 
+                                    onClick = {
+                                         actions.onWatchLater()
+                                    }
+                                )
+                            }
+                            
+                            // Mark as Watched (6)
+                            item {
+                                SidebarButton(
+                                    text = "Mark as Watched",
+                                    icon = Icons.Default.CheckCircle,
+                                    onClick = {
+                                        actions.onMarkWatched()
+                                        onDismiss()
+                                    }
+                                )
+                            }
+
+                            // Save to Playlist (7)
+                            item {
+                                SidebarButton(
+                                    text = "Save to Playlist",
+                                    icon = Icons.Default.List,
+                                    onClick = actions.onShowPlaylists,
+                                    modifier = Modifier.focusRequester(saveToPlaylistFocusRequester)
+                                )
+                            }
+                        }
+                    }
+                    com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists -> {
+                         // Local Focus Management for Playlist View
+                         LaunchedEffect(Unit, actions.userPlaylists) {
+                             if (actions.userPlaylists.isNotEmpty()) {
+                                 try {
+                                     // Ensure top is visible
+                                     playlistListState.scrollToItem(0)
+                                     // Focus the first specific item
+                                     firstPlaylistFocusRequester.requestFocus()
+                                 } catch (e: Exception) { }
+                             }
+                             lastView = com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists
+                         }
+
+                         TvLazyColumn(
+                            state = playlistListState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .focusProperties { exit = { FocusRequester.Cancel } }, 
+                            contentPadding = PaddingValues(24.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            // Title Header
+                            item {
+                                Text(
+                                    text = "Save to...",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+                            }
+
+                            val displayablePlaylists = actions.userPlaylists
+                            
+                            if (displayablePlaylists.isEmpty()) {
+                                item {
+                                    Text(
+                                        text = "No playlists found.\nCreate one on the web or mobile app.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.Gray,
+                                        modifier = Modifier.padding(top = 8.dp)
+                                    )
+                                }
+                            } else {
+                                items(displayablePlaylists.size) { index ->
+                                    val playlist = displayablePlaylists[index]
+                                    val isAdded = playlist.videoIds.contains(state.post.id)
+                                    
+                                    val itemModifier = if (index == 0) Modifier.focusRequester(firstPlaylistFocusRequester) else Modifier
+                                    
+                                    SidebarButton(
+                                        text = playlist.name,
+                                        icon = if (isAdded) Icons.Default.CheckCircle else Icons.Default.Add,
+                                        onClick = { actions.onTogglePlaylist(playlist) },
+                                        modifier = itemModifier
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
     }
-
-    // Request Focus
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
 }
+
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable

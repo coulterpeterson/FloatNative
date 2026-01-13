@@ -306,9 +306,11 @@ class HomeFeedViewModel : ViewModel() {
                 }
                 if (response.isSuccessful && response.body() != null) {
                     _userPlaylists.value = response.body()!!.playlists ?: emptyList()
+                } else {
+                    android.util.Log.e("SaveToPlaylist", "API Error: ${response.code()} ${response.message()}")
                 }
             } catch (e: Exception) {
-                // Ignore
+                android.util.Log.e("SaveToPlaylist", "Exception loading playlists", e)
             }
         }
     }
@@ -349,6 +351,20 @@ class HomeFeedViewModel : ViewModel() {
                 val isAdded = watchLater.videoIds.contains(post.id)
                 var wasAdded = false
                 
+                // Optimistic Update
+                val updatedPlaylists = _userPlaylists.value.map { pl ->
+                    if (pl.id == watchLater.id) {
+                         if (isAdded) {
+                             pl.copy(videoIds = pl.videoIds - post.id)
+                         } else {
+                             pl.copy(videoIds = pl.videoIds + post.id)
+                         }
+                    } else {
+                        pl
+                    }
+                }
+                _userPlaylists.value = updatedPlaylists
+                
                 if (isAdded) {
                     withCompanionRetry {
                         FloatplaneApi.companionApi.removeFromPlaylist(
@@ -366,10 +382,11 @@ class HomeFeedViewModel : ViewModel() {
                     }
                     wasAdded = true
                 }
-                loadPlaylists() // Refresh all playlists to be sure
+                loadPlaylists() // Refresh all playlists to be sure sync is correct
                 onResult(wasAdded)
             } catch (e: Exception) {
                 e.printStackTrace()
+                loadPlaylists() // Revert on error
             }
         }
     }
