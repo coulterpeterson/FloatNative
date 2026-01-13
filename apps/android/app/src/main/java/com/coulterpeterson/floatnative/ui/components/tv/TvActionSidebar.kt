@@ -1,37 +1,28 @@
 package com.coulterpeterson.floatnative.ui.components.tv
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
-
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.outlined.ThumbUp
-import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.WatchLater
+import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -42,14 +33,12 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
 import androidx.tv.foundation.PivotOffsets
 import androidx.tv.foundation.lazy.list.TvLazyColumn
@@ -57,6 +46,7 @@ import androidx.tv.foundation.lazy.list.rememberTvLazyListState
 import androidx.tv.material3.*
 import com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response
 import com.coulterpeterson.floatnative.viewmodels.SidebarState
+import com.coulterpeterson.floatnative.viewmodels.SidebarView
 
 data class SidebarActions(
     val onPlay: () -> Unit,
@@ -72,16 +62,16 @@ data class SidebarActions(
     val userPlaylists: List<com.coulterpeterson.floatnative.api.Playlist>
 )
 
-@OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class, androidx.compose.animation.ExperimentalAnimationApi::class)
+@OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun TvActionSidebar(
     state: SidebarState,
     actions: SidebarActions,
     onDismiss: () -> Unit
 ) {
-    // Intercept Back Press to handle navigation or dismiss
+    // Intercept Back Press
     BackHandler {
-        if (state.currentView == com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists) {
+        if (state.currentView == SidebarView.Playlists) {
             actions.onBack()
         } else {
             onDismiss()
@@ -92,12 +82,9 @@ fun TvActionSidebar(
     val saveToPlaylistFocusRequester = remember { FocusRequester() }
     val firstPlaylistFocusRequester = remember { FocusRequester() }
     
-    val mainListState = rememberTvLazyListState()
-    val playlistListState = rememberTvLazyListState()
+    // SINGLE LIST STATE for the entire sidebar
+    val listState = rememberTvLazyListState()
 
-    // State to track previous view for focus restoration logic
-    var lastView by remember { mutableStateOf(state.currentView) }
-    
     // Track if the initial long-press release has been handled
     var initialReleaseHandled by remember { mutableStateOf(false) }
 
@@ -111,224 +98,196 @@ fun TvActionSidebar(
         }
         false
     }
+    
+    // Focus Management Logic for View Transitions
+    LaunchedEffect(state.currentView) {
+        if (state.currentView == SidebarView.Playlists) {
+            // Moving to Playlists: Focus the first item
+            // We use a small delay or just rely on composition order, but with single list 
+            // the state persistence is much better.
+            try {
+                // Determine scrolling needs. Usually index 0 for playlists.
+                listState.scrollToItem(0)
+                firstPlaylistFocusRequester.requestFocus()
+            } catch(e: Exception) {}
+        } else {
+            // Returning to Main: Focus the "Save" button (approx index 7)
+            try {
+                // Item 7 is "Save to Playlist"
+                listState.scrollToItem(7)
+                saveToPlaylistFocusRequester.requestFocus()
+            } catch(e: Exception) {}
+        }
+    }
+    
+    // Initial Focus
+    LaunchedEffect(Unit) {
+        if (state.currentView == SidebarView.Main) {
+            try {
+                listState.scrollToItem(2) // Play button
+                playFocusRequester.requestFocus()
+            } catch(e: Exception) {}
+        }
+    }
 
     // Thumbnail Logic
     val thumbnailUrl = state.post.thumbnail?.path?.toString()
     val fullThumbnailUrl = if (thumbnailUrl?.startsWith("http") == true) thumbnailUrl else "https://pbs.floatplane.com${thumbnailUrl}"
 
-    // Content
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.6f)) // Dim background
-            .clickable(onClick = onDismiss) // Click outside to dismiss
-            ,
+            .background(Color.Black.copy(alpha = 0.6f))
+            .clickable(onClick = onDismiss),
         contentAlignment = Alignment.CenterEnd
     ) {
-        // Prevent click propagation to background content
+        // Sidebar Container
         Box(
             modifier = Modifier
                 .fillMaxHeight()
                 .width(350.dp)
                 .background(Color(0xFF1E1E1E))
-                .clickable(enabled = false, onClick = {}) // Consume clicks
+                .clickable(enabled = false, onClick = {})
         ) {
-            androidx.compose.animation.AnimatedContent(
-                targetState = state.currentView,
-                transitionSpec = {
-                    if (targetState == com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists) {
-                         // Main -> Playlists: Slide In from Right
-                         (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
-                             slideOutHorizontally { width -> -width } + fadeOut())
-                    } else {
-                         // Playlists -> Main: Slide In from Left
-                         (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
-                             slideOutHorizontally { width -> width } + fadeOut())
-                    }
-                },
-                label = "SidebarTransition"
-            ) { targetView ->
-                when (targetView) {
-                    com.coulterpeterson.floatnative.viewmodels.SidebarView.Main -> {
-                         // Local Focus Management for Main View
-                         LaunchedEffect(Unit) {
-                             if (lastView == com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists) {
-                                  try {
-                                      // Scroll to Save button (last item ~ index 7) to ensure it's composed
-                                      mainListState.scrollToItem(7) 
-                                      saveToPlaylistFocusRequester.requestFocus()
-                                  } catch (e: Exception) { 
-                                       // If specific focus fails, standard restoration kicks in
-                                  }
-                             } else {
-                                  try {
-                                      mainListState.scrollToItem(2) // Play button index
-                                      playFocusRequester.requestFocus()
-                                  } catch (e: Exception) { }
-                             }
-                             lastView = com.coulterpeterson.floatnative.viewmodels.SidebarView.Main
-                         }
-
-                         TvLazyColumn(
-                            state = mainListState,
+            // SINGLE LIST - Content Swaps Inside
+            TvLazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .consumeFirstKeyRelease(),
+                pivotOffsets = PivotOffsets(0.7f),
+                contentPadding = PaddingValues(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (state.currentView == SidebarView.Main) {
+                    // --- MAIN VIEW ITEMS ---
+                    
+                    // Thumbnail (0)
+                    item {
+                        AsyncImage(
+                            model = fullThumbnailUrl,
+                            contentDescription = null,
                             modifier = Modifier
-                                .fillMaxSize()
-                                .consumeFirstKeyRelease()
-                                .focusProperties { exit = { FocusRequester.Cancel } }, 
-                            pivotOffsets = PivotOffsets(0.7f),
-                            contentPadding = PaddingValues(24.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            // Header (0)
-                            item {
-                                AsyncImage(
-                                    model = fullThumbnailUrl,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .aspectRatio(16f / 9f)
-                                        .clip(RoundedCornerShape(12.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-                            
-                            // Title (1)
-                            item {
-                                Text(
-                                    text = state.post.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = Color.White,
-                                    maxLines = 2,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                            }
+                                .fillMaxWidth()
+                                .aspectRatio(16f / 9f)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    
+                    // Title (1)
+                    item {
+                        Text(
+                            text = state.post.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            maxLines = 2,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
 
-                            // Actions - Play (2)
-                            item {
-                                SidebarButton(
-                                    text = "Play",
-                                    icon = Icons.Default.PlayArrow,
-                                    onClick = {
-                                        actions.onPlay()
-                                        onDismiss()
-                                    },
-                                    modifier = Modifier.focusRequester(playFocusRequester)
-                                )
-                            }
+                    // Play (2)
+                    item {
+                        SidebarButton(
+                            text = "Play",
+                            icon = Icons.Default.PlayArrow,
+                            onClick = {
+                                actions.onPlay()
+                                onDismiss()
+                            },
+                            modifier = Modifier.focusRequester(playFocusRequester)
+                        )
+                    }
+                    
+                    // Like (3)
+                    item {
+                        val isLiked = state.interaction == ContentPostV3Response.UserInteraction.like
+                        SidebarButton(
+                            text = if (isLiked) "Liked" else "Like",
+                            icon = if (isLiked) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
+                            onClick = actions.onLike
+                        )
+                    }
 
-                            // Like (3)
-                            item {
-                                val isLiked = state.interaction == ContentPostV3Response.UserInteraction.like
-                                SidebarButton(
-                                    text = if (isLiked) "Liked" else "Like",
-                                    icon = if (isLiked) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
-                                    onClick = actions.onLike
-                                )
-                            }
+                    // Dislike (4)
+                    item {
+                        val isDisliked = state.interaction == ContentPostV3Response.UserInteraction.dislike
+                        SidebarButton(
+                            text = "Dislike",
+                            icon = if (isDisliked) Icons.Default.ThumbDown else Icons.Outlined.ThumbDown,
+                            onClick = actions.onDislike
+                        )
+                    }
 
-                            // Dislike (4)
-                            item {
-                                val isDisliked = state.interaction == ContentPostV3Response.UserInteraction.dislike
-                                SidebarButton(
-                                    text = "Dislike",
-                                    icon = if (isDisliked) Icons.Default.ThumbDown else Icons.Outlined.ThumbDown,
-                                    onClick = actions.onDislike
-                                )
+                    // Watch Later (5)
+                    item {
+                        val isInWatchLater = actions.isInWatchLater
+                        SidebarButton(
+                            text = if (isInWatchLater) "Remove from Watch Later" else "Save to Watch Later",
+                            icon = if (isInWatchLater) Icons.Default.Check else Icons.Default.WatchLater, 
+                            onClick = actions.onWatchLater
+                        )
+                    }
+                    
+                    // Mark as Watched (6)
+                    item {
+                        SidebarButton(
+                            text = "Mark as Watched",
+                            icon = Icons.Default.CheckCircle,
+                            onClick = {
+                                actions.onMarkWatched()
+                                onDismiss()
                             }
+                        )
+                    }
 
-                            // Watch Later (5)
-                            item {
-                                val isInWatchLater = actions.isInWatchLater
-                                SidebarButton(
-                                    text = if (isInWatchLater) "Remove from Watch Later" else "Save to Watch Later",
-                                    icon = if (isInWatchLater) Icons.Default.Check else Icons.Default.WatchLater, 
-                                    onClick = {
-                                         actions.onWatchLater()
-                                    }
-                                )
-                            }
-                            
-                            // Mark as Watched (6)
-                            item {
-                                SidebarButton(
-                                    text = "Mark as Watched",
-                                    icon = Icons.Default.CheckCircle,
-                                    onClick = {
-                                        actions.onMarkWatched()
-                                        onDismiss()
-                                    }
-                                )
-                            }
-
-                            // Save to Playlist (7)
-                            item {
-                                SidebarButton(
-                                    text = "Save to Playlist",
-                                    icon = Icons.Default.List,
-                                    onClick = actions.onShowPlaylists,
-                                    modifier = Modifier.focusRequester(saveToPlaylistFocusRequester)
-                                )
-                            }
+                    // Save to Playlist (7)
+                    item {
+                        SidebarButton(
+                            text = "Save to Playlist",
+                            icon = Icons.Default.List,
+                            onClick = actions.onShowPlaylists,
+                            modifier = Modifier.focusRequester(saveToPlaylistFocusRequester)
+                        )
+                    }
+                    
+                } else {
+                    // --- PLAYLIST VIEW ITEMS ---
+                    
+                    // Header (0)
+                    item {
+                        Text(
+                            text = "Save to...",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
+                    
+                    val displayablePlaylists = actions.userPlaylists
+                    
+                    if (displayablePlaylists.isEmpty()) {
+                        item {
+                            Text(
+                                text = "No playlists found.\nCreate one on mobile/web.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
                         }
-                    }
-                    com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists -> {
-                         // Local Focus Management for Playlist View
-                         LaunchedEffect(Unit, actions.userPlaylists) {
-                             if (actions.userPlaylists.isNotEmpty()) {
-                                 try {
-                                     // Ensure top is visible
-                                     playlistListState.scrollToItem(0)
-                                     // Focus the first specific item
-                                     firstPlaylistFocusRequester.requestFocus()
-                                 } catch (e: Exception) { }
-                             }
-                             lastView = com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists
-                         }
-
-                         TvLazyColumn(
-                            state = playlistListState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .focusProperties { exit = { FocusRequester.Cancel } }, 
-                            contentPadding = PaddingValues(24.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            // Title Header
-                            item {
-                                Text(
-                                    text = "Save to...",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(bottom = 16.dp)
-                                )
-                            }
-
-                            val displayablePlaylists = actions.userPlaylists
+                    } else {
+                        items(displayablePlaylists.size) { index ->
+                            val playlist = displayablePlaylists[index]
+                            val isAdded = playlist.videoIds.contains(state.post.id)
                             
-                            if (displayablePlaylists.isEmpty()) {
-                                item {
-                                    Text(
-                                        text = "No playlists found.\nCreate one on the web or mobile app.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.Gray,
-                                        modifier = Modifier.padding(top = 8.dp)
-                                    )
-                                }
-                            } else {
-                                items(displayablePlaylists.size) { index ->
-                                    val playlist = displayablePlaylists[index]
-                                    val isAdded = playlist.videoIds.contains(state.post.id)
-                                    
-                                    val itemModifier = if (index == 0) Modifier.focusRequester(firstPlaylistFocusRequester) else Modifier
-                                    
-                                    SidebarButton(
-                                        text = playlist.name,
-                                        icon = if (isAdded) Icons.Default.CheckCircle else Icons.Default.Add,
-                                        onClick = { actions.onTogglePlaylist(playlist) },
-                                        modifier = itemModifier
-                                    )
-                                }
-                            }
+                            val itemModifier = if (index == 0) Modifier.focusRequester(firstPlaylistFocusRequester) else Modifier
+                            
+                            SidebarButton(
+                                text = playlist.name,
+                                icon = if (isAdded) Icons.Default.CheckCircle else Icons.Default.Add,
+                                onClick = { actions.onTogglePlaylist(playlist) },
+                                modifier = itemModifier
+                            )
                         }
                     }
                 }
@@ -336,7 +295,6 @@ fun TvActionSidebar(
         }
     }
 }
-
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -349,7 +307,7 @@ fun SidebarButton(
     Surface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape = ClickableSurfaceDefaults.shape(shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
             contentColor = Color.White,
