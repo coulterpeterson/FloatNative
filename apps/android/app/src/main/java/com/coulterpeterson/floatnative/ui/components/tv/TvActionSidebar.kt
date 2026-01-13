@@ -59,7 +59,11 @@ data class SidebarActions(
     val onWatchLater: () -> Unit,
     val onMarkWatched: () -> Unit,
     val onAddToPlaylist: () -> Unit,
-    val isInWatchLater: Boolean
+    val onShowPlaylists: () -> Unit,
+    val onBack: () -> Unit,
+    val onTogglePlaylist: (com.coulterpeterson.floatnative.api.Playlist) -> Unit,
+    val isInWatchLater: Boolean,
+    val userPlaylists: List<com.coulterpeterson.floatnative.api.Playlist>
 )
 
 @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
@@ -69,8 +73,14 @@ fun TvActionSidebar(
     actions: SidebarActions,
     onDismiss: () -> Unit
 ) {
-    // Intercept Back Press to close sidebar
-    BackHandler(onBack = onDismiss)
+    // Intercept Back Press to handle navigation or dismiss
+    BackHandler {
+        if (state.currentView == com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists) {
+            actions.onBack()
+        } else {
+            onDismiss()
+        }
+    }
 
     val focusRequester = remember { FocusRequester() }
     
@@ -84,10 +94,6 @@ fun TvActionSidebar(
                  initialReleaseHandled = true
                  return@onPreviewKeyEvent true // Consume the release event
              }
-             // We DO NOT consume other events here, let them pass to children
-             // Unless it's the specific release we want to block.
-             // Wait, if we are holding the button, we might see repeats?
-             // Actually, if we consume the Release, the Click won't happen (usually triggered on Up).
         }
         false
     }
@@ -113,106 +119,148 @@ fun TvActionSidebar(
                 .background(Color(0xFF1E1E1E))
                 .clickable(enabled = false, onClick = {}) // Consume clicks
         ) {
-            TvLazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .consumeFirstKeyRelease()
-                    .focusProperties { exit = { FocusRequester.Cancel } }, // Trap focus locally
-                pivotOffsets = PivotOffsets(0.7f),
-                contentPadding = PaddingValues(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            AnimatedVisibility(
+                visible = state.currentView == com.coulterpeterson.floatnative.viewmodels.SidebarView.Main,
+                enter = slideInHorizontally { -it },
+                exit = slideOutHorizontally { -it },
+                modifier = Modifier.fillMaxSize()
             ) {
-                // Header
-                item {
-                    AsyncImage(
-                        model = fullThumbnailUrl,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
-                            .clip(RoundedCornerShape(12.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                
-                item {
-                    Text(
-                        text = state.post.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        maxLines = 2,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                }
+                 TvLazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .consumeFirstKeyRelease()
+                        .focusProperties { exit = { FocusRequester.Cancel } }, // Trap focus locally
+                    pivotOffsets = PivotOffsets(0.7f),
+                    contentPadding = PaddingValues(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Header
+                    item {
+                        AsyncImage(
+                            model = fullThumbnailUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(16f / 9f)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    
+                    item {
+                        Text(
+                            text = state.post.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            maxLines = 2,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
 
-                // Actions
-                item {
-                    SidebarButton(
-                        text = "Play",
-                        icon = Icons.Default.PlayArrow,
-                        onClick = {
-                            actions.onPlay()
-                            onDismiss()
-                        },
-                        modifier = Modifier.focusRequester(focusRequester)
-                    )
-                }
+                    // Actions
+                    item {
+                        SidebarButton(
+                            text = "Play",
+                            icon = Icons.Default.PlayArrow,
+                            onClick = {
+                                actions.onPlay()
+                                onDismiss()
+                            },
+                            modifier = Modifier.focusRequester(focusRequester)
+                        )
+                    }
 
-                // Like
-                item {
-                    val isLiked = state.interaction == ContentPostV3Response.UserInteraction.like
-                    SidebarButton(
-                        text = if (isLiked) "Liked" else "Like", // Or just "Like" with filled icon
-                        icon = if (isLiked) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
-                        onClick = actions.onLike
-                    )
-                }
+                    // Like
+                    item {
+                        val isLiked = state.interaction == ContentPostV3Response.UserInteraction.like
+                        SidebarButton(
+                            text = if (isLiked) "Liked" else "Like",
+                            icon = if (isLiked) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
+                            onClick = actions.onLike
+                        )
+                    }
 
-                // Dislike
-                item {
-                    val isDisliked = state.interaction == ContentPostV3Response.UserInteraction.dislike
-                    SidebarButton(
-                        text = "Dislike",
-                        icon = if (isDisliked) Icons.Default.ThumbDown else Icons.Outlined.ThumbDown,
-                        onClick = actions.onDislike
-                    )
-                }
+                    // Dislike
+                    item {
+                        val isDisliked = state.interaction == ContentPostV3Response.UserInteraction.dislike
+                        SidebarButton(
+                            text = "Dislike",
+                            icon = if (isDisliked) Icons.Default.ThumbDown else Icons.Outlined.ThumbDown,
+                            onClick = actions.onDislike
+                        )
+                    }
 
-                // Watch Later
-                item {
-                    val isInWatchLater = actions.isInWatchLater
-                    SidebarButton(
-                        text = if (isInWatchLater) "Remove from Watch Later" else "Save to Watch Later",
-                        icon = if (isInWatchLater) Icons.Default.Check else Icons.Default.WatchLater, // Check or WatchLater icon
-                        onClick = {
-                             actions.onWatchLater()
-                             onDismiss()
+                    // Watch Later
+                    item {
+                        val isInWatchLater = actions.isInWatchLater
+                        SidebarButton(
+                            text = if (isInWatchLater) "Remove from Watch Later" else "Save to Watch Later",
+                            icon = if (isInWatchLater) Icons.Default.Check else Icons.Default.WatchLater, 
+                            onClick = {
+                                 actions.onWatchLater()
+                                 onDismiss()
+                            }
+                        )
+                    }
+                    
+                    // Mark as Watched
+                    item {
+                        SidebarButton(
+                            text = "Mark as Watched",
+                            icon = Icons.Default.CheckCircle,
+                            onClick = {
+                                actions.onMarkWatched()
+                                onDismiss()
+                            }
+                        )
+                    }
+
+                    // Save to Playlist
+                    item {
+                        SidebarButton(
+                            text = "Save to Playlist",
+                            icon = Icons.Default.List,
+                            onClick = actions.onShowPlaylists
+                        )
+                    }
+                }
+            }
+
+            // Playlist Sub-View
+            AnimatedVisibility(
+                visible = state.currentView == com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists,
+                enter = slideInHorizontally { it },
+                exit = slideOutHorizontally { it },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                 TvLazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .focusProperties { exit = { FocusRequester.Cancel } }, 
+                    contentPadding = PaddingValues(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        Text(
+                            text = "Save to Playlist",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
+
+                    items(actions.userPlaylists.size) { index ->
+                        val playlist = actions.userPlaylists[index]
+                        // Don't show Watch Later here, handled separately
+                        if (!playlist.isWatchLater) {
+                            val isAdded = playlist.videoIds.contains(state.post.id)
+                            SidebarButton(
+                                text = playlist.name,
+                                icon = if (isAdded) Icons.Default.CheckCircle else Icons.Default.Add,
+                                onClick = { actions.onTogglePlaylist(playlist) }
+                            )
                         }
-                    )
-                }
-                
-                // Mark as Watched
-                item {
-                    SidebarButton(
-                        text = "Mark as Watched",
-                        icon = Icons.Default.CheckCircle,
-                        onClick = {
-                            actions.onMarkWatched()
-                            onDismiss()
-                        }
-                    )
-                }
-
-                // Save to Playlist
-                item {
-                    SidebarButton(
-                        text = "Save to Playlist",
-                        icon = Icons.Default.List,
-                        onClick = {
-                            actions.onAddToPlaylist()
-                            onDismiss()
-                        }
-                    )
+                    }
                 }
             }
         }

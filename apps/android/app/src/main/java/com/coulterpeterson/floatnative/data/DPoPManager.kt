@@ -30,8 +30,11 @@ class DPoPManager(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    private var keyPair: KeyPair? = null
+    // Time offset in seconds (Service Time - Local Time)
+    var timeOffsetSeconds: Long = 0
 
+    private var keyPair: KeyPair? = null
+    
     companion object {
         private const val KEY_PRIVATE_KEY = "dpop_private_key"
         private const val KEY_PUBLIC_KEY = "dpop_public_key"
@@ -115,7 +118,7 @@ class DPoPManager(context: Context) {
         }
 
         val payload = JSONObject()
-        payload.put("iat", System.currentTimeMillis() / 1000)
+        payload.put("iat", (System.currentTimeMillis() / 1000) + timeOffsetSeconds)
         payload.put("jti", UUID.randomUUID().toString())
         payload.put("htm", httpMethod)
         payload.put("htu", htu)

@@ -79,9 +79,15 @@ object FloatplaneApi {
             level = HttpLoggingInterceptor.Level.BODY // TODO: Reduce level in production
         }
 
+        // OAuth Client with logging but NO AuthInterceptor (to avoid cycles)
+        val oauthClient = OkHttpClient.Builder()
+            .addInterceptor(loggingInterceptor)
+            .build()
+
         // OAuth API for refreshing (no interceptor)
         val oauthRetrofit = Retrofit.Builder()
             .baseUrl("https://auth.floatplane.com/")
+            .client(oauthClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             

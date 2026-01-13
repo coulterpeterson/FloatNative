@@ -209,11 +209,33 @@ fun TvHomeFeedScreen(
                                  Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                              }
                         },
-                        onMarkWatched = { viewModel.markAsWatched(currentSidebarState.post) },
-                        onAddToPlaylist = { 
-                            Toast.makeText(context, "Playlist selection coming soon to TV", Toast.LENGTH_SHORT).show()
+                        onMarkWatched = { 
+                            viewModel.markAsWatched(currentSidebarState.post)
+                            Toast.makeText(context, "Marked as watched", Toast.LENGTH_SHORT).show()
                         },
-                        isInWatchLater = isInWatchLater
+                        onAddToPlaylist = { 
+                             // Deprecated in favor of onShowPlaylists / separate logic, 
+                             // but kept for interface compatibility if needed, though we replaced it in `SidebarActions`
+                             // actually we removed `onAddToPlaylist`'s old logic and focused on `onShowPlaylists`.
+                             // Wait, I see I kept `onAddToPlaylist` in `SidebarActions` in previous step but used `onShowPlaylists` in UI?
+                             // Let me check SidebarActions definition I just wrote.
+                             // `val onAddToPlaylist: () -> Unit` IS in the data class.
+                             // But in UI I used `onShowPlaylists` for the "Save to Playlist" button.
+                             // So `onAddToPlaylist` might be unused or duplicate.
+                             // I'll just map it to `onShowPlaylists` to be safe/consistent.
+                             viewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists)
+                        },
+                        onShowPlaylists = {
+                            viewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists)
+                        },
+                        onBack = {
+                            viewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Main)
+                        },
+                        onTogglePlaylist = { playlist ->
+                            viewModel.togglePlaylistMembership(playlist, currentSidebarState.post)
+                        },
+                        isInWatchLater = isInWatchLater,
+                        userPlaylists = userPlaylists
                     ),
                     onDismiss = { viewModel.closeSidebar() }
                 )

@@ -202,6 +202,24 @@ fun TvLoginScreen(
                                 strokeWidth = 2.dp,
                                 color = Color.White.copy(alpha = 0.3f)
                             )
+
+                            // Time Hint
+                            var showTimeHint by remember { mutableStateOf(false) }
+                            LaunchedEffect(Unit) {
+                                kotlinx.coroutines.delay(30_000)
+                                showTimeHint = true
+                            }
+
+                            if (showTimeHint) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "If you're having trouble signing in, ensure your TV is set to the correct time.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
+                            }
                         }
                         is TvLoginState.Error -> {
                             Text("Error", color = MaterialTheme.colorScheme.error)
