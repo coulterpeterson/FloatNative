@@ -1,0 +1,110 @@
+package com.coulterpeterson.floatnative.data
+
+import android.content.Context
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+class TokenManager(context: Context) {
+
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
+
+    private val prefs = EncryptedSharedPreferences.create(
+        context,
+        "floatnative_secure_prefs",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
+
+    companion object {
+        private const val KEY_ACCESS_TOKEN = "access_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
+        private const val KEY_AUTH_COOKIE = "sails.sid"
+        private const val KEY_TOKEN_EXPIRY = "token_expiry"
+        private const val KEY_USER_ID = "user_id"
+        private const val KEY_COMPANION_API_KEY = "companion_api_key"
+    }
+
+    // Auth State Flow
+    private val _authStateFlow = MutableStateFlow(retrieve(KEY_ACCESS_TOKEN))
+    val authStateFlow = _authStateFlow.asStateFlow()
+
+    var accessToken: String?
+        get() = retrieve(KEY_ACCESS_TOKEN)
+        set(value) {
+            save(KEY_ACCESS_TOKEN, value)
+            _authStateFlow.value = value
+        }
+
+    var refreshToken: String?
+        get() = retrieve(KEY_REFRESH_TOKEN)
+        set(value) = save(KEY_REFRESH_TOKEN, value)
+
+    var authCookie: String?
+        get() = retrieve(KEY_AUTH_COOKIE)
+        set(value) = save(KEY_AUTH_COOKIE, value)
+        
+    var tokenExpiry: Long
+        get() = prefs.getLong(KEY_TOKEN_EXPIRY, 0)
+        set(value) = prefs.edit().putLong(KEY_TOKEN_EXPIRY, value).apply()
+        
+    var userId: String?
+        get() = retrieve(KEY_USER_ID)
+        set(value) = save(KEY_USER_ID, value)
+
+    var companionApiKey: String?
+        get() = retrieve(KEY_COMPANION_API_KEY)
+        set(value) = save(KEY_COMPANION_API_KEY, value)
+
+    var codeVerifier: String?
+        get() = retrieve("pkce_verifier")
+        set(value) = save("pkce_verifier", value)
+
+    fun clearAll() {
+        prefs.edit().clear().apply()
+        _authStateFlow.value = null
+    }
+
+    private fun save(key: String, value: String?) {
+        if (value == null) {
+            prefs.edit().remove(key).apply()
+        } else {
+            prefs.edit().putString(key, value).apply()
+        }
+    }
+
+    fun retrieve(key: String): String? {
+        return prefs.getString(key, null)
+    }
+
+    // Settings
+    private val _themeFlow = kotlinx.coroutines.flow.MutableStateFlow(prefs.getString("theme_mode", "dark") ?: "dark")
+    val themeFlow = _themeFlow.asStateFlow()
+
+    var themeMode: String
+        get() = prefs.getString("theme_mode", "dark") ?: "dark"
+        set(value) {
+            prefs.edit().putString("theme_mode", value).apply()
+            _themeFlow.value = value
+        }
+
+    var enhancedLttSearchEnabled: Boolean
+        get() = prefs.getBoolean("enhanced_ltt_search_enabled", false)
+        set(value) {
+            prefs.edit().putBoolean("enhanced_ltt_search_enabled", value).apply()
+        }
+
+    var downloadLocationUri: String?
+        get() = prefs.getString("download_location_uri", null)
+        set(value) {
+            if (value == null) {
+                prefs.edit().remove("download_location_uri").apply()
+            } else {
+                prefs.edit().putString("download_location_uri", value).apply()
+            }
+        }
+}

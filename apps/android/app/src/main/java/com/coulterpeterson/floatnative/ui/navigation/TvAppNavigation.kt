@@ -1,0 +1,72 @@
+package com.coulterpeterson.floatnative.ui.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.coulterpeterson.floatnative.ui.screens.tv.TvHomeFeedScreen
+import com.coulterpeterson.floatnative.ui.screens.tv.TvLoginScreen
+import com.coulterpeterson.floatnative.ui.screens.tv.TvVideoPlayerScreen
+
+sealed class TvScreen(val route: String) {
+    object Login : TvScreen("login")
+    object Home : TvScreen("home")
+    object Search : TvScreen("search")
+    object Player : TvScreen("player/{videoId}") {
+        fun createRoute(videoId: String) = "player/$videoId"
+    }
+}
+
+@Composable
+fun TvAppNavigation(
+    startDestination: String,
+    navController: NavHostController = rememberNavController()
+) {
+    NavHost(
+        navController = navController,
+        startDestination = startDestination
+    ) {
+        composable(TvScreen.Login.route) {
+            TvLoginScreen(
+                onLoginSuccess = {
+                    navController.navigate(TvScreen.Home.route) {
+                        popUpTo(TvScreen.Login.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+        
+        composable(TvScreen.Home.route) {
+            TvHomeFeedScreen(
+                onPlayVideo = { videoId ->
+                    navController.navigate(TvScreen.Player.createRoute(videoId))
+                },
+                onSearchClick = {
+                    navController.navigate(TvScreen.Search.route)
+                }
+            )
+        }
+        
+        composable(TvScreen.Search.route) {
+            com.coulterpeterson.floatnative.ui.screens.tv.TvSearchScreen(
+                onPlayVideo = { videoId ->
+                    navController.navigate(TvScreen.Player.createRoute(videoId))
+                }
+            )
+        }
+        
+        composable(
+            route = TvScreen.Player.route,
+            arguments = listOf(navArgument("videoId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val videoId = backStackEntry.arguments?.getString("videoId") ?: return@composable
+            TvVideoPlayerScreen(
+                videoId = videoId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+    }
+}

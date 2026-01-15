@@ -1,0 +1,32 @@
+- [X] Fix video player screen download functionality
+- [X] Add link truncation to description and timestamp linking to description/comments
+- [X] Add playlist management sheet to video player with button in actions bar
+- [X] Flesh out playlists screens 
+- [X] Add 3 dot menu to video feed for 'mark as watched', 'watch later', and 'save to playlist' actions
+- [X] Add watch progress and video duration badges
+- [X] Test native and companion search functionality (and the enhanced LTI search toggle)
+- [X] Format landscape video player 
+- [X] Enable background play
+- [X] Enable PiP 
+- [X] Style login screen after the ios version
+- [X] Add actual FloatNative logo to app
+- [X] Change support link to discord server
+- [X] Tablet grid styles
+- [] Ensure watch progress calls are implemented
+- [] Implement live support
+- [] Android TV styles/versions of screens
+  - [X] Login screen
+  - [X] Video feed
+  - [X] Video player
+  - [X] Video feed long-press actions
+  - [X] Video player custom controls
+  - [X] Video player sidebar slideout
+  - [] Remaining screens
+- [] Chromecast support that triggers the Android TV version to open to that video(?)
+- [] Pollsplane integration on the VODs(?)
+
+## Fixes
+- [X] PiP shouldn't launch unless we're existing from a playing video
+- [X] Status bar should be white in dark mode
+- [X] Start video playback at current watch progress
+- [X] Remove extra line in playlist sheet
