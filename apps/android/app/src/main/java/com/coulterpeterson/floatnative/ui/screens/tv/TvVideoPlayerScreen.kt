@@ -2,6 +2,9 @@
 
 package com.coulterpeterson.floatnative.ui.screens.tv
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.foundation.background
@@ -74,143 +77,172 @@ fun TvVideoPlayerScreen(
         }
     }
 
-    Box(
+    // Sidebar State
+    val sidebarMode by viewModel.sidebarMode.collectAsState()
+
+    Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
-        contentAlignment = Alignment.Center
+            .background(Color.Black)
     ) {
-        when (state) {
-            is VideoPlayerState.Loading, VideoPlayerState.Idle -> {
-                Text("Loading Video...", color = Color.White)
-            }
-            is VideoPlayerState.Error -> {
-                Text(
-                    text = "Error: ${(state as VideoPlayerState.Error).message}",
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-            is VideoPlayerState.Content -> {
-                var showSettings by remember { mutableStateOf(false) }
+        // Video Player Container
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            contentAlignment = Alignment.Center
+        ) {
+            when (state) {
+                is VideoPlayerState.Loading, VideoPlayerState.Idle -> {
+                    Text("Loading Video...", color = Color.White)
+                }
+                is VideoPlayerState.Error -> {
+                    Text(
+                        text = "Error: ${(state as VideoPlayerState.Error).message}",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                is VideoPlayerState.Content -> {
+                    var showSettings by remember { mutableStateOf(false) }
 
-                AndroidView(
-                    factory = { ctx ->
-                        // Anonymous subclass to intercept key events before they are consumed involving
-                        // focus or child views. This ensures we can "wake up" the controls even if the 
-                        // focus state is ambiguous when controls are hidden.
-                        object : PlayerView(ctx) {
-                             override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-                                // Intercept D-pad keys when controller is hidden to show it
-                                if (event.action == android.view.KeyEvent.ACTION_DOWN && !isControllerFullyVisible) {
-                                    when (event.keyCode) {
-                                        android.view.KeyEvent.KEYCODE_DPAD_CENTER,
-                                        android.view.KeyEvent.KEYCODE_ENTER,
-                                        android.view.KeyEvent.KEYCODE_DPAD_UP,
-                                        android.view.KeyEvent.KEYCODE_DPAD_DOWN,
-                                        android.view.KeyEvent.KEYCODE_DPAD_LEFT,
-                                        android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                            showController()
-                                            // Consume the event to prevent accidental action (like pausing) upon waking the UI
-                                            return true
+                    AndroidView(
+                        factory = { ctx ->
+                            // Anonymous subclass to intercept key events before they are consumed involving
+                            // focus or child views. This ensures we can "wake up" the controls even if the 
+                            // focus state is ambiguous when controls are hidden.
+                            object : PlayerView(ctx) {
+                                 override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+                                    // Intercept D-pad keys when controller is hidden to show it
+                                    if (event.action == android.view.KeyEvent.ACTION_DOWN && !isControllerFullyVisible) {
+                                        when (event.keyCode) {
+                                            android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                                            android.view.KeyEvent.KEYCODE_ENTER,
+                                            android.view.KeyEvent.KEYCODE_DPAD_UP,
+                                            android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+                                            android.view.KeyEvent.KEYCODE_DPAD_LEFT,
+                                            android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                                                showController()
+                                                // Consume the event to prevent accidental action (like pausing) upon waking the UI
+                                                return true
+                                            }
                                         }
                                     }
+                                    return super.dispatchKeyEvent(event)
                                 }
-                                return super.dispatchKeyEvent(event)
+                            }.apply {
+                                player = exoPlayer
+                                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                layoutParams = FrameLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                )
+                                // Enable default controls which handle D-pad focus
+                                useController = true
+                                keepScreenOn = true
+                                
+                                // Use our custom layout
+                                setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_ALWAYS)
+                                setControllerVisibilityListener(androidx.media3.ui.PlayerView.ControllerVisibilityListener { visibility ->
+                                    if (visibility == android.view.View.GONE && sidebarMode == com.coulterpeterson.floatnative.viewmodels.PlayerSidebarMode.None) {
+                                      requestFocus()
+                                    }
+                                })
+
+                                // Ensure the view takes focus to handle D-pad events
+                                isFocusable = true
+                                isFocusableInTouchMode = true 
+                                descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+                                requestFocus()
                             }
-                        }.apply {
-                            player = exoPlayer
-                            resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-                            layoutParams = FrameLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                            // Enable default controls which handle D-pad focus
-                            useController = true
-                            keepScreenOn = true
+                        },
+                        update = { playerView ->
+                            // Bind Custom Controls
+                            val btnLike = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_like)
+                            val btnDislike = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_dislike)
+                            val btnDesc = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_description)
+                            val btnComments = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_comments)
+                            val btnSettings = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_settings)
+
+                            // Update UI State (Colors)
+                            val redColor = android.graphics.Color.RED
+                            val whiteColor = android.graphics.Color.WHITE
+                            val grayColor = android.graphics.Color.LTGRAY
+
+                            val interaction = (state as? VideoPlayerState.Content)?.userInteraction
                             
-                            // Use our custom layout
-                            setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_ALWAYS)
-                            setControllerVisibilityListener(androidx.media3.ui.PlayerView.ControllerVisibilityListener { visibility ->
-                                if (visibility == android.view.View.GONE) {
-                                  requestFocus()
-                                }
-                            })
+                            btnLike?.setColorFilter(if (interaction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.like) 
+                                redColor else whiteColor)
+                            
+                            btnDislike?.setColorFilter(if (interaction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.dislike) 
+                                redColor else whiteColor)
 
-                            // Ensure the view takes focus to handle D-pad events
-                            isFocusable = true
-                            isFocusableInTouchMode = true 
-                            descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-                            requestFocus()
-                        }
-                    },
-                    update = { playerView ->
-                        // Bind Custom Controls
-                        val btnLike = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_like)
-                        val btnDislike = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_dislike)
-                        val btnDesc = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_description)
-                        val btnComments = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_comments)
-                        val btnSettings = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_settings)
-
-                        // Update UI State (Colors)
-                        val redColor = android.graphics.Color.RED
-                        val whiteColor = android.graphics.Color.WHITE
-                        val grayColor = android.graphics.Color.LTGRAY
-
-                        val interaction = (state as? VideoPlayerState.Content)?.userInteraction
-                        
-                        btnLike?.setColorFilter(if (interaction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.like) 
-                            redColor else whiteColor)
-                        
-                        btnDislike?.setColorFilter(if (interaction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.dislike) 
-                            redColor else whiteColor)
-
-                        // Set Listeners (only need to set once, but Compose update might be frequent, safe to re-set or memoize if needed. 
-                        // For simplicity setting here is fine)
-                        btnLike?.setOnClickListener { viewModel.toggleLike() }
-                        btnDislike?.setOnClickListener { viewModel.toggleDislike() }
-                        
-                        btnDesc?.setOnClickListener { 
-                            // TODO: Show Description
-                        }
-                        btnComments?.setOnClickListener { 
-                            // TODO: Show Comments
-                        }
-                         btnSettings?.setOnClickListener { 
-                            showSettings = true
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-                
-                if (showSettings) {
-                   val contentState = state as VideoPlayerState.Content
-                   Dialog(onDismissRequest = { showSettings = false }) {
-                       Box(
-                           modifier = Modifier
-                               .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-                               .padding(16.dp)
-                               .width(300.dp)
-                       ) {
-                           Column {
-                               Text("Quality", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                               LazyColumn {
-                                   items(contentState.availableQualities.size) { index ->
-                                       val quality = contentState.availableQualities[index]
-                                       val isSelected = quality == contentState.currentQuality
-                                       ListItem(
-                                           selected = isSelected,
-                                           onClick = {
-                                               viewModel.changeQuality(quality)
-                                               showSettings = false
-                                           },
-                                           headlineContent = { Text(quality.label) }
-                                       )
+                            // Set Listeners
+                            btnLike?.setOnClickListener { viewModel.toggleLike() }
+                            btnDislike?.setOnClickListener { viewModel.toggleDislike() }
+                            
+                            btnDesc?.setOnClickListener { 
+                                viewModel.openDescription()
+                            }
+                            btnComments?.setOnClickListener { 
+                                viewModel.openComments()
+                            }
+                             btnSettings?.setOnClickListener { 
+                                showSettings = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    
+                    if (showSettings) {
+                       val contentState = state as VideoPlayerState.Content
+                       Dialog(onDismissRequest = { showSettings = false }) {
+                           Box(
+                               modifier = Modifier
+                                   .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                                   .padding(16.dp)
+                                   .width(300.dp)
+                           ) {
+                               Column {
+                                   Text("Quality", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+                                   LazyColumn {
+                                       items(contentState.availableQualities.size) { index ->
+                                           val quality = contentState.availableQualities[index]
+                                           val isSelected = quality == contentState.currentQuality
+                                           ListItem(
+                                               selected = isSelected,
+                                               onClick = {
+                                                   viewModel.changeQuality(quality)
+                                                   showSettings = false
+                                               },
+                                               headlineContent = { Text(quality.label) }
+                                           )
+                                       }
                                    }
                                }
                            }
                        }
-                   }
+                    }
                 }
+            }
+        }
+        
+        // Sidebar
+        androidx.compose.animation.AnimatedVisibility(
+            visible = sidebarMode != com.coulterpeterson.floatnative.viewmodels.PlayerSidebarMode.None,
+            enter = androidx.compose.animation.slideInHorizontally { it } + androidx.compose.animation.expandHorizontally(),
+            exit = androidx.compose.animation.slideOutHorizontally { it } + androidx.compose.animation.shrinkHorizontally()
+        ) {
+            val contentState = state as? VideoPlayerState.Content
+            if (contentState != null) {
+                com.coulterpeterson.floatnative.ui.components.tv.TvVideoPlayerSidebar(
+                    mode = sidebarMode,
+                    descriptionHtml = contentState.blogPost.text ?: "",
+                    title = contentState.blogPost.title,
+                    publishDate = contentState.blogPost.releaseDate,
+                    comments = contentState.comments,
+                    onDismiss = { viewModel.closeSidebar() },
+                    onSeek = { viewModel.seekTo(it) }
+                )
             }
         }
     }

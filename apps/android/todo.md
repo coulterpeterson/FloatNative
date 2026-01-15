@@ -20,7 +20,7 @@
   - [X] Video player
   - [X] Video feed long-press actions
   - [X] Video player custom controls
-  - [] Video player sidebar slideout
+  - [X] Video player sidebar slideout
   - [] Remaining screens
 - [] Chromecast support that triggers the Android TV version to open to that video(?)
 - [] Pollsplane integration on the VODs(?)
