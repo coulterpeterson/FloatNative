@@ -53,9 +53,9 @@ fun VideoFeedScreen(
 ) {
     androidx.compose.runtime.LaunchedEffect(creatorId, channelId) {
         if (channelId != null && creatorId != null) {
-            viewModel.setFilter(HomeFeedViewModel.FeedFilter.Channel(channelId, creatorId))
+            viewModel.setFilter(HomeFeedViewModel.FeedFilter.Channel(channelId, creatorId, displayTitle = "Loading..."))
         } else if (creatorId != null) {
-            viewModel.setFilter(HomeFeedViewModel.FeedFilter.Creator(creatorId))
+            viewModel.setFilter(HomeFeedViewModel.FeedFilter.Creator(creatorId, displayTitle = "Loading..."))
         }
     }
 

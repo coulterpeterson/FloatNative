@@ -7,6 +7,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.tv.material3.Text
 import androidx.tv.material3.MaterialTheme
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -61,6 +63,7 @@ fun TvHomeFeedScreen(
     val state by viewModel.state.collectAsState()
     val sidebarState by viewModel.sidebarState.collectAsState()
     val userPlaylists by viewModel.userPlaylists.collectAsState()
+    val filter by viewModel.filter.collectAsState()
     val context = LocalContext.current
     
     // Top Navigation Items
@@ -71,13 +74,71 @@ fun TvHomeFeedScreen(
         Column(modifier = Modifier.fillMaxSize()) {
         
         // 1. Top Navigation Bar (Pill shapes)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 32.dp, bottom = 32.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        // Show only if no filter is active (or if we want to allow nav while filtered? 
+        // Screenshot shows "Home, Creators..." pill bar IS visible in filtered view, 
+        // BUT the header "TechLinked" replaces the "Home" text? 
+        // No, the screenshot shows "TechLinked" roughly where the Row of pills was?
+        // Actually the screenshot shows a Header "TechLinked" at the top left, and NO pill bar.
+        // Wait, the screenshot ID 0 (filtered view) shows "TechLinked" header and a "Clear" button.
+        // It does NOT show the navigation pills "Home, Creators...".
+        // Screenshot ID 1 (creators list) shows the navigation pills.
+        // So: If Filter is active -> Show Filter Header. If Filter is inactive -> Show Navigation Pills.
+        val activeFilter = filter
+        if (activeFilter !is com.coulterpeterson.floatnative.viewmodels.HomeFeedViewModel.FeedFilter.All) {
+             // Filter Header
+             androidx.compose.material3.Surface(
+                color = Color(0xFF1E1E1E), // Darker surface
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 32.dp, bottom = 32.dp, start = 50.dp, end = 50.dp)
+            ) {
+                Row(
+                   modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                   verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val (iconPath, title) = when (activeFilter) {
+                        is com.coulterpeterson.floatnative.viewmodels.HomeFeedViewModel.FeedFilter.Creator -> activeFilter.icon to activeFilter.displayTitle
+                        is com.coulterpeterson.floatnative.viewmodels.HomeFeedViewModel.FeedFilter.Channel -> activeFilter.icon to activeFilter.displayTitle
+                        else -> null to ""
+                    }
+
+                    if (iconPath != null) {
+                        coil.compose.AsyncImage(
+                            model = iconPath,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                    }
+                    
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White
+                    )
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                    
+                    androidx.tv.material3.Button(
+                        onClick = { viewModel.setFilter(com.coulterpeterson.floatnative.viewmodels.HomeFeedViewModel.FeedFilter.All) },
+                        scale = androidx.tv.material3.ButtonDefaults.scale(focusedScale = 1.1f)
+                    ) {
+                        Text("Clear")
+                    }
+                }
+            }
+        } else {
+             // Navigation Pills
+             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 32.dp, bottom = 32.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
             navItems.forEachIndexed { index, title ->
                 val isSelected = index == selectedNavIndex
                 
@@ -134,111 +195,124 @@ fun TvHomeFeedScreen(
                 }
             }
         }
+        }
 
-        // 2. Content Grid
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(4), 
-            contentPadding = PaddingValues(horizontal = 50.dp, vertical = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-            verticalArrangement = Arrangement.spacedBy(32.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            when (val s = state) {
-                is HomeFeedState.Loading -> {
-                     item(span = { GridItemSpan(4) }) {
-                        Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                            Text("Loading content...", color = Color.White)
+        // 2. Content
+        if (selectedNavIndex == 1) {
+             // Creators Screen
+             com.coulterpeterson.floatnative.ui.screens.tv.TvCreatorsScreen(
+                 onFilterSelected = { filter ->
+                     viewModel.setFilter(filter)
+                     selectedNavIndex = 0 // Switch to Home tab
+                 }
+             )
+        } else if (selectedNavIndex == 0) {
+            // Home Feed
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(4), 
+                contentPadding = PaddingValues(horizontal = 50.dp, vertical = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalArrangement = Arrangement.spacedBy(32.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                when (val s = state) {
+                    is HomeFeedState.Loading -> {
+                         item(span = { GridItemSpan(4) }) {
+                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                                Text("Loading content...", color = Color.White)
+                            }
                         }
                     }
-                }
-                is HomeFeedState.Error -> {
-                    item(span = { GridItemSpan(4) }) {
-                         Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                            Text("Error: ${s.message}", color = MaterialTheme.colorScheme.error)
-                         }
+                    is HomeFeedState.Error -> {
+                        item(span = { GridItemSpan(4) }) {
+                             Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                                Text("Error: ${s.message}", color = MaterialTheme.colorScheme.error)
+                             }
+                        }
                     }
-                }
-                is HomeFeedState.Content -> {
-                    items(s.posts) { post ->
-                       TvVideoCard(
-                           post = post,
-                           onClick = {
-                                // VideoPlayerViewModel expects a BlogPost ID, NOT a VideoAttachment ID.
-                                // It will fetch the post and extract the video attached to it.
-                                if (viewModel.sidebarState.value == null && !post.videoAttachments.isNullOrEmpty()) {
-                                    onPlayVideo(post.id)
-                                }
-                           },
-                           onLongClick = {
-                               viewModel.openSidebar(post)
-                           }
-                       ) 
+                    is HomeFeedState.Content -> {
+                        items(s.posts) { post ->
+                           TvVideoCard(
+                               post = post,
+                               onClick = {
+                                    // VideoPlayerViewModel expects a BlogPost ID, NOT a VideoAttachment ID.
+                                    // It will fetch the post and extract the video attached to it.
+                                    if (viewModel.sidebarState.value == null && !post.videoAttachments.isNullOrEmpty()) {
+                                        onPlayVideo(post.id)
+                                    }
+                               },
+                               onLongClick = {
+                                   viewModel.openSidebar(post)
+                               }
+                           ) 
+                        }
                     }
+                    else -> {}
                 }
-                else -> {}
             }
+        } else {
+             // Other tabs placeholders
+             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                 Text("Feature coming soon", color = Color.Gray)
+             }
         }
         } // End Column
 
         // Sidebar Overlay
-        androidx.compose.animation.AnimatedVisibility(
-            visible = sidebarState != null,
-            enter = androidx.compose.animation.slideInHorizontally { it },
-            exit = androidx.compose.animation.slideOutHorizontally { it },
-            modifier = Modifier.align(Alignment.CenterEnd) 
+        // Sidebar Overlay
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.CenterEnd
         ) {
-            val currentSidebarState = sidebarState
-            if (currentSidebarState != null) {
-                // Determine Watch Later status
-                val watchLaterPlaylist = userPlaylists.find { it.isWatchLater }
-                val isInWatchLater = watchLaterPlaylist?.videoIds?.contains(currentSidebarState.post.id) == true
+            androidx.compose.animation.AnimatedVisibility(
+                visible = sidebarState != null,
+                enter = androidx.compose.animation.slideInHorizontally { it },
+                exit = androidx.compose.animation.slideOutHorizontally { it }
+            ) {
+                val currentSidebarState = sidebarState
+                if (currentSidebarState != null) {
+                    // Determine Watch Later status
+                    val watchLaterPlaylist = userPlaylists.find { it.isWatchLater }
+                    val isInWatchLater = watchLaterPlaylist?.videoIds?.contains(currentSidebarState.post.id) == true
 
-                TvActionSidebar(
-                    state = currentSidebarState,
-                    actions = SidebarActions(
-                        onPlay = { 
-                            if (!currentSidebarState.post.videoAttachments.isNullOrEmpty()) {
-                                onPlayVideo(currentSidebarState.post.id)
-                            }
-                        },
-                        onLike = { viewModel.toggleSidebarLike() },
-                        onDislike = { viewModel.toggleSidebarDislike() },
-                        onWatchLater = { 
-                             viewModel.toggleWatchLater(currentSidebarState.post) { wasAdded ->
-                                 val msg = if (wasAdded) "Added to Watch Later" else "Removed from Watch Later"
-                                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                             }
-                        },
-                        onMarkWatched = { 
-                            viewModel.markAsWatched(currentSidebarState.post)
-                            Toast.makeText(context, "Marked as watched", Toast.LENGTH_SHORT).show()
-                        },
-                        onAddToPlaylist = { 
-                             // Deprecated in favor of onShowPlaylists / separate logic, 
-                             // but kept for interface compatibility if needed, though we replaced it in `SidebarActions`
-                             // actually we removed `onAddToPlaylist`'s old logic and focused on `onShowPlaylists`.
-                             // Wait, I see I kept `onAddToPlaylist` in `SidebarActions` in previous step but used `onShowPlaylists` in UI?
-                             // Let me check SidebarActions definition I just wrote.
-                             // `val onAddToPlaylist: () -> Unit` IS in the data class.
-                             // But in UI I used `onShowPlaylists` for the "Save to Playlist" button.
-                             // So `onAddToPlaylist` might be unused or duplicate.
-                             // I'll just map it to `onShowPlaylists` to be safe/consistent.
-                             viewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists)
-                        },
-                        onShowPlaylists = {
-                            viewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists)
-                        },
-                        onBack = {
-                            viewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Main)
-                        },
-                        onTogglePlaylist = { playlist ->
-                            viewModel.togglePlaylistMembership(playlist, currentSidebarState.post)
-                        },
-                        isInWatchLater = isInWatchLater,
-                        userPlaylists = userPlaylists
-                    ),
-                    onDismiss = { viewModel.closeSidebar() }
-                )
+                    TvActionSidebar(
+                        state = currentSidebarState,
+                        actions = SidebarActions(
+                            onPlay = { 
+                                if (!currentSidebarState.post.videoAttachments.isNullOrEmpty()) {
+                                    onPlayVideo(currentSidebarState.post.id)
+                                }
+                            },
+                            onLike = { viewModel.toggleSidebarLike() },
+                            onDislike = { viewModel.toggleSidebarDislike() },
+                            onWatchLater = { 
+                                 viewModel.toggleWatchLater(currentSidebarState.post) { wasAdded ->
+                                     val msg = if (wasAdded) "Added to Watch Later" else "Removed from Watch Later"
+                                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                 }
+                            },
+                            onMarkWatched = { 
+                                viewModel.markAsWatched(currentSidebarState.post)
+                                Toast.makeText(context, "Marked as watched", Toast.LENGTH_SHORT).show()
+                            },
+                            onAddToPlaylist = { 
+                                 viewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists)
+                            },
+                            onShowPlaylists = {
+                                viewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists)
+                            },
+                            onBack = {
+                                viewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Main)
+                            },
+                            onTogglePlaylist = { playlist ->
+                                viewModel.togglePlaylistMembership(playlist, currentSidebarState.post)
+                            },
+                            isInWatchLater = isInWatchLater,
+                            userPlaylists = userPlaylists
+                        ),
+                        onDismiss = { viewModel.closeSidebar() }
+                    )
+                }
             }
         }
     }

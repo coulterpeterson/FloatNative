@@ -52,8 +52,8 @@ class HomeFeedViewModel : ViewModel() {
 
     sealed class FeedFilter {
         object All : FeedFilter()
-        data class Creator(val id: String) : FeedFilter()
-        data class Channel(val id: String, val creatorId: String) : FeedFilter()
+        data class Creator(val id: String, val displayTitle: String, val icon: String? = null) : FeedFilter()
+        data class Channel(val id: String, val creatorId: String, val displayTitle: String, val icon: String? = null) : FeedFilter()
     }
 
     private val _filter = MutableStateFlow<FeedFilter>(FeedFilter.All)
