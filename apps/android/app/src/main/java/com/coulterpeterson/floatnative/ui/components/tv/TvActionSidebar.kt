@@ -1,6 +1,7 @@
 package com.coulterpeterson.floatnative.ui.components.tv
 
 import androidx.activity.compose.BackHandler
+import com.coulterpeterson.floatnative.openapi.models.ImageModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -44,8 +45,7 @@ import androidx.tv.foundation.PivotOffsets
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.rememberTvLazyListState
 import androidx.tv.material3.*
-import com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response
-import com.coulterpeterson.floatnative.viewmodels.SidebarState
+import com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction
 import com.coulterpeterson.floatnative.viewmodels.SidebarView
 
 data class SidebarActions(
@@ -62,10 +62,18 @@ data class SidebarActions(
     val userPlaylists: List<com.coulterpeterson.floatnative.api.Playlist>
 )
 
+data class SidebarUiState(
+    val title: String,
+    val thumbnail: ImageModel?,
+    val postId: String,
+    val interaction: UserInteraction? = null,
+    val currentView: SidebarView = SidebarView.Main
+)
+
 @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun TvActionSidebar(
-    state: SidebarState,
+    state: SidebarUiState,
     actions: SidebarActions,
     onDismiss: () -> Unit
 ) {
@@ -131,7 +139,7 @@ fun TvActionSidebar(
     }
 
     // Thumbnail Logic
-    val thumbnailUrl = state.post.thumbnail?.path?.toString()
+    val thumbnailUrl = state.thumbnail?.path?.toString()
     val fullThumbnailUrl = if (thumbnailUrl?.startsWith("http") == true) thumbnailUrl else "https://pbs.floatplane.com${thumbnailUrl}"
 
     Box(
@@ -178,7 +186,7 @@ fun TvActionSidebar(
                     // Title (1)
                     item {
                         Text(
-                            text = state.post.title,
+                            text = state.title,
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.White,
                             maxLines = 2,
@@ -209,7 +217,7 @@ fun TvActionSidebar(
                     
                     // Like (3)
                     item {
-                        val isLiked = state.interaction == ContentPostV3Response.UserInteraction.like
+                        val isLiked = state.interaction == UserInteraction.like
                         SidebarButton(
                             text = if (isLiked) "Liked" else "Like",
                             icon = if (isLiked) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
@@ -219,7 +227,7 @@ fun TvActionSidebar(
 
                     // Dislike (4)
                     item {
-                        val isDisliked = state.interaction == ContentPostV3Response.UserInteraction.dislike
+                        val isDisliked = state.interaction == UserInteraction.dislike
                         SidebarButton(
                             text = "Dislike",
                             icon = if (isDisliked) Icons.Default.ThumbDown else Icons.Outlined.ThumbDown,
@@ -286,7 +294,7 @@ fun TvActionSidebar(
                     } else {
                         items(displayablePlaylists.size) { index ->
                             val playlist = displayablePlaylists[index]
-                            val isAdded = playlist.videoIds.contains(state.post.id)
+                            val isAdded = playlist.videoIds.contains(state.postId)
                             val isFirst = index == 0
                             val isLast = index == displayablePlaylists.lastIndex
                             

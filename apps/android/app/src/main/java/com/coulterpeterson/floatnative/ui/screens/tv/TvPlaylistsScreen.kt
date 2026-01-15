@@ -40,6 +40,9 @@ fun TvPlaylistsScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val selectedPlaylist by viewModel.selectedPlaylist.collectAsState()
+    val sidebarState by detailViewModel.sidebarState.collectAsState()
+    val userPlaylists by detailViewModel.userPlaylists.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
     
     // Focus Requesters
     val playlistListFocusRequester = remember { FocusRequester() }
@@ -156,6 +159,9 @@ fun TvPlaylistsScreen(
                                                      onPlayVideo(post.id)
                                                  }
                                              },
+                                             onLongClick = {
+                                                  detailViewModel.openSidebar(post)
+                                             },
                                              modifier = if (index == 0) Modifier.focusRequester(playlistDetailFocusRequester) else Modifier
                                          )
                                     }
@@ -164,6 +170,65 @@ fun TvPlaylistsScreen(
                         }
                     }
                 }
+            }
+        }
+
+        // Sidebar Overlay
+        androidx.compose.animation.AnimatedVisibility(
+            visible = sidebarState != null,
+            enter = androidx.compose.animation.slideInHorizontally { it },
+            exit = androidx.compose.animation.slideOutHorizontally { it },
+            modifier = Modifier.align(Alignment.CenterEnd)
+        ) {
+            val currentSidebarState = sidebarState
+            if (currentSidebarState != null) {
+                // Determine Watch Later status
+                val watchLaterPlaylist = userPlaylists.find { it.isWatchLater }
+                val isInWatchLater = watchLaterPlaylist?.videoIds?.contains(currentSidebarState.post.id) == true
+
+                com.coulterpeterson.floatnative.ui.components.tv.TvActionSidebar(
+                    state = com.coulterpeterson.floatnative.ui.components.tv.SidebarUiState(
+                        title = currentSidebarState.post.title,
+                        thumbnail = currentSidebarState.post.thumbnail,
+                        postId = currentSidebarState.post.id,
+                        interaction = currentSidebarState.interaction,
+                        currentView = currentSidebarState.currentView
+                    ),
+                    actions = com.coulterpeterson.floatnative.ui.components.tv.SidebarActions(
+                        onPlay = { 
+                            if (!currentSidebarState.post.videoAttachments.isNullOrEmpty()) {
+                                onPlayVideo(currentSidebarState.post.id)
+                            }
+                        },
+                        onLike = { detailViewModel.toggleSidebarLike() },
+                        onDislike = { detailViewModel.toggleSidebarDislike() },
+                        onWatchLater = { 
+                             detailViewModel.toggleWatchLater(currentSidebarState.post) { wasAdded ->
+                                 val msg = if (wasAdded) "Added to Watch Later" else "Removed from Watch Later"
+                                 android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                             }
+                        },
+                        onMarkWatched = { 
+                            detailViewModel.markAsWatched(currentSidebarState.post)
+                            android.widget.Toast.makeText(context, "Marked as watched", android.widget.Toast.LENGTH_SHORT).show()
+                        },
+                        onAddToPlaylist = { 
+                             detailViewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists)
+                        },
+                        onShowPlaylists = {
+                            detailViewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Playlists)
+                        },
+                        onBack = {
+                            detailViewModel.toggleSidebarView(com.coulterpeterson.floatnative.viewmodels.SidebarView.Main)
+                        },
+                        onTogglePlaylist = { playlist ->
+                            detailViewModel.togglePlaylistMembership(playlist, currentSidebarState.post)
+                        },
+                        isInWatchLater = isInWatchLater,
+                        userPlaylists = userPlaylists
+                    ),
+                    onDismiss = { detailViewModel.closeSidebar() }
+                )
             }
         }
     }

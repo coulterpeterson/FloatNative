@@ -17,12 +17,23 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 
+import com.coulterpeterson.floatnative.viewmodels.SidebarView
+import com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction
+import com.coulterpeterson.floatnative.openapi.models.ContentLikeV3Request
+
 sealed class PlaylistDetailState {
     object Initial : PlaylistDetailState()
     object Loading : PlaylistDetailState()
     data class Content(val posts: List<ContentPostV3Response>) : PlaylistDetailState()
     data class Error(val message: String) : PlaylistDetailState()
 }
+
+data class PlaylistSidebarState(
+    val post: ContentPostV3Response,
+    val interaction: UserInteraction? = null,
+    val isLoadingInteraction: Boolean = false,
+    val currentView: SidebarView = SidebarView.Main
+)
 
 class PlaylistDetailViewModel : ViewModel() {
     private val _state = MutableStateFlow<PlaylistDetailState>(PlaylistDetailState.Initial)
@@ -33,6 +44,147 @@ class PlaylistDetailViewModel : ViewModel() {
 
     private val _watchProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
     val watchProgress = _watchProgress.asStateFlow()
+
+    private val _sidebarState = MutableStateFlow<PlaylistSidebarState?>(null)
+    val sidebarState = _sidebarState.asStateFlow()
+
+    fun openSidebar(post: ContentPostV3Response) {
+        _sidebarState.value = PlaylistSidebarState(post = post, isLoadingInteraction = true)
+        
+        // Parallel load: Interaction and Playlists
+        viewModelScope.launch {
+            loadPlaylists() 
+        }
+        
+        viewModelScope.launch {
+            try {
+                // Fetch fresh post to get interaction
+                // Assuming ContentPostV3Response ID is the blog post ID suitable for this call
+                val response = FloatplaneApi.contentV3.getBlogPost(post.id)
+                if (response.isSuccessful && response.body() != null) {
+                    val fullPost = response.body()!!
+                    val interaction = fullPost.userInteraction?.firstOrNull()
+                    val currentState = _sidebarState.value
+                    if (currentState != null && currentState.post.id == post.id) {
+                         _sidebarState.value = currentState.copy(
+                             interaction = interaction,
+                             isLoadingInteraction = false
+                         )
+                    }
+                } else {
+                     val currentState = _sidebarState.value
+                     if (currentState != null && currentState.post.id == post.id) {
+                         _sidebarState.value = currentState.copy(isLoadingInteraction = false)
+                     }
+                }
+            } catch (e: Exception) {
+                 val currentState = _sidebarState.value
+                 if (currentState != null && currentState.post.id == post.id) {
+                     _sidebarState.value = currentState.copy(isLoadingInteraction = false)
+                 }
+            }
+        }
+    }
+
+    fun closeSidebar() {
+        _sidebarState.value = null
+    }
+
+    fun toggleSidebarView(view: SidebarView) {
+        val currentState = _sidebarState.value ?: return
+        _sidebarState.value = currentState.copy(currentView = view)
+    }
+
+    fun toggleSidebarLike() {
+        val currentState = _sidebarState.value ?: return
+        val currentInteraction = currentState.interaction
+        val newInteraction = if (currentInteraction == UserInteraction.like) null else UserInteraction.like
+        
+        _sidebarState.value = currentState.copy(interaction = newInteraction)
+        
+        viewModelScope.launch {
+            try {
+                if (newInteraction == UserInteraction.like) {
+                    FloatplaneApi.contentV3.likeContent(
+                        ContentLikeV3Request(
+                            id = currentState.post.id,
+                            contentType = ContentLikeV3Request.ContentType.blogPost
+                        )
+                    )
+                } else if (newInteraction == null && currentInteraction == UserInteraction.like) {
+                     FloatplaneApi.contentV3.dislikeContent(
+                        ContentLikeV3Request(
+                            id = currentState.post.id,
+                            contentType = ContentLikeV3Request.ContentType.blogPost
+                        )
+                    )
+                }
+            } catch (e: Exception) { }
+        }
+    }
+
+    fun toggleSidebarDislike() {
+        val currentState = _sidebarState.value ?: return
+        val currentInteraction = currentState.interaction
+        val newInteraction = if (currentInteraction == UserInteraction.dislike) null else UserInteraction.dislike
+        
+        _sidebarState.value = currentState.copy(interaction = newInteraction)
+        
+        viewModelScope.launch {
+            try {
+                if (newInteraction == UserInteraction.dislike) {
+                    FloatplaneApi.contentV3.dislikeContent(
+                        ContentLikeV3Request(
+                            id = currentState.post.id,
+                            contentType = ContentLikeV3Request.ContentType.blogPost
+                        )
+                    )
+                }
+            } catch (e: Exception) { }
+        }
+    }
+
+    fun togglePlaylistMembership(playlist: Playlist, post: ContentPostV3Response) {
+        viewModelScope.launch {
+             try {
+                 val isAdded = playlist.videoIds.contains(post.id)
+                 
+                 // Optimistic Update
+                 val updatedPlaylists = _userPlaylists.value.map { pl ->
+                     if (pl.id == playlist.id) {
+                         if (isAdded) {
+                             pl.copy(videoIds = pl.videoIds - post.id)
+                         } else {
+                             pl.copy(videoIds = pl.videoIds + post.id)
+                         }
+                     } else {
+                         pl
+                     }
+                 }
+                 _userPlaylists.value = updatedPlaylists
+
+                 if (isAdded) {
+                     withCompanionRetry {
+                         FloatplaneApi.companionApi.removeFromPlaylist(
+                             id = playlist.id,
+                             request = PlaylistRemoveRequest(post.id)
+                         )
+                     }
+                 } else {
+                     withCompanionRetry {
+                         FloatplaneApi.companionApi.addToPlaylist(
+                             id = playlist.id,
+                             request = PlaylistAddRequest(post.id)
+                         )
+                     }
+                 }
+                 loadPlaylists()
+             } catch (e: Exception) {
+                e.printStackTrace()
+                loadPlaylists() 
+             }
+        }
+    }
 
     fun loadPlaylistPosts(playlistId: String) {
         viewModelScope.launch {

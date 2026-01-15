@@ -284,7 +284,13 @@ fun TvHomeFeedScreen(
                     val isInWatchLater = watchLaterPlaylist?.videoIds?.contains(currentSidebarState.post.id) == true
 
                     TvActionSidebar(
-                        state = currentSidebarState,
+                        state = com.coulterpeterson.floatnative.ui.components.tv.SidebarUiState(
+                            title = currentSidebarState.post.title,
+                            thumbnail = currentSidebarState.post.thumbnail,
+                            postId = currentSidebarState.post.id,
+                            interaction = currentSidebarState.interaction,
+                            currentView = currentSidebarState.currentView
+                        ),
                         actions = SidebarActions(
                             onPlay = { 
                                 if (!currentSidebarState.post.videoAttachments.isNullOrEmpty()) {
