@@ -40,8 +40,58 @@ fun TvVideoCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null
 ) {
+    TvVideoCardContent(
+        title = post.title,
+        thumbnail = post.thumbnail,
+        channelTitle = post.channel.title,
+        channelIcon = post.channel.icon,
+        creatorIcon = post.creator.icon,
+        duration = post.metadata.videoDuration.toLong(),
+        releaseDate = post.releaseDate.toString(),
+        onClick = onClick,
+        onLongClick = onLongClick,
+        modifier = modifier
+    )
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun TvVideoCard(
+    post: com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null
+) {
+    TvVideoCardContent(
+        title = post.title,
+        thumbnail = post.thumbnail,
+        channelTitle = post.channel.title,
+        channelIcon = post.channel.icon,
+        creatorIcon = post.creator.icon,
+        duration = post.metadata.videoDuration.toLong(),
+        releaseDate = post.releaseDate.toString(),
+        onClick = onClick,
+        onLongClick = onLongClick,
+        modifier = modifier
+    )
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun TvVideoCardContent(
+    title: String,
+    thumbnail: ImageModel?,
+    channelTitle: String,
+    channelIcon: ImageModel?,
+    creatorIcon: ImageModel?,
+    duration: Long,
+    releaseDate: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null
+) {
     // Thumbnail Logic
-    val thumbnailUrl = post.thumbnail?.path?.toString()
+    val thumbnailUrl = thumbnail?.path?.toString()
     val fullThumbnailUrl = if (thumbnailUrl?.startsWith("http") == true) thumbnailUrl else "https://pbs.floatplane.com${thumbnailUrl}"
 
     // Icon Logic
@@ -49,13 +99,10 @@ fun TvVideoCard(
         if (imageModel == null) return null
         return (imageModel.childImages?.firstOrNull()?.path ?: imageModel.path).toString()
     }
-    val channelIcon = getIconPath(post.channel.icon)
-    val creatorIcon = getIconPath(post.creator.icon)
-    val iconUrl = channelIcon ?: creatorIcon
+    val channelIconUrl = getIconPath(channelIcon)
+    val creatorIconUrl = getIconPath(creatorIcon)
+    val iconUrl = channelIconUrl ?: creatorIconUrl
 
-    // Duration Logic
-    val duration = post.metadata.videoDuration.toLong()
-    
     Card(
         onClick = onClick,
         onLongClick = onLongClick,
@@ -77,7 +124,7 @@ fun TvVideoCard(
             ) {
                 AsyncImage(
                     model = fullThumbnailUrl,
-                    contentDescription = post.title,
+                    contentDescription = title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
@@ -106,10 +153,6 @@ fun TvVideoCard(
             // 2. Info Area
             Row(modifier = Modifier.fillMaxWidth()) {
                 // Creator Icon
-                /* 
-                   Using a placeholder box or the image if available.
-                   TV design often shows large thumbnails, icon is secondary but adds 'friendliness'.
-                */
                 if (iconUrl != null) {
                     AsyncImage(
                         model = iconUrl,
@@ -125,7 +168,7 @@ fun TvVideoCard(
                 // Text Details
                 Column {
                     Text(
-                        text = post.title ?: "Untitled",
+                        text = title ?: "Untitled",
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White, // Explicit White
                         maxLines = 2
@@ -137,15 +180,14 @@ fun TvVideoCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = post.channel.title,
+                            text = channelTitle,
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.LightGray // High contrast grey
                         )
                     }
                     
                     // Release Date Line
-                    val dateStr = post.releaseDate.toString()
-                    val relativeTime = DateUtils.getRelativeTime(dateStr)
+                    val relativeTime = DateUtils.getRelativeTime(releaseDate)
                     
                     Text(
                         text = relativeTime,

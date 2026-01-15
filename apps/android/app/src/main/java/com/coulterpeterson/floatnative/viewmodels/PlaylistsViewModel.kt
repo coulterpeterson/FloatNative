@@ -24,6 +24,13 @@ class PlaylistsViewModel : ViewModel() {
     private val _state = MutableStateFlow<PlaylistsState>(PlaylistsState.Initial)
     val state = _state.asStateFlow()
 
+    private val _selectedPlaylist = MutableStateFlow<Playlist?>(null)
+    val selectedPlaylist = _selectedPlaylist.asStateFlow()
+
+    fun selectPlaylist(playlist: Playlist?) {
+        _selectedPlaylist.value = playlist
+    }
+
     init {
         loadPlaylists()
     }

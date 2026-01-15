@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.runtime.saveable.rememberSaveable
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -68,7 +69,7 @@ fun TvHomeFeedScreen(
     
     // Top Navigation Items
     val navItems = listOf("Home", "Creators", "Playlists", "Search", "History", "Settings")
-    var selectedNavIndex by remember { mutableIntStateOf(0) }
+    var selectedNavIndex by rememberSaveable { mutableIntStateOf(0) }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0F0F0F))) { // Dark background
         Column(modifier = Modifier.fillMaxSize()) {
@@ -250,6 +251,13 @@ fun TvHomeFeedScreen(
                     else -> {}
                 }
             }
+        } else if (selectedNavIndex == 2) {
+            // Playlists
+            com.coulterpeterson.floatnative.ui.screens.tv.TvPlaylistsScreen(
+                onPlayVideo = { videoId ->
+                    onPlayVideo(videoId)
+                }
+            )
         } else {
              // Other tabs placeholders
              Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
