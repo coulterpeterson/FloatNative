@@ -18,7 +18,7 @@
   - [X] Login screen
   - [X] Video feed
   - [X] Video player
-  - [] Video feed long-press actions
+  - [X] Video feed long-press actions
   - [X] Video player custom controls
   - [] Video player sidebar slideout
   - [] Remaining screens

@@ -195,7 +195,15 @@ fun TvActionSidebar(
                                 actions.onPlay()
                                 onDismiss()
                             },
-                            modifier = Modifier.focusRequester(playFocusRequester)
+                            modifier = Modifier
+                                .focusRequester(playFocusRequester)
+                                .onPreviewKeyEvent { event ->
+                                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
+                                        true // Consume the event, preventing scroll up
+                                    } else {
+                                        false
+                                    }
+                                }
                         )
                     }
                     
@@ -279,8 +287,25 @@ fun TvActionSidebar(
                         items(displayablePlaylists.size) { index ->
                             val playlist = displayablePlaylists[index]
                             val isAdded = playlist.videoIds.contains(state.post.id)
+                            val isFirst = index == 0
+                            val isLast = index == displayablePlaylists.lastIndex
                             
-                            val itemModifier = if (index == 0) Modifier.focusRequester(firstPlaylistFocusRequester) else Modifier
+                            var itemModifier: Modifier = Modifier
+                            if (isFirst) {
+                                itemModifier = itemModifier.focusRequester(firstPlaylistFocusRequester)
+                            }
+
+                            itemModifier = itemModifier.onPreviewKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown) {
+                                    if (isFirst && event.key == Key.DirectionUp) {
+                                        return@onPreviewKeyEvent true // Prevent scroll up past top
+                                    }
+                                    if (isLast && event.key == Key.DirectionDown) {
+                                        return@onPreviewKeyEvent true // Prevent scroll down past bottom
+                                    }
+                                }
+                                false
+                            }
                             
                             SidebarButton(
                                 text = playlist.name,
