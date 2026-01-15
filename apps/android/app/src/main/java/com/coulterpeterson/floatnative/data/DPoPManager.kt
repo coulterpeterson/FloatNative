@@ -30,15 +30,24 @@ class DPoPManager(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    // Time offset in seconds (Service Time - Local Time)
-    var timeOffsetSeconds: Long = 0
-
-    private var keyPair: KeyPair? = null
-    
-    companion object {
         private const val KEY_PRIVATE_KEY = "dpop_private_key"
         private const val KEY_PUBLIC_KEY = "dpop_public_key"
+        private const val KEY_TIME_OFFSET = "dpop_time_offset"
     }
+
+    init {
+        // Load offset on init
+        timeOffsetSeconds = prefs.getLong(KEY_TIME_OFFSET, 0L)
+    }
+
+    // Time offset in seconds (Service Time - Local Time)
+    var timeOffsetSeconds: Long = 0
+        set(value) {
+            field = value
+            prefs.edit().putLong(KEY_TIME_OFFSET, value).apply()
+        }
+
+    private var keyPair: KeyPair? = null
 
     @Synchronized
     private fun getOrGenerateKeyPair(): KeyPair {

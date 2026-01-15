@@ -4,7 +4,12 @@ import com.coulterpeterson.floatnative.data.TokenManager
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
+import retrofit2.HttpException
+import org.json.JSONObject
 import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Locale
+
 
 class AuthInterceptor(
     private val tokenManager: TokenManager,
@@ -183,8 +188,66 @@ class AuthInterceptor(
                         )
 
                     } catch (e: Exception) {
-                        // Refresh failed, clear tokens to force re-login
-                        tokenManager.clearAll()
+                        // Handle DPoP Time Skew for Refresh Token
+                         if (e is HttpException && e.code() == 400) {
+                            val errorBody = e.response()?.errorBody()?.string()
+                            if (!errorBody.isNullOrEmpty() && errorBody.contains("DPoP", ignoreCase = true)) {
+                                try {
+                                    // 1. Auto-correct time
+                                    val dateHeader = e.response()?.headers()?.get("date")
+                                    if (dateHeader != null) {
+                                        val sdf = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
+                                        val serverTime = sdf.parse(dateHeader)?.time
+                                        if (serverTime != null) {
+                                            val deviceTime = System.currentTimeMillis()
+                                            val offsetSeconds = (serverTime - deviceTime) / 1000
+                                            dpopManager.timeOffsetSeconds = offsetSeconds
+                                            android.util.Log.i("AuthInterceptor", "Auto-corrected DPoP time offset: $offsetSeconds s")
+                                        }
+                                    }
+
+                                    // 2. Retry Refresh
+                                    val authApi = authApiProvider()
+                                    val tokenEndpoint = "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/token"
+                                    val retryProof = dpopManager.generateProof("POST", tokenEndpoint)
+
+                                    val retryTokenResponse = runBlocking {
+                                        authApi.getToken(
+                                            dpop = retryProof,
+                                            grantType = "refresh_token",
+                                            clientId = "floatnative",
+                                            refreshToken = refreshToken
+                                        )
+                                    }
+
+                                    // 3. Save new tokens
+                                    tokenManager.accessToken = retryTokenResponse.access_token
+                                    tokenManager.refreshToken = retryTokenResponse.refresh_token
+
+                                    // 4. Retry Original Request
+                                    response.close()
+                                    val method = originalRequest.method
+                                    val url = originalRequest.url.toString()
+                                    val proof = dpopManager.generateProof(method, url, retryTokenResponse.access_token)
+
+                                    return chain.proceed(
+                                        originalRequest.newBuilder()
+                                            .header("DPoP", proof)
+                                            .header("Authorization", "DPoP ${retryTokenResponse.access_token}")
+                                            .build()
+                                    )
+
+                                } catch (retryEx: Exception) {
+                                    android.util.Log.e("AuthInterceptor", "Retry refresh failed", retryEx)
+                                    tokenManager.clearAll()
+                                }
+                            } else {
+                                tokenManager.clearAll()
+                            }
+                        } else {
+                            // Refresh failed, clear tokens to force re-login
+                            tokenManager.clearAll()
+                        }
                     }
                 }
             }
