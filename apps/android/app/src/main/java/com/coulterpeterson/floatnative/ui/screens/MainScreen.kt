@@ -44,16 +44,26 @@ fun MainScreen(
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isVideo = currentRoute == "video/{postId}"
     
+    val isLive = currentRoute?.startsWith("live/") == true
     val isPlaylist = currentRoute?.startsWith("playlist/") == true
 
     Scaffold(
         topBar = {
             // Hide TopBar in fullscreen video (landscape)
-            if (isVideo && isLandscape) {
+            if ((isVideo || isLive) && isLandscape) {
                 // No TopBar
             } else if (currentRoute == Screen.History.route) {
                 TopAppBar(
                     title = { Text("Watch History") },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                )
+            } else if (isLive) {
+                TopAppBar(
+                    title = { Text("Live") },
                     navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -112,7 +122,7 @@ fun MainScreen(
             }
         },
         bottomBar = {
-            if (!(isVideo && isLandscape)) {
+            if (!((isVideo || isLive) && isLandscape)) {
                 NavigationBar {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination

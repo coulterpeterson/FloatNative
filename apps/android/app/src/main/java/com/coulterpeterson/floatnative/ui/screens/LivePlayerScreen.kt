@@ -66,107 +66,90 @@ fun LivePlayerScreen(
 
     val exoPlayer = viewModel.player
 
-    Scaffold(
-        topBar = {
-             // Only show top bar in portrait
-             if (!isLandscape) {
-                 TopAppBar(
-                     title = { Text("Live") },
-                     navigationIcon = {
-                         IconButton(onClick = onClose) {
-                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                         }
-                     }
-                 )
-             }
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        // Video Player Area
+            Box(
+            modifier = if (isLandscape) {
+                Modifier.fillMaxSize()
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(Color.Black)
+            }
         ) {
-            // Video Player Area
-             Box(
-                modifier = if (isLandscape) {
-                    Modifier.fillMaxSize()
-                } else {
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .background(Color.Black)
+            LiveVideoPlayerView(exoPlayer)
+            
+            // Overlay for loading/error
+            when (val currentState = state) {
+                is LivePlayerState.Loading -> {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
-            ) {
-                LiveVideoPlayerView(exoPlayer)
-                
-                // Overlay for loading/error
-                when (val currentState = state) {
-                    is LivePlayerState.Loading -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                    }
-                    is LivePlayerState.Error -> {
-                        Text(
-                            text = currentState.message,
-                            color = Color.Red,
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    }
-                    else -> {}
+                is LivePlayerState.Error -> {
+                    Text(
+                        text = currentState.message,
+                        color = Color.Red,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
                 }
-                
-                // Back button overlay in landscape
-                if (isLandscape) {
-                    IconButton(
-                        onClick = onClose,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(16.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
+                else -> {}
+            }
+            
+            // Back button overlay in landscape
+            if (isLandscape) {
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(16.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                 }
             }
+        }
 
-            // Portrait Content (Info + Chat)
-            if (!isLandscape) {
-                /*
-                 Split view: 
-                 - Metadata
-                 - Chat List (filling remaining space)
-                 */
-                 
-                 val contentState = state as? LivePlayerState.Content
-                 
-                 if (contentState != null) {
-                     // Metadata
-                     Column(modifier = Modifier.padding(16.dp)) {
-                         Text(
-                             text = contentState.streamTitle,
-                             style = MaterialTheme.typography.titleMedium,
-                             fontWeight = FontWeight.Bold
-                         )
-                         if (contentState.creatorTitle.isNotEmpty()) {
-                             Text(
-                                 text = contentState.creatorTitle,
-                                 style = MaterialTheme.typography.bodyMedium,
-                                 color = MaterialTheme.colorScheme.primary
-                             )
-                         }
-                     }
-                     
-                     HorizontalDivider()
-                     
-                     // Chat Placeholder
-                     Box(modifier = Modifier.weight(1f)) {
-                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                             Text("Live Comments Coming Soon", color = Color.Gray)
-                         }
-                     }
-                 } else {
-                     Box(modifier = Modifier.weight(1f))
-                 }
-            }
+        // Portrait Content (Info + Chat)
+        if (!isLandscape) {
+            /*
+                Split view: 
+                - Metadata
+                - Chat List (filling remaining space)
+                */
+                
+                val contentState = state as? LivePlayerState.Content
+                
+                if (contentState != null) {
+                    // Metadata
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = contentState.streamTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (contentState.creatorTitle.isNotEmpty()) {
+                            Text(
+                                text = contentState.creatorTitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    
+                    HorizontalDivider()
+                    
+                    // Chat Placeholder
+                    Box(modifier = Modifier.weight(1f)) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Live Comments Coming Soon", color = Color.Gray)
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.weight(1f))
+                }
         }
     }
 }
