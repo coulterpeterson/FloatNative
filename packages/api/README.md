@@ -155,7 +155,8 @@ The API implements comprehensive rate limiting using Cloudflare Workers Rate Lim
 | Endpoint | Auth Required | Rate Limit | Key Type |
 |----------|---------------|------------|----------|
 | `/`, `/health` | No | 200/min | IP |
-| `/auth/register`, `/auth/qr/submit` | No | 20/min | IP |
+| `/auth/login`, `/auth/register` | No | 20/min | IP |
+| `/auth/qr/submit` | No | 20/min | IP |
 | `/auth/qr/generate` | No | 30/min | IP |
 | `/auth/qr/poll/:id` | No | 120/min | Session ID |
 | `/playlists/*` (reads) | Yes | 100/min | API Key |
@@ -202,6 +203,49 @@ Rate limiters are configured in `wrangler.toml` with unique namespace IDs. All l
 Complete documentation of all available endpoints.
 
 ### Authentication
+
+#### POST /auth/login
+**Active - Primary Authentication Method**
+
+Login a user using their Floatplane OAuth access token. This endpoint supports DPoP (Demonstrating Proof-of-Possession) to bind the session to the client device.
+
+**Request:**
+```json
+{
+  "access_token": "string",       // Floatplane OAuth access token
+  "dpop_proof": "string",         // DPoP proof JWT
+  "device_info": "string"         // Optional, for session tracking
+}
+```
+
+**Response (200):**
+```json
+{
+  "api_key": "uuid",
+  "floatplane_user_id": "string",
+  "message": "User registered successfully" | "User logged in successfully"
+}
+```
+
+**Errors:**
+- `400` - Missing required fields or invalid DPoP proof
+- `401` - Invalid or expired Floatplane token
+- `500` - Internal server error
+
+**Rate Limit:** 20 requests per minute
+
+#### POST /auth/logout
+Invalidate the current user's API key. Requires authentication.
+
+**Request:**
+- Headers: `Authorization: Bearer {api_key}`
+
+**Response (200):**
+```json
+{
+  "message": "Logged out successfully. API key invalidated."
+}
+```
 
 #### DEPRECATED POST /auth/register
 Register or login a user using their Floatplane session cookie.

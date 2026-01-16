@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS device_sessions;
+DROP TABLE IF EXISTS qr_sessions;
+DROP TABLE IF EXISTS fp_posts;
+DROP TABLE IF EXISTS playlists;
+DROP TABLE IF EXISTS users;
