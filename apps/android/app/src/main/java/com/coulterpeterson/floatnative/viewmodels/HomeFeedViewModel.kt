@@ -11,7 +11,9 @@ import com.coulterpeterson.floatnative.api.PlaylistAddRequest
 import com.coulterpeterson.floatnative.api.PlaylistRemoveRequest
 import com.coulterpeterson.floatnative.api.PlaylistCreateRequest
 import com.coulterpeterson.floatnative.openapi.models.UpdateProgressRequest
+
 import com.coulterpeterson.floatnative.openapi.models.GetProgressRequest
+import com.coulterpeterson.floatnative.openapi.models.CreatorModelV3
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -59,6 +61,10 @@ class HomeFeedViewModel : ViewModel() {
     private val _filter = MutableStateFlow<FeedFilter>(FeedFilter.All)
     val filter = _filter.asStateFlow()
 
+    private val _liveCreators = MutableStateFlow<List<CreatorModelV3>>(emptyList())
+    val liveCreators = _liveCreators.asStateFlow()
+
+
     private val _sidebarState = MutableStateFlow<SidebarState?>(null)
     val sidebarState = _sidebarState.asStateFlow()
 
@@ -87,10 +93,12 @@ class HomeFeedViewModel : ViewModel() {
             
             try {
                 // 1. Get Subscriptions if needed (only for All filter)
+                // 1. Get Subscriptions if needed (only for All filter)
                 if (_filter.value is FeedFilter.All && subscriptions.isEmpty()) {
                     val subResponse = FloatplaneApi.manual.getSubscriptions()
                     if (subResponse.isSuccessful && subResponse.body() != null) {
                         subscriptions = subResponse.body()!!
+                        checkLiveCreators()
                     } else {
                         // If loading all feed and subs fail, we can't show anything
                         if (_filter.value is FeedFilter.All) {
@@ -664,6 +672,62 @@ class HomeFeedViewModel : ViewModel() {
                     )
                 }
             } catch (e: Exception) { }
+        }
+    }
+
+    private fun checkLiveCreators() {
+        val currentSubs = subscriptions
+        if (currentSubs.isEmpty()) return
+
+        val creatorIds = currentSubs.mapNotNull { it.creator }
+        if (creatorIds.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                // Batch if too many? For now just send all (assuming reasonable count)
+                val response = FloatplaneApi.manual.getCreatorsByIds(creatorIds)
+                if (response.isSuccessful && response.body() != null) {
+                    val creators = response.body()!!
+                    // Filter for creators that have a liveStream object
+                    val live = creators.filter { it.liveStream != null && it.liveStream.offline == null } // Wait, offline object presence might mean offline?
+                    // User Request says: "offline": { ... } logic?
+                    // Let's look at the User Request JSON again.
+                    // The liveStream object HAS an offline object inside it even when live?
+                    // Sample JSON: "liveStream": { "offline": { ... } }
+                    // Wait, if they are LIVE, is `offline` null?
+                    // The sample shows: "offline": { "title": "Offline", ... }
+                    // But also has "streamPath": "..."
+                    // If streamPath is present, they are likely live?
+                    // Or maybe we check if `offline` is null? 
+                    // Actually, looking at the sample data for Linus (Live):
+                    // "liveStream": { "id": "...", "title": "...", "streamPath": "/api/video/...", "offline": { ... } }
+                    // It SEEMS `offline` is always populated with the offline message/thumbnail.
+                    // BUT `streamPath` is present.
+                    // And `status`? No status field.
+                    // The user said: "Linus tech tips is currently live, and here are some seemingly related API calls I'm seeing"
+                    // In that JSON, `streamPath` is present.
+                    // Let's assume presence of `streamPath` or checking delivery info is needed?
+                    // Actually, usually `liveStream` is null if not live?
+                    // OR, maybe we should check if `streamPath` is not null/empty?
+                    // Let's assume `liveStream` object always exists for creators who CAN stream?
+                    // Let's filter by `it.liveStream != null`.
+                    // But we need to distinguish live vs offline.
+                    // The `offline` field inside `liveStream` describes what to show when offline.
+                    // If they are live, they have `title`, `description` populated with CURRENT stream info.
+                    // If they are offline, do they still have `title`? 
+                    // Inspecting sample again: 
+                    // "liveStream": { "title": "My TV Demo Failed...", "streamPath": "..." }
+                    // This looks like active stream info.
+                    // I will check if `streamPath` is present.
+                    
+                    val liveCreatorsList = creators.filter { 
+                        it.liveStream != null && !it.liveStream.streamPath.isNullOrEmpty()
+                    }
+                    _liveCreators.value = liveCreatorsList
+                }
+            } catch (e: Exception) {
+               e.printStackTrace()
+            }
         }
     }
 }

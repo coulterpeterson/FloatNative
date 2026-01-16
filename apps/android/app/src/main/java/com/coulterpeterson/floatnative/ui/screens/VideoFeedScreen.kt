@@ -1,11 +1,10 @@
 package com.coulterpeterson.floatnative.ui.screens
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+// import androidx.compose.ui.graphics.Color  <-- Removed to avoid ambiguity
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -40,6 +39,13 @@ import androidx.compose.runtime.setValue
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import com.coulterpeterson.floatnative.ui.components.PlaylistSelectionSheet
+import coil.compose.AsyncImage
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +54,7 @@ fun VideoFeedScreen(
     creatorId: String? = null,
     channelId: String? = null,
     onPlayVideo: (String) -> Unit = {},
+    onPlayLive: (String) -> Unit = {},
     // Added navController to handle "Clear" action (popBackStack)
     onClearFilter: () -> Unit = {}
 ) {
@@ -62,6 +69,7 @@ fun VideoFeedScreen(
     val state by viewModel.state.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val filter by viewModel.filter.collectAsState()
+    val liveCreators by viewModel.liveCreators.collectAsState()
     // State for playlists and sheet
     val userPlaylists by viewModel.userPlaylists.collectAsState()
     val watchProgress by viewModel.watchProgress.collectAsState()
@@ -128,6 +136,108 @@ fun VideoFeedScreen(
                     }
                 }
             }
+        }
+
+        // Live Banner
+        if (liveCreators.isNotEmpty() && filter is HomeFeedViewModel.FeedFilter.All) {
+             val liveCreator = liveCreators.first() // Just show first for now or horizontal list?
+             // User requested: "show the thumbnail and title for that live stream at the very top of the list ... with a "live" style red circle"
+
+             // User requested: "make the live banner look like a regular video item, but with a the red recording dot overlaid in the top left"
+
+             androidx.compose.material3.Card(
+                 modifier = Modifier
+                     .fillMaxWidth()
+                     .padding(horizontal = 24.dp, vertical = 8.dp) // Match VideoCard padding alignment
+                     .clickable { 
+                         // Navigate to live player
+                         liveCreator.liveStream?.id?.let { onPlayLive(it) } 
+                     },
+                 shape = MaterialTheme.shapes.extraLarge,
+                 colors = androidx.compose.material3.CardDefaults.cardColors(
+                     containerColor = MaterialTheme.colorScheme.surfaceContainer
+                 )
+             ) {
+                 androidx.compose.foundation.layout.Column {
+                     // Thumbnail Area
+                     Box(
+                         modifier = Modifier
+                             .fillMaxWidth()
+                             .aspectRatio(16f / 9f)
+                     ) {
+                         // Thumbnail Image
+                         androidx.compose.ui.platform.LocalContext.current.let { ctx ->
+                             val imageModel = liveCreator.liveStream?.thumbnail ?: liveCreator.icon
+                             AsyncImage(
+                                 model = imageModel.path.toString(),
+                                 contentDescription = "Live Stream Thumbnail",
+                                 modifier = Modifier.fillMaxSize(),
+                                 contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                             )
+                         }
+                         
+                         // Red Dot Overlay (Top Left)
+                         Box(
+                             modifier = Modifier
+                                 .padding(8.dp)
+                                 .align(Alignment.TopStart)
+                                 .background(androidx.compose.ui.graphics.Color.Red, androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                                 .padding(horizontal = 6.dp, vertical = 2.dp)
+                         ) {
+                             androidx.compose.foundation.layout.Row(
+                                 verticalAlignment = Alignment.CenterVertically
+                             ) {
+                                 Box(
+                                     modifier = Modifier
+                                         .size(8.dp)
+                                         .background(androidx.compose.ui.graphics.Color.White, androidx.compose.foundation.shape.CircleShape)
+                                 )
+                                 androidx.compose.foundation.layout.Spacer(modifier = Modifier.width(4.dp))
+                                 Text(
+                                     text = "LIVE",
+                                     color = androidx.compose.ui.graphics.Color.White,
+                                     style = MaterialTheme.typography.labelSmall,
+                                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                 )
+                             }
+                         }
+                     }
+
+                     // Metadata Area
+                     androidx.compose.foundation.layout.Row(
+                         modifier = Modifier.padding(12.dp),
+                         verticalAlignment = Alignment.CenterVertically
+                     ) {
+                         // Creator Icon
+                         AsyncImage(
+                             model = liveCreator.icon.path.toString(),
+                             contentDescription = liveCreator.title,
+                             modifier = Modifier
+                                 .size(40.dp)
+                                 .clip(androidx.compose.foundation.shape.CircleShape),
+                             contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                         )
+
+                         androidx.compose.foundation.layout.Spacer(modifier = Modifier.width(12.dp))
+
+                         androidx.compose.foundation.layout.Column {
+                             Text(
+                                 text = liveCreator.liveStream?.title ?: "Live Stream",
+                                 style = MaterialTheme.typography.titleMedium,
+                                 maxLines = 2,
+                                 minLines = 1,
+                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                             )
+                             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(4.dp))
+                             Text(
+                                 text = liveCreator.title,
+                                 style = MaterialTheme.typography.bodyMedium,
+                                 color = MaterialTheme.colorScheme.onSurfaceVariant
+                             )
+                         }
+                     }
+                 }
+             }
         }
 
         PullToRefreshBox(

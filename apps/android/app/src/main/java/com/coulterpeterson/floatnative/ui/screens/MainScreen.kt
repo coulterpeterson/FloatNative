@@ -146,6 +146,9 @@ fun MainScreen(
                 VideoFeedScreen(
                     onPlayVideo = { postId ->
                         navController.navigate("video/$postId")
+                    },
+                    onPlayLive = { liveStreamId ->  // Pass the ID
+                         navController.navigate("live/$liveStreamId")
                     }
                 ) 
             }
@@ -159,6 +162,25 @@ fun MainScreen(
                     postId = postId,
                     onClose = { navController.popBackStack() }
                 )
+                VideoPlayerScreen(
+                    postId = postId,
+                    onClose = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route = "live/{creatorId}",
+                arguments = listOf(navArgument("creatorId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val creatorId = backStackEntry.arguments?.getString("creatorId") ?: return@composable
+                // We actually passed the creator LIVE STREAM ID as parameter in VideoFeedScreen,
+                // but let's call it "liveStreamId" or just reuse "creatorId" param name for simplicity in route
+                // logic in VideoFeedScreen was: onPlayVideo("live/${liveCreator.liveStream?.id}")
+                
+                 com.coulterpeterson.floatnative.ui.screens.LivePlayerScreen(
+                    liveStreamId = creatorId,
+                    onClose = { navController.popBackStack() }
+                )
             }
 
             composable(
@@ -170,6 +192,9 @@ fun MainScreen(
                     creatorId = creatorId,
                     onPlayVideo = { postId ->
                         navController.navigate("video/$postId")
+                    },
+                    onPlayLive = { liveStreamId ->
+                         navController.navigate("live/$liveStreamId")
                     },
                     onClearFilter = {
                          navController.popBackStack()
@@ -191,6 +216,9 @@ fun MainScreen(
                     creatorId = creatorId,
                     onPlayVideo = { postId ->
                         navController.navigate("video/$postId")
+                    },
+                    onPlayLive = { liveStreamId ->
+                         navController.navigate("live/$liveStreamId")
                     },
                     onClearFilter = {
                          navController.popBackStack()

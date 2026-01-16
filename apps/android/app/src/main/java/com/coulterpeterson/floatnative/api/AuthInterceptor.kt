@@ -42,15 +42,20 @@ class AuthInterceptor(
                 // Fallback (though DPoP is required now)
                 builder.header("Authorization", "Bearer $accessToken")
             }
-        } else if (authCookie != null) {
+        } 
+        
+        // Add Cookie if present (Sails requires this for chat, even if we have DPoP)
+        if (authCookie != null) {
             builder.header("Cookie", "sails.sid=$authCookie")
         }
 
         builder.header("User-Agent", "FloatNative/1.0 (Android)")
         
+        val finalRequest = builder.build()
+
         var response: Response? = null
         try {
-            response = chain.proceed(builder.build())
+            response = chain.proceed(finalRequest)
         } catch (e: Exception) {
             // Check for SSL Handshake or Peer Unverified exceptions which might indicate
             // clock skew or cert issues that a fresh token *might* help with (user request),
