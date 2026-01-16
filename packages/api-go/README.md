@@ -50,14 +50,48 @@ This is a **Go** reimplementation of the previous Cloudflare Workers API, design
     *Note*: To enable the LTT Search scraper, you must provide a valid `FLOATPLANE_SAILS_SID` in `.env`.
 
 3.  **Run with Docker Compose**:
+    # Start services (detached)
     ```bash
-    docker-compose up --build
+    docker-compose up -d
     ```
     -   API will be available at `http://localhost:8080`.
     -   PostgreSQL will be available at `localhost:5432`.
 
 4.  **Database Migrations**:
     Migrations in the `migrations/` directory are automatically applied on container startup.
+
+### 4. CloudPanel / NGINX Configuration
+
+If you are using **CloudPanel**, set up a **Reverse Proxy** to expose the API (running on port 8080) to the public internet (port 80/443).
+
+1.  **Create a Site**:
+    -   Go to **Sites** -> **Add Site** -> **Create a Generic Node.js / Python Site** (or just a Reverse Proxy if available).
+    -   Domain: `api.yourdomain.com`
+    -   Port: `8080` (This tells CloudPanel where the app is listening internally)
+
+2.  **NGINX VHost Configuration**:
+    If you need to manually configure the NGINX VHost, ensure the `location /` block looks like this:
+
+    ```nginx
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Websocket support (if needed in future)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    ```
+
+### 5. Updates
+
+To deploy an update:
+1.  **Local**: `docker-compose build` and `docker-compose push`.
+2.  **Server**: `docker-compose pull` and `docker-compose up -d` (Docker automatically recreates the container with the new image).
 
 ## Testing
     
