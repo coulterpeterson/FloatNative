@@ -33,7 +33,73 @@ class LivePlayerViewModel(application: Application) : AndroidViewModel(applicati
     private val _state = MutableStateFlow<LivePlayerState>(LivePlayerState.Idle)
     val state = _state.asStateFlow()
 
-    val player: ExoPlayer = ExoPlayer.Builder(application).build()
+    val player: ExoPlayer = run {
+        // Create a custom RenderersFactory with decoder fallback
+        val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(application)
+            .setEnableDecoderFallback(true) // Allow fallback to software decoder if hardware has issues
+        
+        // Create a TrackSelector with tunneling explicitly disabled
+        // Tunneling is a known cause of video zooming/cropping to top-left on certain devices
+        val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(application).apply {
+            parameters = buildUponParameters()
+                .setTunnelingEnabled(false) // CRITICAL: Disable tunneling to prevent zoom issue
+                .build()
+        }
+        
+        ExoPlayer.Builder(application, renderersFactory)
+            .setTrackSelector(trackSelector)
+            .build()
+            .apply {
+                // Set video scaling mode for SurfaceView
+                videoScalingMode = androidx.media3.common.C.VIDEO_SCALING_MODE_SCALE_TO_FIT
+                
+                // Add comprehensive logging to diagnose the issue
+                addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+                    override fun onVideoSizeChanged(
+                        eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                        videoSize: androidx.media3.common.VideoSize
+                    ) {
+                        android.util.Log.d("LivePlayer", ">>> onVideoSizeChanged: ${videoSize.width}x${videoSize.height}, " +
+                            "pixelWidthHeightRatio=${videoSize.pixelWidthHeightRatio}, " +
+                            "unappliedRotationDegrees=${videoSize.unappliedRotationDegrees}")
+                    }
+                    
+                    override fun onSurfaceSizeChanged(
+                        eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                        width: Int,
+                        height: Int
+                    ) {
+                        android.util.Log.d("LivePlayer", ">>> onSurfaceSizeChanged: ${width}x${height}")
+                    }
+                    
+                    override fun onRenderedFirstFrame(
+                        eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                        output: Any,
+                        renderTimeMs: Long
+                    ) {
+                        android.util.Log.d("LivePlayer", ">>> onRenderedFirstFrame: output=$output, renderTimeMs=$renderTimeMs")
+                    }
+                    
+                    override fun onVideoDecoderInitialized(
+                        eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                        decoderName: String,
+                        initializedTimestampMs: Long,
+                        initializationDurationMs: Long
+                    ) {
+                        android.util.Log.d("LivePlayer", ">>> onVideoDecoderInitialized: decoder=$decoderName")
+                    }
+                    
+                    override fun onVideoInputFormatChanged(
+                        eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                        format: androidx.media3.common.Format,
+                        decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?
+                    ) {
+                        android.util.Log.d("LivePlayer", ">>> onVideoInputFormatChanged: ${format.width}x${format.height}, " +
+                            "codecs=${format.codecs}, frameRate=${format.frameRate}")
+                    }
+                })
+            }
+    }
 
     override fun onCleared() {
         super.onCleared()
