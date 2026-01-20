@@ -36,6 +36,9 @@ class SettingsViewModel : ViewModel() {
     private val _downloadLocation = MutableStateFlow<String?>(FloatplaneApi.tokenManager.downloadLocationUri)
     val downloadLocation = _downloadLocation.asStateFlow()
 
+    private val _fakeLiveStreamEnabled = MutableStateFlow(FloatplaneApi.tokenManager.fakeLiveStreamEnabled)
+    val fakeLiveStreamEnabled = _fakeLiveStreamEnabled.asStateFlow()
+
     init {
         fetchUserProfile()
         checkLttOnlySubscription()
@@ -89,6 +92,11 @@ class SettingsViewModel : ViewModel() {
     fun setDownloadLocation(uri: String?) {
         FloatplaneApi.tokenManager.downloadLocationUri = uri
         _downloadLocation.value = uri
+    }
+
+    fun setFakeLiveStreamEnabled(enabled: Boolean) {
+        FloatplaneApi.tokenManager.fakeLiveStreamEnabled = enabled
+        _fakeLiveStreamEnabled.value = enabled
     }
 
     fun logout() {

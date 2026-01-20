@@ -109,6 +109,21 @@ class LivePlayerViewModel(application: Application) : AndroidViewModel(applicati
     fun loadStream(liveStreamId: String) {
         if (_state.value is LivePlayerState.Content) return // Already loaded
 
+        // Check for Fake Live Stream
+        if (liveStreamId == "fake_live_stream_id" || liveStreamId == "fake_creator_id") {
+             val fakeThumbnail = "https://pbs.floatplane.com/stream_thumbnails/5c13f3c006f1be15e08e05c0/510600934781497_1768590626092_400x225.jpeg"
+             _state.value = LivePlayerState.Content(
+                streamUrl = "", // Empty or invalid URL to prevent playback
+                creatorTitle = "Fake Creator",
+                streamTitle = "Fake Live Stream",
+                description = "This is a fake live stream for testing.",
+                icon = fakeThumbnail,
+                creatorId = "fake_creator_id"
+            )
+            // Do not call player.prepare() / player.playWhenReady = true
+            return
+        }
+
         viewModelScope.launch {
             _state.value = LivePlayerState.Loading
             try {

@@ -98,6 +98,12 @@ class TokenManager(context: Context) {
             prefs.edit().putBoolean("enhanced_ltt_search_enabled", value).apply()
         }
 
+    var fakeLiveStreamEnabled: Boolean
+        get() = prefs.getBoolean("fake_live_stream_enabled", false)
+        set(value) {
+            prefs.edit().putBoolean("fake_live_stream_enabled", value).apply()
+        }
+
     var downloadLocationUri: String?
         get() = prefs.getString("download_location_uri", null)
         set(value) {

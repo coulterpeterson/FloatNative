@@ -190,6 +190,27 @@ fun SettingsScreen(
                 )
             }
 
+            // --- Debug Section ---
+            if (com.coulterpeterson.floatnative.BuildConfig.DEBUG) {
+                item {
+                    val fakeLiveDtreamEnabled by viewModel.fakeLiveStreamEnabled.collectAsState()
+                    
+                    Text("Debug", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    ListItem(
+                        headlineContent = { Text("Enable Fake Live Stream") },
+                        supportingContent = { Text("Injects a fake live stream into the main feed for UI testing.") },
+                        trailingContent = {
+                            Switch(
+                                checked = fakeLiveDtreamEnabled,
+                                onCheckedChange = { viewModel.setFakeLiveStreamEnabled(it) }
+                            )
+                        }
+                    )
+                }
+            }
+
             // --- Logout ---
             item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))

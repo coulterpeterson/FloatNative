@@ -688,41 +688,53 @@ class HomeFeedViewModel : ViewModel() {
                 val response = FloatplaneApi.manual.getCreatorsByIds(creatorIds)
                 if (response.isSuccessful && response.body() != null) {
                     val creators = response.body()!!
-                    // Filter for creators that have a liveStream object
-                    val live = creators.filter { it.liveStream != null && it.liveStream.offline == null } // Wait, offline object presence might mean offline?
-                    // User Request says: "offline": { ... } logic?
-                    // Let's look at the User Request JSON again.
-                    // The liveStream object HAS an offline object inside it even when live?
-                    // Sample JSON: "liveStream": { "offline": { ... } }
-                    // Wait, if they are LIVE, is `offline` null?
-                    // The sample shows: "offline": { "title": "Offline", ... }
-                    // But also has "streamPath": "..."
-                    // If streamPath is present, they are likely live?
-                    // Or maybe we check if `offline` is null? 
-                    // Actually, looking at the sample data for Linus (Live):
-                    // "liveStream": { "id": "...", "title": "...", "streamPath": "/api/video/...", "offline": { ... } }
-                    // It SEEMS `offline` is always populated with the offline message/thumbnail.
-                    // BUT `streamPath` is present.
-                    // And `status`? No status field.
-                    // The user said: "Linus tech tips is currently live, and here are some seemingly related API calls I'm seeing"
-                    // In that JSON, `streamPath` is present.
-                    // Let's assume presence of `streamPath` or checking delivery info is needed?
-                    // Actually, usually `liveStream` is null if not live?
-                    // OR, maybe we should check if `streamPath` is not null/empty?
-                    // Let's assume `liveStream` object always exists for creators who CAN stream?
-                    // Let's filter by `it.liveStream != null`.
-                    // But we need to distinguish live vs offline.
-                    // The `offline` field inside `liveStream` describes what to show when offline.
-                    // If they are live, they have `title`, `description` populated with CURRENT stream info.
-                    // If they are offline, do they still have `title`? 
-                    // Inspecting sample again: 
-                    // "liveStream": { "title": "My TV Demo Failed...", "streamPath": "..." }
-                    // This looks like active stream info.
-                    // I will check if `streamPath` is present.
-                    
                     val liveCreatorsList = creators.filter { 
                         it.liveStream != null && !it.liveStream.streamPath.isNullOrEmpty()
+                    }.toMutableList()
+
+                    if (FloatplaneApi.tokenManager.fakeLiveStreamEnabled) {
+                        try {
+                             val fakeLiveStream = com.coulterpeterson.floatnative.openapi.models.LiveStreamModel(
+                                id = "fake_live_stream_id",
+                                title = "Fake Live Stream",
+                                description = "Fake description",
+                                thumbnail = com.coulterpeterson.floatnative.openapi.models.ImageModel(
+                                    width = 400,
+                                    height = 225,
+                                    path = java.net.URI("https://pbs.floatplane.com/stream_thumbnails/5c13f3c006f1be15e08e05c0/510600934781497_1768590626092_400x225.jpeg"),
+                                    childImages = null
+                                ),
+                                owner = "fake_creator_id",
+                                streamPath = "fake_path",
+                                offline = com.coulterpeterson.floatnative.openapi.models.LiveStreamModelOffline(
+                                    title = "Offline",
+                                    description = "Offline",
+                                    thumbnail = null
+                                )
+                            )
+
+                            // We need a full Creator object to display it
+                            // Reusing the first creator or creating a dummy
+                            val baseCreator = creators.firstOrNull() 
+                            if (baseCreator != null) {
+                                val fakeCreator = baseCreator.copy(
+                                    id = "fake_creator_id",
+                                    title = "Fake Creator",
+                                    liveStream = fakeLiveStream,
+                                    icon = com.coulterpeterson.floatnative.openapi.models.ImageModel(
+                                        width = 400,
+                                        height = 225,
+                                        path = java.net.URI("https://pbs.floatplane.com/stream_thumbnails/5c13f3c006f1be15e08e05c0/510600934781497_1768590626092_400x225.jpeg"),
+                                        childImages = null
+                                    )
+                                )
+                                liveCreatorsList.add(0, fakeCreator)
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
+
                     _liveCreators.value = liveCreatorsList
                 }
             } catch (e: Exception) {
