@@ -15,6 +15,9 @@ sealed class TvScreen(val route: String) {
     object Login : TvScreen("login")
     object Home : TvScreen("home")
     object Search : TvScreen("search")
+    object LivePlayer : TvScreen("live_player/{liveStreamId}") {
+        fun createRoute(liveStreamId: String) = "live_player/$liveStreamId"
+    }
     object Player : TvScreen("player/{videoId}") {
         fun createRoute(videoId: String) = "player/$videoId"
     }
@@ -44,6 +47,9 @@ fun TvAppNavigation(
                 onPlayVideo = { videoId ->
                     navController.navigate(TvScreen.Player.createRoute(videoId))
                 },
+                onPlayLive = { liveStreamId ->
+                    navController.navigate(TvScreen.LivePlayer.createRoute(liveStreamId))
+                },
                 onSearchClick = {
                     navController.navigate(TvScreen.Search.route)
                 }
@@ -65,6 +71,17 @@ fun TvAppNavigation(
             val videoId = backStackEntry.arguments?.getString("videoId") ?: return@composable
             TvVideoPlayerScreen(
                 videoId = videoId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        
+        composable(
+            route = TvScreen.LivePlayer.route,
+            arguments = listOf(navArgument("liveStreamId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val liveStreamId = backStackEntry.arguments?.getString("liveStreamId") ?: return@composable
+            com.coulterpeterson.floatnative.ui.screens.tv.TvLivePlayerScreen(
+                liveStreamId = liveStreamId,
                 onBack = { navController.popBackStack() }
             )
         }

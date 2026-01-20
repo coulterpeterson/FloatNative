@@ -58,10 +58,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 @Composable
 fun TvHomeFeedScreen(
     onPlayVideo: (String) -> Unit = {},
+    onPlayLive: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
     viewModel: com.coulterpeterson.floatnative.viewmodels.HomeFeedViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val liveCreators by viewModel.liveCreators.collectAsState()
     val sidebarState by viewModel.sidebarState.collectAsState()
     val userPlaylists by viewModel.userPlaylists.collectAsState()
     val filter by viewModel.filter.collectAsState()
@@ -231,7 +233,24 @@ fun TvHomeFeedScreen(
                              }
                         }
                     }
+
                     is HomeFeedState.Content -> {
+                        // Live Card at the start
+                        if (filter is com.coulterpeterson.floatnative.viewmodels.HomeFeedViewModel.FeedFilter.All) {
+                            val liveList = liveCreators
+                            if (liveList.isNotEmpty()) {
+                                item {
+                                    val creator = liveList.first()
+                                    com.coulterpeterson.floatnative.ui.components.tv.TvLiveVideoCard(
+                                        creator = creator,
+                                        onClick = {
+                                            creator.liveStream?.id?.let { onPlayLive(it) }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
                         items(s.posts) { post ->
                            TvVideoCard(
                                post = post,

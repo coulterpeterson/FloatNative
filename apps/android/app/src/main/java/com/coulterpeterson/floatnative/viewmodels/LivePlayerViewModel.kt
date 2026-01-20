@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+
 sealed class LivePlayerState {
     object Idle : LivePlayerState()
     object Loading : LivePlayerState()
@@ -21,14 +22,14 @@ sealed class LivePlayerState {
         val description: String,
 
         val icon: String?,
-        val creatorId: String // Added creatorId to content state
+        val creatorId: String
     ) : LivePlayerState()
     data class Error(val message: String) : LivePlayerState()
 }
-
-
-
 class LivePlayerViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val _sidebarMode = MutableStateFlow(PlayerSidebarMode.None)
+    val sidebarMode = _sidebarMode.asStateFlow()
 
     private val _state = MutableStateFlow<LivePlayerState>(LivePlayerState.Idle)
     val state = _state.asStateFlow()
@@ -192,5 +193,13 @@ class LivePlayerViewModel(application: Application) : AndroidViewModel(applicati
                 _state.value = LivePlayerState.Error(e.message ?: "Unknown error")
             }
         }
+    }
+
+    fun openDescription() {
+        _sidebarMode.value = PlayerSidebarMode.Description
+    }
+
+    fun closeSidebar() {
+        _sidebarMode.value = PlayerSidebarMode.None
     }
 }

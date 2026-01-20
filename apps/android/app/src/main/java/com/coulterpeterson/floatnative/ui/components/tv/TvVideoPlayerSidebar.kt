@@ -70,7 +70,7 @@ fun TvVideoPlayerSidebar(
     mode: PlayerSidebarMode,
     descriptionHtml: String,
     title: String,
-    publishDate: java.time.OffsetDateTime,
+    publishDate: java.time.OffsetDateTime?,
     comments: List<CommentModel>,
     onDismiss: () -> Unit,
     onSeek: (Long) -> Unit
@@ -123,11 +123,13 @@ fun TvVideoPlayerSidebar(
                             )
                         }
                         item {
-                            Text(
-                                text = "Published on ${publishDate.toLocalDate()}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (publishDate != null) {
+                                Text(
+                                    text = "Published on ${publishDate.toLocalDate()}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                         item {
                             Spacer(modifier = Modifier.height(8.dp))

@@ -26,6 +26,7 @@ import com.coulterpeterson.floatnative.openapi.models.VideoAttachmentModel
 @Composable
 fun TvMainScreen(
     onPlayVideo: (String) -> Unit,
+    onPlayLive: (String) -> Unit,
     onNavigateToSettings: () -> Unit,
     viewModel: HomeFeedViewModel = viewModel()
 ) {
