@@ -126,6 +126,10 @@ class TvLoginViewModel : ViewModel() {
                                 // Continue picking up the next loop with corrected time
                                 android.util.Log.d("TvLoginViewModel", "pollForToken: Retrying with new offset...")
                                 continue
+                            } else if (error == "expired_token" || errorDesc.contains("expired", ignoreCase = true)) {
+                                android.util.Log.i("TvLoginViewModel", "pollForToken: Device code expired. Requesting new code...")
+                                isDone = true
+                                startAuthFlow()
                             } else {
                                 // Fatal error (expired_token, access_denied, invalid_grant, etc.)
                                 android.util.Log.e("TvLoginViewModel", "pollForToken: Fatal 400 Error: $error / $errorDesc")

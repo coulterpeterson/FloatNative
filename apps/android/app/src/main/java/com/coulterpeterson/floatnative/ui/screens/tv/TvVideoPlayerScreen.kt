@@ -107,14 +107,20 @@ fun TvVideoPlayerScreen(
 
                     AndroidView(
                         factory = { ctx ->
-                            // Anonymous subclass to intercept key events before they are consumed involving
-                            // focus or child views. This ensures we can "wake up" the controls even if the 
-                            // focus state is ambiguous when controls are hidden.
-                            object : PlayerView(ctx) {
-                                 override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-                                    // Intercept D-pad keys when controller is hidden to show it
+                            // Inflate the wrapper layout which sets the custom controller attribute
+                            val view = android.view.LayoutInflater.from(ctx).inflate(
+                                com.coulterpeterson.floatnative.R.layout.tv_player_wrapper, 
+                                null
+                            ) as PlayerView
+                            
+                            view.apply {
+                                player = exoPlayer
+                                // XML sets resize_mode="fit", show_buffering="always", etc.
+                                
+                                // Handle D-pad wakeup using KeyListener instead of overriding dispatchKeyEvent
+                                setOnKeyListener { _, keyCode, event ->
                                     if (event.action == android.view.KeyEvent.ACTION_DOWN && !isControllerFullyVisible) {
-                                        when (event.keyCode) {
+                                        when (keyCode) {
                                             android.view.KeyEvent.KEYCODE_DPAD_CENTER,
                                             android.view.KeyEvent.KEYCODE_ENTER,
                                             android.view.KeyEvent.KEYCODE_DPAD_UP,
@@ -122,26 +128,13 @@ fun TvVideoPlayerScreen(
                                             android.view.KeyEvent.KEYCODE_DPAD_LEFT,
                                             android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
                                                 showController()
-                                                // Consume the event to prevent accidental action (like pausing) upon waking the UI
-                                                return true
+                                                return@setOnKeyListener true
                                             }
                                         }
                                     }
-                                    return super.dispatchKeyEvent(event)
+                                    false
                                 }
-                            }.apply {
-                                player = exoPlayer
-                                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-                                layoutParams = FrameLayout.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                )
-                                // Enable default controls which handle D-pad focus
-                                useController = true
-                                keepScreenOn = true
-                                
-                                // Use our custom layout
-                                setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_ALWAYS)
+
                                 setControllerVisibilityListener(androidx.media3.ui.PlayerView.ControllerVisibilityListener { visibility ->
                                     if (visibility == android.view.View.GONE && sidebarMode == com.coulterpeterson.floatnative.viewmodels.PlayerSidebarMode.None) {
                                       requestFocus()
@@ -149,8 +142,6 @@ fun TvVideoPlayerScreen(
                                 })
 
                                 // Ensure the view takes focus to handle D-pad events
-                                isFocusable = true
-                                isFocusableInTouchMode = true 
                                 descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
                                 requestFocus()
                             }
