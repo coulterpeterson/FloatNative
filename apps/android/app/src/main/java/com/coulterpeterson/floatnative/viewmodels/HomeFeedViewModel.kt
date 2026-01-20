@@ -689,7 +689,9 @@ class HomeFeedViewModel : ViewModel() {
                 if (response.isSuccessful && response.body() != null) {
                     val creators = response.body()!!
                     val liveCreatorsList = creators.filter { 
-                        it.liveStream != null && !it.liveStream.streamPath.isNullOrEmpty()
+                        it.liveStream != null && 
+                        !it.liveStream.streamPath.isNullOrEmpty() &&
+                        it.liveStream.offline.title.isNullOrEmpty()
                     }.toMutableList()
 
                     if (FloatplaneApi.tokenManager.fakeLiveStreamEnabled) {
