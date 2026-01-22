@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -131,10 +133,29 @@ fun TvPlaylistsScreen(
                         }
                         is PlaylistDetailState.Content -> {
                              
+                            val focusRequesters = remember { mutableMapOf<String, FocusRequester>() }
+                            var lastFocusedPostId by remember { mutableStateOf<String?>(null) }
+
+                             // Focus Restoration Logic
+                             LaunchedEffect(sidebarState) {
+                                 if (sidebarState == null && lastFocusedPostId != null) {
+                                     try {
+                                         focusRequesters[lastFocusedPostId]?.requestFocus()
+                                     } catch (e: Exception) {
+                                         // Handle potential focus request failures gracefully
+                                     }
+                                 }
+                             }
+
                              // Auto-focus first video when content is loaded
                              LaunchedEffect(currentDetailState.posts) {
                                  if (currentDetailState.posts.isNotEmpty()) {
-                                     playlistDetailFocusRequester.requestFocus()
+                                     // Only auto-focus the first item if we aren't returning from the sidebar
+                                     if (lastFocusedPostId == null) {
+                                         try {
+                                             focusRequesters[currentDetailState.posts.first().id]?.requestFocus()
+                                         } catch (e: Exception) {}
+                                     }
                                  }
                              }
 
@@ -152,6 +173,8 @@ fun TvPlaylistsScreen(
                                 ) {
                                     items(currentDetailState.posts.size) { index ->
                                          val post = currentDetailState.posts[index]
+                                         val requester = focusRequesters.getOrPut(post.id) { FocusRequester() }
+                                         
                                          TvVideoCard(
                                              post = post,
                                              onClick = { 
@@ -160,9 +183,10 @@ fun TvPlaylistsScreen(
                                                  }
                                              },
                                              onLongClick = {
+                                                  lastFocusedPostId = post.id
                                                   detailViewModel.openSidebar(post)
                                              },
-                                             modifier = if (index == 0) Modifier.focusRequester(playlistDetailFocusRequester) else Modifier
+                                             modifier = Modifier.focusRequester(requester)
                                          )
                                     }
                                 }
