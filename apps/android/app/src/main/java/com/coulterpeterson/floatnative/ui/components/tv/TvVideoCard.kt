@@ -38,7 +38,8 @@ fun TvVideoCard(
     post: BlogPostModelV3,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onLongClick: (() -> Unit)? = null
+    onLongClick: (() -> Unit)? = null,
+    progress: Float = 0f
 ) {
     TvVideoCardContent(
         title = post.title,
@@ -50,7 +51,8 @@ fun TvVideoCard(
         releaseDate = post.releaseDate.toString(),
         onClick = onClick,
         onLongClick = onLongClick,
-        modifier = modifier
+        modifier = modifier,
+        progress = progress
     )
 }
 
@@ -60,7 +62,8 @@ fun TvVideoCard(
     post: com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onLongClick: (() -> Unit)? = null
+    onLongClick: (() -> Unit)? = null,
+    progress: Float = 0f
 ) {
     TvVideoCardContent(
         title = post.title,
@@ -72,7 +75,32 @@ fun TvVideoCard(
         releaseDate = post.releaseDate.toString(),
         onClick = onClick,
         onLongClick = onLongClick,
-        modifier = modifier
+        modifier = modifier,
+        progress = progress
+    )
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun TvVideoCard(
+    post: com.coulterpeterson.floatnative.api.WatchHistoryBlogPost,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    progress: Float = 0f
+) {
+    TvVideoCardContent(
+        title = post.title,
+        thumbnail = post.thumbnail,
+        channelTitle = post.channel.title,
+        channelIcon = post.channel.icon,
+        creatorIcon = post.creator.icon,
+        duration = post.metadata.videoDuration.toLong(),
+        releaseDate = post.releaseDate,
+        onClick = onClick,
+        onLongClick = onLongClick,
+        modifier = modifier,
+        progress = progress
     )
 }
 
@@ -88,7 +116,8 @@ private fun TvVideoCardContent(
     releaseDate: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onLongClick: (() -> Unit)? = null
+    onLongClick: (() -> Unit)? = null,
+    progress: Float = 0f
 ) {
     // Thumbnail Logic
     val thumbnailUrl = thumbnail?.path?.toString()
@@ -145,6 +174,19 @@ private fun TvVideoCardContent(
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
                         )
                     }
+                }
+                
+                // Progress Bar
+                if (progress > 0) {
+                     androidx.compose.material3.LinearProgressIndicator(
+                        progress = progress,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .height(4.dp),
+                        color = Color.Red,
+                        trackColor = Color.White.copy(alpha = 0.3f)
+                    )
                 }
             }
             

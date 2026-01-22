@@ -316,6 +316,11 @@ fun TvHomeFeedScreen(
             com.coulterpeterson.floatnative.ui.screens.tv.TvSearchScreen(
                 onPlayVideo = onPlayVideo
             )
+        } else if (selectedNavIndex == 4) {
+            // History
+            com.coulterpeterson.floatnative.ui.screens.tv.TvHistoryScreen(
+                onPlayVideo = onPlayVideo
+            )
         } else {
              // Other tabs placeholders
              Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

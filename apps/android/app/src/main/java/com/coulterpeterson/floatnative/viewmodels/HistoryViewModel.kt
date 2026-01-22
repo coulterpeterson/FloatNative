@@ -20,10 +20,17 @@ sealed class HistoryState {
     data class Error(val message: String) : HistoryState()
 }
 
-class HistoryViewModel : ViewModel() {
+class HistoryViewModel : TvSidebarViewModel() {
 
     private val _state = MutableStateFlow<HistoryState>(HistoryState.Initial)
     val state = _state.asStateFlow()
+
+    private val _lastFocusedId = MutableStateFlow<String?>(null)
+    val lastFocusedId = _lastFocusedId.asStateFlow()
+
+    fun setLastFocusedId(id: String?) {
+        _lastFocusedId.value = id
+    }
 
     init {
         loadHistory()
@@ -39,8 +46,10 @@ class HistoryViewModel : ViewModel() {
                 
                 if (response.isSuccessful && response.body() != null) {
                     val rawHistory = response.body()!!
-                    val grouped = groupHistory(rawHistory)
-                    _state.value = HistoryState.Content(rawHistory, grouped)
+                    // Filter out items where blogPost is null (deleted videos, etc)
+                    val validHistory = rawHistory.filter { it.blogPost != null }
+                    val grouped = groupHistory(validHistory)
+                    _state.value = HistoryState.Content(validHistory, grouped)
                 } else {
                     _state.value = HistoryState.Error("Failed to fetch history: ${response.code()}")
                 }
@@ -96,5 +105,79 @@ class HistoryViewModel : ViewModel() {
     private fun isSameWeek(now: Calendar, itemCal: Calendar): Boolean {
         return now.get(Calendar.YEAR) == itemCal.get(Calendar.YEAR) &&
                now.get(Calendar.WEEK_OF_YEAR) == itemCal.get(Calendar.WEEK_OF_YEAR)
+    }
+
+    // Sidebar Support
+    fun openSidebar(post: com.coulterpeterson.floatnative.api.WatchHistoryBlogPost) {
+         openSidebar(toBlogPostModel(post))
+    }
+
+    private fun toBlogPostModel(post: com.coulterpeterson.floatnative.api.WatchHistoryBlogPost): com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3 {
+        // Map Creator
+        val creator = post.creator
+        val blogCreatorOwner = com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3CreatorOwner(
+            id = creator.owner,
+            username = "" 
+        )
+        
+        val blogCreator = com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3Creator(
+            id = creator.id,
+            owner = blogCreatorOwner,
+            title = creator.title,
+            urlname = creator.urlname,
+            description = creator.description,
+            about = creator.about,
+            category = com.coulterpeterson.floatnative.openapi.models.CreatorModelV3Category(id="unknown", title="Unknown"), // V2 mismatch
+            cover = creator.cover,
+            icon = creator.icon,
+            liveStream = creator.liveStream,
+            subscriptionPlans = creator.subscriptionPlans ?: emptyList(),
+            discoverable = creator.discoverable,
+            subscriberCountDisplay = creator.subscriberCountDisplay,
+            incomeDisplay = creator.incomeDisplay,
+            defaultChannel = creator.defaultChannel,
+            channels = null,
+            card = null
+        )
+
+        // Map Channel
+        val channel = post.channel
+        val blogChannel = com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3Channel(
+            id = channel.id,
+            creator = channel.creator,
+            title = channel.title,
+            urlname = channel.urlname,
+            about = channel.about,
+            cover = channel.cover,
+            card = channel.card,
+            icon = channel.icon,
+            order = channel.order,
+            socialLinks = channel.socialLinks
+        )
+
+        return com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3(
+            id = post.id,
+            guid = post.guid,
+            title = post.title,
+            text = post.text,
+            type = com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3.Type.blogPost,
+            channel = blogChannel,
+            tags = post.tags,
+            attachmentOrder = post.attachmentOrder,
+            metadata = post.metadata,
+            releaseDate = java.time.OffsetDateTime.parse(post.releaseDate), // History uses String, assumes ISO8601
+            likes = post.likes,
+            dislikes = post.dislikes,
+            score = post.score,
+            comments = post.comments,
+            creator = blogCreator,
+            wasReleasedSilently = post.wasReleasedSilently,
+            thumbnail = post.thumbnail,
+            isAccessible = post.isAccessible,
+            videoAttachments = post.videoAttachments,
+            audioAttachments = post.audioAttachments,
+            pictureAttachments = post.pictureAttachments,
+            galleryAttachments = post.galleryAttachments
+        )
     }
 }

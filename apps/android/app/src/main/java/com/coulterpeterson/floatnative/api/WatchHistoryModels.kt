@@ -15,7 +15,7 @@ data class WatchHistoryResponse(
     val contentType: String,
     val progress: Int,
     val updatedAt: String, // Keep as String for simplicity unless Moshi Date adapter is confirmed
-    val blogPost: WatchHistoryBlogPost
+    val blogPost: WatchHistoryBlogPost?
 )
 
 @JsonClass(generateAdapter = true)

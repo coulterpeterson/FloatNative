@@ -62,7 +62,7 @@ fun HistoryScreen(
                        items(items) { historyItem ->
                            HistoryItemCard(item = historyItem, onClick = { 
                                // History item ID is contentId, but we might need postId (blogPost.id)
-                               onVideoClick(historyItem.blogPost.id) 
+                               historyItem.blogPost?.id?.let { onVideoClick(it) } 
                            })
                        }
                    }
@@ -88,7 +88,7 @@ fun HistoryItemCard(item: WatchHistoryResponse, onClick: () -> Unit) {
             .aspectRatio(16f/9f)
         ) {
             AsyncImage(
-                model = item.blogPost.thumbnail?.path?.toString(),
+                model = item.blogPost?.thumbnail?.path?.toString(),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize()
             )
@@ -109,18 +109,18 @@ fun HistoryItemCard(item: WatchHistoryResponse, onClick: () -> Unit) {
         
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = item.blogPost.title,
+                text = item.blogPost?.title ?: "",
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 2
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = item.blogPost.channel.title,
+                text = item.blogPost?.channel?.title ?: "",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray
             )
             Text(
-                text = DateUtils.getRelativeTime(item.blogPost.releaseDate),
+                text = DateUtils.getRelativeTime(item.blogPost?.releaseDate ?: ""),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray
             )
