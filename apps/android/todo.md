@@ -38,3 +38,4 @@
 - [X] Status bar should be white in dark mode
 - [X] Start video playback at current watch progress
 - [X] Remove extra line in playlist sheet
+- [] Fix Android TV requiring 2 single-presses to play a video after closing its sidebar
