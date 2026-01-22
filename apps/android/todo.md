@@ -22,6 +22,12 @@
   - [X] Video player custom controls
   - [X] Video player sidebar slideout
   - [] Remaining screens
+    - [] Search screen
+    - [] Watch history screen
+    - [] Settings screen 
+  - [] Home screen infinite scroll/pagination
+  - [] Dark mode the sidebar description/comments slideouts in player
+  - [] Add Live feed description to phone and tv live views
 - [] Chromecast support that triggers the Android TV version to open to that video(?)
 - [] Pollsplane integration on the VODs(?)
 

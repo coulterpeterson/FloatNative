@@ -1,6 +1,5 @@
 package com.coulterpeterson.floatnative.viewmodels
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coulterpeterson.floatnative.api.FloatplaneApi
 import com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3
@@ -19,13 +18,20 @@ sealed class SearchState {
     data class Error(val message: String) : SearchState()
 }
 
-class SearchViewModel : ViewModel() {
+class SearchViewModel : TvSidebarViewModel() {
 
     private val _state = MutableStateFlow<SearchState>(SearchState.Idle)
     val state = _state.asStateFlow()
 
     private val _query = MutableStateFlow("")
     val query = _query.asStateFlow()
+
+    private val _lastFocusedId = MutableStateFlow<String?>(null)
+    val lastFocusedId = _lastFocusedId.asStateFlow()
+
+    fun setLastFocusedId(id: String?) {
+        _lastFocusedId.value = id
+    }
 
     fun onQueryChange(newQuery: String) {
         _query.value = newQuery

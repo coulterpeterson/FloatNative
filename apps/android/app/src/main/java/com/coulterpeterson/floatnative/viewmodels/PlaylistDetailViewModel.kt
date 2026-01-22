@@ -17,10 +17,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 
-import com.coulterpeterson.floatnative.viewmodels.SidebarView
-import com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction
-import com.coulterpeterson.floatnative.openapi.models.ContentLikeV3Request
-
 sealed class PlaylistDetailState {
     object Initial : PlaylistDetailState()
     object Loading : PlaylistDetailState()
@@ -28,163 +24,10 @@ sealed class PlaylistDetailState {
     data class Error(val message: String) : PlaylistDetailState()
 }
 
-data class PlaylistSidebarState(
-    val post: ContentPostV3Response,
-    val interaction: UserInteraction? = null,
-    val isLoadingInteraction: Boolean = false,
-    val currentView: SidebarView = SidebarView.Main
-)
-
-class PlaylistDetailViewModel : ViewModel() {
+class PlaylistDetailViewModel : TvSidebarViewModel() {
     private val _state = MutableStateFlow<PlaylistDetailState>(PlaylistDetailState.Initial)
     val state = _state.asStateFlow()
 
-    private val _userPlaylists = MutableStateFlow<List<Playlist>>(emptyList())
-    val userPlaylists = _userPlaylists.asStateFlow()
-
-    private val _watchProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
-    val watchProgress = _watchProgress.asStateFlow()
-
-    private val _sidebarState = MutableStateFlow<PlaylistSidebarState?>(null)
-    val sidebarState = _sidebarState.asStateFlow()
-
-    fun openSidebar(post: ContentPostV3Response) {
-        _sidebarState.value = PlaylistSidebarState(post = post, isLoadingInteraction = true)
-        
-        // Parallel load: Interaction and Playlists
-        viewModelScope.launch {
-            loadPlaylists() 
-        }
-        
-        viewModelScope.launch {
-            try {
-                // Fetch fresh post to get interaction
-                // Assuming ContentPostV3Response ID is the blog post ID suitable for this call
-                val response = FloatplaneApi.contentV3.getBlogPost(post.id)
-                if (response.isSuccessful && response.body() != null) {
-                    val fullPost = response.body()!!
-                    val interaction = fullPost.userInteraction?.firstOrNull()
-                    val currentState = _sidebarState.value
-                    if (currentState != null && currentState.post.id == post.id) {
-                         _sidebarState.value = currentState.copy(
-                             interaction = interaction,
-                             isLoadingInteraction = false
-                         )
-                    }
-                } else {
-                     val currentState = _sidebarState.value
-                     if (currentState != null && currentState.post.id == post.id) {
-                         _sidebarState.value = currentState.copy(isLoadingInteraction = false)
-                     }
-                }
-            } catch (e: Exception) {
-                 val currentState = _sidebarState.value
-                 if (currentState != null && currentState.post.id == post.id) {
-                     _sidebarState.value = currentState.copy(isLoadingInteraction = false)
-                 }
-            }
-        }
-    }
-
-    fun closeSidebar() {
-        _sidebarState.value = null
-    }
-
-    fun toggleSidebarView(view: SidebarView) {
-        val currentState = _sidebarState.value ?: return
-        _sidebarState.value = currentState.copy(currentView = view)
-    }
-
-    fun toggleSidebarLike() {
-        val currentState = _sidebarState.value ?: return
-        val currentInteraction = currentState.interaction
-        val newInteraction = if (currentInteraction == UserInteraction.like) null else UserInteraction.like
-        
-        _sidebarState.value = currentState.copy(interaction = newInteraction)
-        
-        viewModelScope.launch {
-            try {
-                if (newInteraction == UserInteraction.like) {
-                    FloatplaneApi.contentV3.likeContent(
-                        ContentLikeV3Request(
-                            id = currentState.post.id,
-                            contentType = ContentLikeV3Request.ContentType.blogPost
-                        )
-                    )
-                } else if (newInteraction == null && currentInteraction == UserInteraction.like) {
-                     FloatplaneApi.contentV3.dislikeContent(
-                        ContentLikeV3Request(
-                            id = currentState.post.id,
-                            contentType = ContentLikeV3Request.ContentType.blogPost
-                        )
-                    )
-                }
-            } catch (e: Exception) { }
-        }
-    }
-
-    fun toggleSidebarDislike() {
-        val currentState = _sidebarState.value ?: return
-        val currentInteraction = currentState.interaction
-        val newInteraction = if (currentInteraction == UserInteraction.dislike) null else UserInteraction.dislike
-        
-        _sidebarState.value = currentState.copy(interaction = newInteraction)
-        
-        viewModelScope.launch {
-            try {
-                if (newInteraction == UserInteraction.dislike) {
-                    FloatplaneApi.contentV3.dislikeContent(
-                        ContentLikeV3Request(
-                            id = currentState.post.id,
-                            contentType = ContentLikeV3Request.ContentType.blogPost
-                        )
-                    )
-                }
-            } catch (e: Exception) { }
-        }
-    }
-
-    fun togglePlaylistMembership(playlist: Playlist, post: ContentPostV3Response) {
-        viewModelScope.launch {
-             try {
-                 val isAdded = playlist.videoIds.contains(post.id)
-                 
-                 // Optimistic Update
-                 val updatedPlaylists = _userPlaylists.value.map { pl ->
-                     if (pl.id == playlist.id) {
-                         if (isAdded) {
-                             pl.copy(videoIds = pl.videoIds - post.id)
-                         } else {
-                             pl.copy(videoIds = pl.videoIds + post.id)
-                         }
-                     } else {
-                         pl
-                     }
-                 }
-                 _userPlaylists.value = updatedPlaylists
-
-                 if (isAdded) {
-                     withCompanionRetry {
-                         FloatplaneApi.companionApi.removeFromPlaylist(
-                             id = playlist.id,
-                             request = PlaylistRemoveRequest(post.id)
-                         )
-                     }
-                 } else {
-                     withCompanionRetry {
-                         FloatplaneApi.companionApi.addToPlaylist(
-                             id = playlist.id,
-                             request = PlaylistAddRequest(post.id)
-                         )
-                     }
-                 }
-                 loadPlaylists()
-             } catch (e: Exception) {
-                e.printStackTrace()
-                loadPlaylists() 
-             }
-        }
-    }
 
     fun loadPlaylistPosts(playlistId: String) {
         viewModelScope.launch {
@@ -216,21 +59,7 @@ class PlaylistDetailViewModel : ViewModel() {
                 val posts = playlist.videoIds.map { videoId ->
                     async {
                         try {
-                            // Using contentV3 for blog post or manual?
-                            // Assuming fetchBlogPost logic exists in similar VM.
-                            // Looking at HomeFeedViewModel or VideoPlayerViewModel logic might help.
-                            // But usually it's contentV3.getBlogPost(id)
                             val res = FloatplaneApi.contentV3.getBlogPost(videoId) // Retrofit suspend
-                            // It returns BlogPostResponseV3 or similar?
-                            // Actually earlier used `FloatplaneApi.api.getBlogPost`. `api` was invalid.
-                            // If `ContentV3Api` is generated, it likely has `getBlogPost`.
-                            // Let's assume it returns Response<ContentPostV3Response> or direct object.
-                            // Generated API usually returns object directly if suspend, or Call.
-                            // If using `apiClient.createService`, it might be Retrofit.
-                            
-                            // Let's try `FloatplaneApi.contentV3.getBlogPost(videoId)` 
-                            // If it's `ContentV3Api`, check methods.
-                            // Error said `Unresolved reference 'api'`. 
                             if (res.isSuccessful) res.body() else null
                         } catch (e: Exception) {
                             null
@@ -242,7 +71,12 @@ class PlaylistDetailViewModel : ViewModel() {
                 val sortedPosts = posts.sortedByDescending { it.releaseDate }
                 
                 _state.value = PlaylistDetailState.Content(sortedPosts)
-                fetchWatchProgress(sortedPosts)
+                
+                // Convert ContentPostV3Response to BlogPostModelV3 for watch progress fetching
+                val blogPosts = sortedPosts.map { post ->
+                     toBlogPostModel(post)
+                }
+                fetchWatchProgress(blogPosts)
                 
             } catch (e: Exception) {
                 _state.value = PlaylistDetailState.Error(e.message ?: "Unknown error")
@@ -257,15 +91,6 @@ class PlaylistDetailViewModel : ViewModel() {
          // Optimistic update
          val oldPosts = currentState.posts
          val newPosts = oldPosts.filter { 
-             // Check video attachments ID or post ID? 
-             // getBlogPost returns ContentPostV3Response which has `post` and `videoAttachments`.
-             // videoId passed here usually refers to the ID in `videoAttachments`.
-             // But floatplane video URLs use the BLOG POST ID usually? 
-             // Wait, `playlist.videoIds` are likely VIDEO IDs or BLOG POST IDs?
-             // Looking at `loadThumbnails` in iOS: `api.getBlogPost(id: playlist.videoIds[0])`.
-             // This implies `playlist.videoIds` contains IDs suitable for `getBlogPost`.
-             
-             // Floatplane structure: a BlogPost has an ID.
              val postId = it.id
              postId != videoId
          }
@@ -285,175 +110,5 @@ class PlaylistDetailViewModel : ViewModel() {
              }
          }
     }
-    private suspend fun ensureCompanionLogin() {
-        FloatplaneApi.ensureCompanionLogin()
-    }
-    
-    /**
-     * Helper function to wrap companion API calls with automatic 401 retry logic
-     */
-    private suspend fun <T> withCompanionRetry(block: suspend () -> retrofit2.Response<T>): retrofit2.Response<T> {
-        ensureCompanionLogin()
-        val response = block()
-        
-        // If 401, retry with fresh login
-        if (response.code() == 401) {
-            FloatplaneApi.ensureCompanionLogin(forceRefresh = true)
-            return block()
-        }
-        
-        return response
-    }
-
-    fun loadPlaylists() {
-        viewModelScope.launch {
-            try {
-                val response = withCompanionRetry {
-                    FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
-                }
-                if (response.isSuccessful && response.body() != null) {
-                    _userPlaylists.value = response.body()!!.playlists
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    fun markAsWatched(post: ContentPostV3Response) {
-        viewModelScope.launch {
-            try {
-                 // Optimistic update
-                 _watchProgress.value = _watchProgress.value + (post.id to 1.0f)
-
-                 // ContentPostV3Response doesn't explicitly have videoDuration in root, but metadata has it.
-                 // also videoAttachments is List<VideoAttachmentModel>?
-                 val videoId = post.videoAttachments?.firstOrNull()?.id ?: return@launch
-                 val durationSeconds = post.metadata.videoDuration.toInt()
-                 
-                 FloatplaneApi.contentV3.updateProgress(
-                     updateProgressRequest = UpdateProgressRequest(
-                         id = videoId,
-                         contentType = UpdateProgressRequest.ContentType.video,
-                         progress = durationSeconds
-                     )
-                 )
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    fun toggleWatchLater(post: ContentPostV3Response, onResult: (Boolean) -> Unit) {
-         viewModelScope.launch {
-            try {
-                val dummyRes = withCompanionRetry {
-                    FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
-                }
-                val playlists = dummyRes.body()?.playlists ?: _userPlaylists.value
-                val watchLater = playlists.find { it.isWatchLater } ?: return@launch
-                val isAdded = watchLater.videoIds.contains(post.id)
-                var wasAdded = false
-                
-                if (isAdded) {
-                    withCompanionRetry {
-                        FloatplaneApi.companionApi.removeFromPlaylist(
-                            id = watchLater.id,
-                            request = PlaylistRemoveRequest(post.id)
-                        )
-                    }
-                    wasAdded = false
-                } else {
-                    withCompanionRetry {
-                        FloatplaneApi.companionApi.addToPlaylist(
-                            id = watchLater.id,
-                            request = PlaylistAddRequest(post.id)
-                        )
-                    }
-                    wasAdded = true
-                }
-                loadPlaylists()
-                onResult(wasAdded)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    fun addToPlaylist(playlistId: String, videoId: String) {
-        viewModelScope.launch {
-            try {
-                withCompanionRetry {
-                    FloatplaneApi.companionApi.addToPlaylist(
-                        id = playlistId,
-                        request = PlaylistAddRequest(videoId)
-                    )
-                }
-                loadPlaylists()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    fun removeFromPlaylistApi(playlistId: String, videoId: String) {
-         viewModelScope.launch {
-            try {
-                withCompanionRetry {
-                    FloatplaneApi.companionApi.removeFromPlaylist(
-                        id = playlistId,
-                        request = PlaylistRemoveRequest(videoId)
-                    )
-                }
-                loadPlaylists()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    fun createPlaylist(name: String) {
-        viewModelScope.launch {
-            try {
-                withCompanionRetry {
-                    FloatplaneApi.companionApi.createPlaylist(
-                        request = PlaylistCreateRequest(name)
-                    )
-                }
-                loadPlaylists()
-            } catch (e: Exception) {
-                    e.printStackTrace()
-            }
-        }
-    }
-    
-    private fun fetchWatchProgress(posts: List<ContentPostV3Response>) {
-        val videoPosts = posts.filter { it.metadata.hasVideo }
-        if (videoPosts.isEmpty()) return
-
-        val ids = videoPosts.map { it.id }
-        viewModelScope.launch {
-            try {
-                // Batch requests in chunks of 20
-                ids.chunked(20).forEach { batchIds ->
-                    val response = FloatplaneApi.contentV3.getProgress(
-                        getProgressRequest = GetProgressRequest(
-                            ids = batchIds,
-                            contentType = GetProgressRequest.ContentType.blogPost
-                        )
-                    )
-                    
-                    if (response.isSuccessful && response.body() != null) {
-                        val progressMap = response.body()!!.associate { 
-                             it.id to (it.progress.toFloat() / 100f).coerceIn(0f, 1f)
-                        }
-                        
-                        _watchProgress.value = _watchProgress.value + progressMap
-                    }
-                }
-            } catch (e: Exception) {
-               e.printStackTrace()
-            }
-        }
-    }
 }
+

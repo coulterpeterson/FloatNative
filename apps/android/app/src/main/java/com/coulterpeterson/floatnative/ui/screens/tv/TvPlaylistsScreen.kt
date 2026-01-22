@@ -32,6 +32,7 @@ import com.coulterpeterson.floatnative.viewmodels.PlaylistDetailState
 import com.coulterpeterson.floatnative.viewmodels.PlaylistDetailViewModel
 import com.coulterpeterson.floatnative.viewmodels.PlaylistsState
 import com.coulterpeterson.floatnative.viewmodels.PlaylistsViewModel
+import com.coulterpeterson.floatnative.viewmodels.SidebarView
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable

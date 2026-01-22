@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import com.coulterpeterson.floatnative.viewmodels.HomeFeedState
+import com.coulterpeterson.floatnative.viewmodels.SidebarView
 import com.coulterpeterson.floatnative.ui.components.tv.TvVideoCard
 import com.coulterpeterson.floatnative.ui.components.tv.TvActionSidebar
 import com.coulterpeterson.floatnative.ui.components.tv.SidebarActions
@@ -53,6 +54,12 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.runtime.DisposableEffect
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -68,6 +75,32 @@ fun TvHomeFeedScreen(
     val userPlaylists by viewModel.userPlaylists.collectAsState()
     val filter by viewModel.filter.collectAsState()
     val context = LocalContext.current
+    
+    val focusRequesters = remember { mutableMapOf<String, FocusRequester>() }
+    val lastFocusedId by viewModel.lastFocusedId.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Restore focus when sidebar closes
+    androidx.compose.runtime.LaunchedEffect(sidebarState) {
+        if (sidebarState == null && lastFocusedId != null) {
+            try { focusRequesters[lastFocusedId]?.requestFocus() } catch (e: Exception) {}
+        }
+    }
+
+    // Restore focus on re-entry (ON_RESUME)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                 if (lastFocusedId != null) {
+                     try { focusRequesters[lastFocusedId]?.requestFocus() } catch (e: Exception) {}
+                 }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     
     // Top Navigation Items
     val navItems = listOf("Home", "Creators", "Playlists", "Search", "History", "Settings")
@@ -146,11 +179,7 @@ fun TvHomeFeedScreen(
                 val isSelected = index == selectedNavIndex
                 
                 val onClick = {
-                    if (title == "Search") {
-                        onSearchClick()
-                    } else {
-                        selectedNavIndex = index
-                    }
+                    selectedNavIndex = index
                 }
 
                 Surface(
@@ -251,10 +280,14 @@ fun TvHomeFeedScreen(
                             }
                         }
 
-                        items(s.posts) { post ->
+                        items(s.posts.size) { index ->
+                           val post = s.posts[index]
+                           val requester = focusRequesters.getOrPut(post.id) { FocusRequester() }
+
                            TvVideoCard(
                                post = post,
                                onClick = {
+                                    viewModel.setLastFocusedId(post.id)
                                     // VideoPlayerViewModel expects a BlogPost ID, NOT a VideoAttachment ID.
                                     // It will fetch the post and extract the video attached to it.
                                     if (viewModel.sidebarState.value == null && !post.videoAttachments.isNullOrEmpty()) {
@@ -262,8 +295,10 @@ fun TvHomeFeedScreen(
                                     }
                                },
                                onLongClick = {
+                                   viewModel.setLastFocusedId(post.id)
                                    viewModel.openSidebar(post)
-                               }
+                               },
+                               modifier = Modifier.focusRequester(requester)
                            ) 
                         }
                     }
@@ -271,11 +306,15 @@ fun TvHomeFeedScreen(
                 }
             }
         } else if (selectedNavIndex == 2) {
-            // Playlists
             com.coulterpeterson.floatnative.ui.screens.tv.TvPlaylistsScreen(
                 onPlayVideo = { videoId ->
                     onPlayVideo(videoId)
                 }
+            )
+        } else if (selectedNavIndex == 3) {
+            // Search
+            com.coulterpeterson.floatnative.ui.screens.tv.TvSearchScreen(
+                onPlayVideo = onPlayVideo
             )
         } else {
              // Other tabs placeholders
