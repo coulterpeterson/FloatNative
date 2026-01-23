@@ -299,7 +299,28 @@ fun TvHomeFeedScreen(
                                    viewModel.openSidebar(post)
                                },
                                modifier = Modifier.focusRequester(requester)
-                           ) 
+                           )
+
+                           // Prefetch logic: Load more when we are 8 items (approx 2 rows) from the end
+                           if (index >= s.posts.size - 8) {
+                               androidx.compose.runtime.LaunchedEffect(Unit) {
+                                   viewModel.loadMore()
+                               }
+                           }
+                        }
+
+                        item(span = { GridItemSpan(4) }) {
+                             val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+                             if (isLoadingMore) {
+                                  Box(
+                                      modifier = Modifier
+                                          .fillMaxWidth()
+                                          .padding(vertical = 24.dp),
+                                      contentAlignment = Alignment.Center
+                                  ) {
+                                      androidx.tv.material3.Text("Loading...", color = Color.Gray)
+                                  }
+                             }
                         }
                     }
                     else -> {}

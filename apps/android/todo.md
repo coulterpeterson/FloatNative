@@ -21,11 +21,11 @@
   - [X] Video feed long-press actions
   - [X] Video player custom controls
   - [X] Video player sidebar slideout
-  - [] Remaining screens
+  - [X] Remaining screens
     - [X] Search screen
     - [X] Watch history screen
-    - [] Settings screen 
-  - [] Home screen infinite scroll/pagination
+    - [X] Settings screen 
+  - [X] Home screen infinite scroll/pagination
   - [] Dark mode the sidebar description/comments slideouts in player
   - [] Add Live feed description to phone and tv live views
   - [] Add watch progress bars on home, playlists, and search screens
