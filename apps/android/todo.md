@@ -13,24 +13,10 @@
 - [X] Change support link to discord server
 - [X] Tablet grid styles
 - [X] Ensure watch progress calls are implemented
-- [] Implement live support in iOS/tvOS/test android TV
-- [] Android TV styles/versions of screens
-  - [X] Login screen
-  - [X] Video feed
-  - [X] Video player
-  - [X] Video feed long-press actions
-  - [X] Video player custom controls
-  - [X] Video player sidebar slideout
-  - [X] Remaining screens
-    - [X] Search screen
-    - [X] Watch history screen
-    - [X] Settings screen 
-  - [X] Home screen infinite scroll/pagination
-  - [X] Dark mode the sidebar description/comments slideouts in player
-  - [] Add Live feed description to phone and tv live views (tv version should show up in a dark mode)
-  - [X] Add watch progress bars on home, playlists, and search screens
-  - [X] Add bookmark icon for videos that have already been saved (tv and phone)
+- [X] Android TV styles/versions of screens
 - [X] Chromecast support that triggers the Android TV version to open to that video(?)
+- [] Implement live support in iOS/tvOS/test android TV
+- [] Android: Add Live feed description to phone and tv live views (tv version should show up in a dark mode)
 - [] Pollsplane integration on the VODs(?)
 
 ## Fixes
