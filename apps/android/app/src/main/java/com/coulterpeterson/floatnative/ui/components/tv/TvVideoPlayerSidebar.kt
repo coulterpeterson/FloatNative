@@ -95,7 +95,7 @@ fun TvVideoPlayerSidebar(
         modifier = Modifier
             .fillMaxHeight()
             .width(400.dp) // Fixed width sidebar
-            .background(MaterialTheme.colorScheme.surface)
+            .background(Color(0xFF1F1F1F))
             .padding(16.dp)
     ) {
         AnimatedContent(
@@ -119,7 +119,8 @@ fun TvVideoPlayerSidebar(
                             Text(
                                 text = title,
                                 style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onSurface
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
                             )
                         }
                         item {
@@ -127,7 +128,7 @@ fun TvVideoPlayerSidebar(
                                 Text(
                                     text = "Published on ${publishDate.toLocalDate()}",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = Color.LightGray
                                 )
                             }
                         }
@@ -144,8 +145,8 @@ fun TvVideoPlayerSidebar(
                             // without complex movement method logic.
                             // Given the prompt asks for "scrolling ... using up/down arrows", breaking by paragraph satisfies this.
                             
-                            val textColor = MaterialTheme.colorScheme.onSurface
-                            val linkColor = MaterialTheme.colorScheme.primary
+                            val textColor = Color.White
+                            val linkColor = Color(0xFF8AB4F8)
                             
                             val androidTextColor = android.graphics.Color.argb(
                                 (textColor.alpha * 255).toInt(),
@@ -204,7 +205,8 @@ fun TvVideoPlayerSidebar(
                             Text(
                                 text = "Comments (${comments.size})",
                                 style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(bottom = 8.dp)
+                                modifier = Modifier.padding(bottom = 8.dp),
+                                color = Color.White
                             )
                         }
                         
@@ -236,7 +238,7 @@ fun TvCommentItem(comment: CommentModel, depth: Int) {
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+            focusedContainerColor = Color.White.copy(alpha = 0.1f)
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -256,20 +258,20 @@ fun TvCommentItem(comment: CommentModel, depth: Int) {
                     text = comment.user.username,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color(0xFF8AB4F8)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = timeAgo(comment.postDate),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = Color.LightGray
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = comment.text,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = Color.White
             )
             Spacer(modifier = Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -277,13 +279,13 @@ fun TvCommentItem(comment: CommentModel, depth: Int) {
                     imageVector = Icons.Default.ThumbUp,
                     contentDescription = null,
                     modifier = Modifier.size(12.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = Color.LightGray
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "${comment.likes}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = Color.LightGray
                 )
             }
         }
