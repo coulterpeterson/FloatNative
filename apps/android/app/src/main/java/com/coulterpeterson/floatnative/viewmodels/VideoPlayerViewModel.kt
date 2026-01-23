@@ -104,7 +104,50 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     override fun onCleared() {
         super.onCleared()
+        stopProgressUpdateLoop()
         player.release()
+    }
+
+    private var progressUpdateJob: kotlinx.coroutines.Job? = null
+
+    private fun startProgressUpdateLoop() {
+        stopProgressUpdateLoop()
+        progressUpdateJob = viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(5 * 60 * 1000L) // 5 minutes
+                saveWatchProgress()
+            }
+        }
+    }
+
+    private fun stopProgressUpdateLoop() {
+        progressUpdateJob?.cancel()
+        progressUpdateJob = null
+    }
+
+    fun saveWatchProgress() {
+        val currentState = _state.value as? VideoPlayerState.Content ?: return
+        val videoId = currentState.blogPost.videoAttachments?.firstOrNull()?.id ?: return
+        
+        // Progress in seconds
+        val progressSeconds = (player.currentPosition / 1000).toInt()
+        
+        if (progressSeconds < 5) return // Don't save if just started
+
+        viewModelScope.launch {
+            try {
+                FloatplaneApi.contentV3.updateProgress(
+                    UpdateProgressRequest(
+                        id = videoId,
+                        contentType = UpdateProgressRequest.ContentType.video,
+                        progress = progressSeconds
+                    )
+                )
+                android.util.Log.d("VideoPlayerViewModel", "Saved progress: $progressSeconds for $videoId")
+            } catch (e: Exception) {
+                android.util.Log.e("VideoPlayerViewModel", "Failed to save progress", e)
+            }
+        }
     }
 
     fun downloadVideo() {
@@ -331,6 +374,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                             // Ignore user fetch failure
                         }
                     }
+
+                    // Start progress loop
+                    startProgressUpdateLoop()
                     
                 } else {
                     _state.value = VideoPlayerState.Error("No stream URL found")

@@ -12,8 +12,8 @@
 - [X] Add actual FloatNative logo to app
 - [X] Change support link to discord server
 - [X] Tablet grid styles
-- [] Ensure watch progress calls are implemented
-- [] Implement live support
+- [X] Ensure watch progress calls are implemented
+- [] Implement live support in iOS/tvOS/test android TV
 - [] Android TV styles/versions of screens
   - [X] Login screen
   - [X] Video feed
@@ -30,7 +30,7 @@
   - [] Add Live feed description to phone and tv live views (tv version should show up in a dark mode)
   - [X] Add watch progress bars on home, playlists, and search screens
   - [X] Add bookmark icon for videos that have already been saved (tv and phone)
-- [] Chromecast support that triggers the Android TV version to open to that video(?)
+- [X] Chromecast support that triggers the Android TV version to open to that video(?)
 - [] Pollsplane integration on the VODs(?)
 
 ## Fixes

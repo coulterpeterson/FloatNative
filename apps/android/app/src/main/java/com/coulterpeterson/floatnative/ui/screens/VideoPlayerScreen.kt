@@ -60,6 +60,8 @@ fun VideoPlayerScreen(
     val state by viewModel.state.collectAsState()
     val downloadState by viewModel.downloadState.collectAsState()
     val configuration = LocalConfiguration.current
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+
     // Check PiP mode
     val isInPipMode = LocalPipMode.current
     
@@ -177,6 +179,20 @@ fun VideoPlayerScreen(
         onDispose {
             exoPlayer.removeListener(listener)
             (context as? com.coulterpeterson.floatnative.MainActivity)?.isVideoPlaying = false
+            viewModel.saveWatchProgress()
+        }
+    }
+
+    // Handle App Lifecycle (Backgrounding)
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                viewModel.saveWatchProgress()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
     

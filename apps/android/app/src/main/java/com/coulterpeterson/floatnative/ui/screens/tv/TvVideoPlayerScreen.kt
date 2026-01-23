@@ -52,6 +52,7 @@ fun TvVideoPlayerScreen(
     val state by viewModel.state.collectAsState()
     val exoPlayer = viewModel.player
     val context = LocalContext.current
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
 
     LaunchedEffect(videoId) {
         viewModel.loadVideo(videoId)
@@ -74,6 +75,20 @@ fun TvVideoPlayerScreen(
     DisposableEffect(Unit) {
         onDispose {
             exoPlayer.pause()
+            viewModel.saveWatchProgress()
+        }
+    }
+
+    // Handle App Lifecycle (Backgrounding)
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                viewModel.saveWatchProgress()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
