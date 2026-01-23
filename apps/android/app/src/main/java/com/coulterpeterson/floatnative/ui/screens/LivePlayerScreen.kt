@@ -83,6 +83,60 @@ fun LivePlayerScreen(
         ) {
             LiveVideoPlayerView(exoPlayer)
             
+
+
+            // Cast Session Logic
+            val castSessionListener = remember(state) {
+                object : com.google.android.gms.cast.framework.SessionManagerListener<com.google.android.gms.cast.framework.CastSession> {
+                    override fun onSessionStarted(session: com.google.android.gms.cast.framework.CastSession, sessionId: String) {
+                        loadRemoteMedia(session)
+                    }
+                    override fun onSessionResumed(session: com.google.android.gms.cast.framework.CastSession, wasSuspended: Boolean) {
+                        loadRemoteMedia(session)
+                    }
+                    override fun onSessionEnded(session: com.google.android.gms.cast.framework.CastSession, error: Int) {}
+                    override fun onSessionStarting(session: com.google.android.gms.cast.framework.CastSession) {}
+                    override fun onSessionSuspended(session: com.google.android.gms.cast.framework.CastSession, reason: Int) {}
+                    override fun onSessionEnding(session: com.google.android.gms.cast.framework.CastSession) {}
+                    override fun onSessionResumeFailed(session: com.google.android.gms.cast.framework.CastSession, error: Int) {}
+                    override fun onSessionStartFailed(session: com.google.android.gms.cast.framework.CastSession, error: Int) {}
+                    override fun onSessionResuming(session: com.google.android.gms.cast.framework.CastSession, sessionId: String) {}
+
+                    private fun loadRemoteMedia(session: com.google.android.gms.cast.framework.CastSession) {
+                        if (state is LivePlayerState.Content) {
+                            val content = state as LivePlayerState.Content
+                            val metadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MOVIE)
+                            metadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, content.streamTitle)
+                            metadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_SUBTITLE, content.creatorTitle)
+                            // Image? Live streams might not have a static thumb handy in state or we use creator icon
+                            
+                            val customData = org.json.JSONObject()
+                            try {
+                                customData.put("type", "LIVE")
+                            } catch (e: Exception) {}
+
+                            val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(liveStreamId)
+                                .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE)
+                                .setContentType("application/x-mpegurl") // HLS usually
+                                .setMetadata(metadata)
+                                .setCustomData(customData)
+                                .build()
+                                
+                            val remoteMediaClient = session.remoteMediaClient
+                            remoteMediaClient?.load(mediaInfo, true)
+                        }
+                    }
+                }
+            }
+
+            DisposableEffect(Unit) {
+                 val castContext = com.google.android.gms.cast.framework.CastContext.getSharedInstance(context)
+                 castContext.sessionManager.addSessionManagerListener(castSessionListener, com.google.android.gms.cast.framework.CastSession::class.java)
+                 onDispose {
+                     castContext.sessionManager.removeSessionManagerListener(castSessionListener, com.google.android.gms.cast.framework.CastSession::class.java)
+                 }
+            }
+            
             // Overlay for loading/error
             when (val currentState = state) {
                 is LivePlayerState.Loading -> {

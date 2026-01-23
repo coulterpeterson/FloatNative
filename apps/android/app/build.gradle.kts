@@ -44,6 +44,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -97,4 +98,8 @@ dependencies {
     
     // QR Code
     implementation("com.google.zxing:core:3.5.3")
+
+    // Google Cast
+    implementation(libs.play.services.cast.framework)
+    implementation(libs.play.services.cast.tv)
 }

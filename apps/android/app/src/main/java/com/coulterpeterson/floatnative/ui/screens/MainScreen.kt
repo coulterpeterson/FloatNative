@@ -1,8 +1,10 @@
 package com.coulterpeterson.floatnative.ui.screens
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
@@ -94,8 +96,15 @@ fun MainScreen(
                         var showMenu by remember { mutableStateOf(false) }
                         
                         Box {
-                            IconButton(onClick = { showMenu = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                if (isVideo || isLive) {
+                                    com.coulterpeterson.floatnative.ui.components.CastButton(
+                                        color = MaterialTheme.colorScheme.onSurface.toArgb()
+                                    )
+                                }
+                                IconButton(onClick = { showMenu = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                                }
                             }
                             DropdownMenu(
                                 expanded = showMenu,

@@ -1,6 +1,7 @@
 package com.coulterpeterson.floatnative
 
 import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -23,7 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 
 val LocalPipMode = compositionLocalOf { false }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private var isInPipMode by mutableStateOf(false)
     // Default aspect ratio 16:9
     var pipParams: android.app.PictureInPictureParams.Builder? = null
@@ -103,6 +104,41 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("login") {
                                         popUpTo(0) { inclusive = true }
                                     }
+                                }
+                            }
+                            
+                            // Setup Cast Receiver
+                            LaunchedEffect(Unit) {
+                                try {
+                                    val castContext = com.google.android.gms.cast.tv.CastReceiverContext.getInstance()
+                                    val mediaManager = castContext.mediaManager
+                                    
+                                    mediaManager.setMediaLoadCommandCallback(object : com.google.android.gms.cast.tv.media.MediaLoadCommandCallback() {
+                                        override fun onLoad(senderId: String?, loadRequestData: com.google.android.gms.cast.MediaLoadRequestData): com.google.android.gms.tasks.Task<com.google.android.gms.cast.MediaLoadRequestData> {
+                                            if (loadRequestData != null) {
+                                                val mediaInfo = loadRequestData.mediaInfo
+                                                if (mediaInfo != null) {
+                                                    val contentId = mediaInfo.contentId
+                                                    val customData = mediaInfo.customData
+                                                    val isLive = customData?.optString("type") == "LIVE" || mediaInfo.streamType == com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE
+                                                    
+                                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                                        android.util.Log.d("CastReceiver", "Received Load Request: $contentId, isLive=$isLive")
+                                                        if (isLive) {
+                                                            navController.navigate("live_player/$contentId")
+                                                        } else {
+                                                            navController.navigate("player/$contentId")
+                                                        }
+                                                    }
+                                                }
+                                                // Return the request data as success
+                                                return com.google.android.gms.tasks.Tasks.forResult(loadRequestData)
+                                            }
+                                            return com.google.android.gms.tasks.Tasks.forResult(null)
+                                        }
+                                    })
+                                } catch (e: Exception) {
+                                    android.util.Log.e("CastReceiver", "Error initializing Cast Context", e)
                                 }
                             }
                             
