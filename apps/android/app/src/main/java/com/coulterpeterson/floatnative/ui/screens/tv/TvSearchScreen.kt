@@ -57,6 +57,7 @@ fun TvSearchScreen(
     val query by viewModel.query.collectAsState()
     val sidebarState by viewModel.sidebarState.collectAsState()
     val userPlaylists by viewModel.userPlaylists.collectAsState()
+    val watchProgress by viewModel.watchProgress.collectAsState()
     val context = LocalContext.current
     val focusRequesters = remember { mutableMapOf<String, FocusRequester>() }
 
@@ -88,6 +89,10 @@ fun TvSearchScreen(
     // Handle Back press to close sidebar if open
     BackHandler(enabled = sidebarState != null) {
         viewModel.closeSidebar()
+    }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.loadPlaylists()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -198,7 +203,9 @@ fun TvSearchScreen(
                                         viewModel.setLastFocusedId(post.id)
                                         viewModel.openSidebar(post)
                                     },
-                                    modifier = Modifier.focusRequester(requester)
+                                    modifier = Modifier.focusRequester(requester),
+                                    progress = watchProgress[post.id] ?: 0f,
+                                    isBookmarked = userPlaylists.any { it.videoIds.contains(post.id) }
                                 )
                             }
                         }

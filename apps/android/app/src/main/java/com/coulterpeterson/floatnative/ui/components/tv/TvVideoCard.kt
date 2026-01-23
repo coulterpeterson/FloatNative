@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -39,7 +41,8 @@ fun TvVideoCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
-    progress: Float = 0f
+    progress: Float = 0f,
+    isBookmarked: Boolean = false
 ) {
     TvVideoCardContent(
         title = post.title,
@@ -52,7 +55,8 @@ fun TvVideoCard(
         onClick = onClick,
         onLongClick = onLongClick,
         modifier = modifier,
-        progress = progress
+        progress = progress,
+        isBookmarked = isBookmarked
     )
 }
 
@@ -63,7 +67,8 @@ fun TvVideoCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
-    progress: Float = 0f
+    progress: Float = 0f,
+    isBookmarked: Boolean = false
 ) {
     TvVideoCardContent(
         title = post.title,
@@ -76,7 +81,8 @@ fun TvVideoCard(
         onClick = onClick,
         onLongClick = onLongClick,
         modifier = modifier,
-        progress = progress
+        progress = progress,
+        isBookmarked = isBookmarked
     )
 }
 
@@ -87,7 +93,8 @@ fun TvVideoCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
-    progress: Float = 0f
+    progress: Float = 0f,
+    isBookmarked: Boolean = false
 ) {
     TvVideoCardContent(
         title = post.title,
@@ -100,7 +107,8 @@ fun TvVideoCard(
         onClick = onClick,
         onLongClick = onLongClick,
         modifier = modifier,
-        progress = progress
+        progress = progress,
+        isBookmarked = isBookmarked
     )
 }
 
@@ -117,7 +125,8 @@ private fun TvVideoCardContent(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
-    progress: Float = 0f
+    progress: Float = 0f,
+    isBookmarked: Boolean = false
 ) {
     // Thumbnail Logic
     val thumbnailUrl = thumbnail?.path?.toString()
@@ -186,6 +195,29 @@ private fun TvVideoCardContent(
                             .height(4.dp),
                         color = Color.Red,
                         trackColor = Color.White.copy(alpha = 0.3f)
+                    )
+                }
+
+                // Bookmark Icon
+                if (isBookmarked) {
+                    // Shadow layer
+                    androidx.compose.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.Bookmark,
+                        contentDescription = null,
+                        tint = Color.Black.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 9.dp, end = 7.dp) // Slight offset
+                            .size(28.dp)
+                    )
+                     androidx.compose.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.Bookmark,
+                        contentDescription = "Saved to Playlist", // Foreground
+                        tint = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .size(28.dp)
                     )
                 }
             }

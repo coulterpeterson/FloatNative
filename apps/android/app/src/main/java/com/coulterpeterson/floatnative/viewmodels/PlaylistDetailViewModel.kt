@@ -43,6 +43,7 @@ class PlaylistDetailViewModel : TvSidebarViewModel() {
                     FloatplaneApi.companionApi.getPlaylists(includeWatchLater = true)
                 }
                 val playlists = playlistResponse.body()?.playlists ?: emptyList()
+                _userPlaylists.value = playlists
                 val playlist = playlists.find { it.id == playlistId }
                 
                 if (playlist == null) {

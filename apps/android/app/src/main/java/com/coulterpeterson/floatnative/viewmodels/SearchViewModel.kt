@@ -77,6 +77,7 @@ class SearchViewModel : TvSidebarViewModel() {
                                 // Sort by release date (newest first) - string comparison usually works for ISO8601
                                 val sorted = blogPosts.sortedByDescending { it.releaseDate }
                                 _state.value = SearchState.Content(sorted)
+                                fetchWatchProgress(sorted)
                             }
                             return@launch
                         } else {
@@ -114,6 +115,7 @@ class SearchViewModel : TvSidebarViewModel() {
                 } else {
                     val sorted = allResults.sortedByDescending { it.releaseDate }
                     _state.value = SearchState.Content(sorted)
+                    fetchWatchProgress(sorted)
                 }
 
             } catch (e: Exception) {

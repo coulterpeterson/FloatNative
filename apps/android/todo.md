@@ -26,10 +26,10 @@
     - [X] Watch history screen
     - [X] Settings screen 
   - [X] Home screen infinite scroll/pagination
-  - [] Dark mode the sidebar description/comments slideouts in player
+  - [X] Dark mode the sidebar description/comments slideouts in player
   - [] Add Live feed description to phone and tv live views (tv version should show up in a dark mode)
-  - [] Add watch progress bars on home, playlists, and search screens
-  - [] Add bookmark icon for videos that have already been saved (tv and phone)
+  - [X] Add watch progress bars on home, playlists, and search screens
+  - [X] Add bookmark icon for videos that have already been saved (tv and phone)
 - [] Chromecast support that triggers the Android TV version to open to that video(?)
 - [] Pollsplane integration on the VODs(?)
 

@@ -73,6 +73,7 @@ fun TvHomeFeedScreen(
     val liveCreators by viewModel.liveCreators.collectAsState()
     val sidebarState by viewModel.sidebarState.collectAsState()
     val userPlaylists by viewModel.userPlaylists.collectAsState()
+    val watchProgress by viewModel.watchProgress.collectAsState()
     val filter by viewModel.filter.collectAsState()
     val context = LocalContext.current
     
@@ -91,6 +92,7 @@ fun TvHomeFeedScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                 viewModel.loadPlaylists() // Refresh playlists on resume
                  if (lastFocusedId != null) {
                      try { focusRequesters[lastFocusedId]?.requestFocus() } catch (e: Exception) {}
                  }
@@ -284,6 +286,8 @@ fun TvHomeFeedScreen(
                            val post = s.posts[index]
                            val requester = focusRequesters.getOrPut(post.id) { FocusRequester() }
 
+                           val isBookmarked = userPlaylists.any { it.videoIds.contains(post.id) }
+
                            TvVideoCard(
                                post = post,
                                onClick = {
@@ -298,7 +302,9 @@ fun TvHomeFeedScreen(
                                    viewModel.setLastFocusedId(post.id)
                                    viewModel.openSidebar(post)
                                },
-                               modifier = Modifier.focusRequester(requester)
+                               modifier = Modifier.focusRequester(requester),
+                               progress = watchProgress[post.id] ?: 0f,
+                               isBookmarked = isBookmarked
                            )
 
                            // Prefetch logic: Load more when we are 8 items (approx 2 rows) from the end

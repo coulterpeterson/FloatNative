@@ -45,6 +45,7 @@ fun TvPlaylistsScreen(
     val selectedPlaylist by viewModel.selectedPlaylist.collectAsState()
     val sidebarState by detailViewModel.sidebarState.collectAsState()
     val userPlaylists by detailViewModel.userPlaylists.collectAsState()
+    val watchProgress by detailViewModel.watchProgress.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
     
     // Focus Requesters
@@ -187,7 +188,9 @@ fun TvPlaylistsScreen(
                                                   lastFocusedPostId = post.id
                                                   detailViewModel.openSidebar(post)
                                              },
-                                             modifier = Modifier.focusRequester(requester)
+                                             modifier = Modifier.focusRequester(requester),
+                                             progress = watchProgress[post.id] ?: 0f,
+                                             isBookmarked = false
                                          )
                                     }
                                 }
