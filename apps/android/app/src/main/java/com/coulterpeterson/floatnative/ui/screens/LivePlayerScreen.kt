@@ -8,11 +8,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.core.text.HtmlCompat
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -190,6 +196,11 @@ fun LivePlayerScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
+                        }
+                        
+                        if (contentState.description.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            CollapsibleDescription(contentState.description)
                         }
                     }
                     
@@ -372,4 +383,63 @@ fun LiveVideoPlayerView(exoPlayer: ExoPlayer) {
         },
         modifier = Modifier.fillMaxSize()
     )
+}
+
+@Composable
+fun CollapsibleDescription(description: String) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    val cleanDescription = remember(description) {
+        HtmlCompat.fromHtml(description, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
+    }
+
+    var isOverflowing by remember { mutableStateOf(false) }
+    // We only want to show the button if it IS overflowing OR if it IS expanded (so you can collapse it back)
+    // But if we expand, maxLines becomes infinite, so overflow becomes false.
+    // So we need a persistent flag "hasOverflowPotential" that is set once we detect overflow in collapsed state.
+    var hasOverflowPotential by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .clickable { 
+                if (hasOverflowPotential) expanded = !expanded 
+            }
+    ) {
+        Text(
+            text = cleanDescription,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = if (expanded) Int.MAX_VALUE else 2,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { textLayoutResult ->
+                if (!expanded) {
+                    if (textLayoutResult.hasVisualOverflow) {
+                        hasOverflowPotential = true
+                    }
+                }
+            }
+        )
+        
+        if (hasOverflowPotential) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 4.dp)
+            ) {
+                Text(
+                    text = if (expanded) "Show less" else "Show more",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary, // Or secondary
+                    fontWeight = FontWeight.Bold
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
 }

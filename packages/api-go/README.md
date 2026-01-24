@@ -151,8 +151,122 @@ To deploy an update:
 
 4.  **Run**:
     ```bash
+    ```bash
     docker-compose up -d --build
     ```
+
+5.  **Auto-Restart & Service Configuration**:
+    The simplest way to ensure the stack starts on boot is to use Docker's `restart: always` policy (already configured in `docker-compose.yml`).
+    
+    However, to ensure the Docker daemon itself starts on boot:
+    ```bash
+    sudo systemctl enable docker
+    sudo systemctl start docker
+    ```
+
+    For a more robust production setup, you can create a systemd service for this specific app:
+    
+    **`sudo nano /etc/systemd/system/floatnative-api.service`**
+    ```ini
+    [Unit]
+    Description=FloatNative API Go Service
+    Requires=docker.service
+    After=docker.service
+
+    [Service]
+    Restart=always
+    WorkingDirectory=/path/to/floatnative/packages/api-go
+    # Shutdown container (if running) when unit is stopped
+    ExecStartPre=/usr/local/bin/docker-compose down -v
+    ExecStart=/usr/local/bin/docker-compose up
+    ExecStop=/usr/local/bin/docker-compose down -v
+
+    [Install]
+    WantedBy=multi-user.target
+    ```
+    
+    Enable it:
+    ```bash
+    sudo systemctl enable floatnative-api
+    sudo systemctl start floatnative-api
+    ```
+
+## CI/CD: Automated Deployment via GitHub Webhook
+
+To automatically update your DigitalOcean droplet when you push changes to `packages/api-go`, follow these steps to set up a lightweight webhook listener.
+
+### 1. Install & Configure Webhook Listener (On Server)
+
+We will use the lightweight [adnanh/webhook](https://github.com/adnanh/webhook) tool.
+
+1.  **Install**:
+    ```bash
+    sudo apt-get install webhook
+    ```
+
+2.  **Create Deployment Script**:
+    Create `deploy.sh` in your project root (e.g. `~/FloatNative/packages/api-go/deploy.sh`):
+    ```bash
+    #!/bin/bash
+    echo "Received deployment webhook: $(date)" >> /var/log/webhook-deploy.log
+    
+    # Navigate to directory
+    cd /path/to/floatnative/packages/api-go || exit
+
+    # Reset local changes (if any) and pull latest
+    git reset --hard
+    git pull origin main
+
+    # Check if api-go folder was changed (optional optimization, but good for monorepos)
+    # This logic assumes the webhook sends the payload, but standard 'webhook' tool simplifies this.
+    # Simpler approach: Just always rebuild if the hook triggers.
+    
+    # Rebuild and restart containers
+    docker-compose up -d --build --remove-orphans
+    
+    # Prune old images to save space
+    docker image prune -f
+    
+    echo "Deployment verified: $(date)" >> /var/log/webhook-deploy.log
+    ```
+    Make it executable: `chmod +x deploy.sh`
+
+3.  **Configure Webhook**:
+    Create `hooks.json`:
+    ```json
+    [
+      {
+        "id": "deploy-api-go",
+        "execute-command": "/path/to/floatnative/packages/api-go/deploy.sh",
+        "command-working-directory": "/path/to/floatnative/packages/api-go",
+        "trigger-rule": {
+          "match": {
+            "type": "payload-hash-sha1",
+            "secret": "YOUR_SECRET_WEBHOOK_PASSWORD",
+            "parameter": "X-Hub-Signature"
+          }
+        }
+      }
+    ]
+    ```
+
+4.  **Run Webhook Service**:
+    Start it manually to test:
+    ```bash
+    webhook -hooks hooks.json -verbose
+    ```
+    (Once tested, run it as a background service/systemd unit).
+
+### 2. Configure GitHub Repository
+
+1.  Go to your Repository Settings -> **Webhooks** -> **Add webhook**.
+2.  **Payload URL**: `http://your-droplet-ip:9000/hooks/deploy-api-go` (Default port is 9000).
+3.  **Content type**: `application/json`.
+4.  **Secret**: Enter the `YOUR_SECRET_WEBHOOK_PASSWORD` you put in `hooks.json`.
+5.  **Events**: Select "Just the push event".
+6.  Click **Add webhook**.
+
+Now, whenever you push code to the repo, GitHub will ping your server, which will pull the latest code and rebuild the containers.
 
 ## API Endpoints Reference
 

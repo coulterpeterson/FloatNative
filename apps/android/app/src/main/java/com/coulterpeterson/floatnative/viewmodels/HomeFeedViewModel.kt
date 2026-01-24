@@ -10,7 +10,10 @@ import com.coulterpeterson.floatnative.api.Playlist
 
 import com.coulterpeterson.floatnative.openapi.models.GetProgressRequest
 import com.coulterpeterson.floatnative.openapi.models.CreatorModelV3
+import com.coulterpeterson.floatnative.openapi.apis.DeliveryV3Api
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
@@ -302,11 +305,29 @@ class HomeFeedViewModel : TvSidebarViewModel() {
                 val response = FloatplaneApi.manual.getCreatorsByIds(creatorIds)
                 if (response.isSuccessful && response.body() != null) {
                     val creators = response.body()!!
-                    val liveCreatorsList = creators.filter { 
-                        it.liveStream != null && 
-                        !it.liveStream.streamPath.isNullOrEmpty() &&
-                        it.liveStream.offline.title.isNullOrEmpty()
-                    }.toMutableList()
+                    val liveCreatorsList = creators.mapNotNull { creator ->
+                        val liveStream = creator.liveStream
+                        if (liveStream != null) {
+                            // Launch async check for delivery info
+                            viewModelScope.async {
+                                try {
+                                    val delivery = FloatplaneApi.deliveryV3.getDeliveryInfoV3(
+                                        scenario = DeliveryV3Api.ScenarioGetDeliveryInfoV3.live,
+                                        entityId = liveStream.id
+                                    )
+                                    if (delivery.isSuccessful && delivery.body()?.groups?.isNotEmpty() == true) {
+                                        creator
+                                    } else {
+                                        null
+                                    }
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }
+                        } else {
+                            null
+                        }
+                    }.awaitAll().filterNotNull().toMutableList()
 
                     if (FloatplaneApi.tokenManager.fakeLiveStreamEnabled) {
                         try {

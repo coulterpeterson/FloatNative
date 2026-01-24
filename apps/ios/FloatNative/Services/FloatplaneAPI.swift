@@ -818,6 +818,44 @@ class FloatplaneAPI: ObservableObject {
         KeychainManager.shared.clearCredentials()
     }
 
+    // MARK: - LIVE STREAM
+
+    /// Get details for specific creators (including live stream status)
+    func getCreatorsByIds(ids: [String]) async throws -> [Creator] {
+        // Construct query parameters manually since we have an array
+        // Format: ids[]=id1&ids[]=id2...
+        var components = URLComponents(string: baseURL + "/api/v3/creator/list")
+        
+        var queryItems = [URLQueryItem]()
+        for id in ids {
+            queryItems.append(URLQueryItem(name: "ids[]", value: id))
+        }
+        
+        // Append existing query items if any (though there shouldn't be for this base URL)
+        // components?.queryItems = queryItems // This overwrites, which is fine here
+        
+        // We can't use components.queryItems directly because [String] params are sometimes encoded weirdly by Foundation
+        // But for ids[] it usually works ok. Let's try standard way.
+        components?.queryItems = queryItems
+        
+        // If components fails, we fallback to manual string construction, but URLComponents usually handles [] correctly
+        // as "ids%5B%5D=..." which is standard.
+        // However, Floatplane API expects "ids[]=val", percent encoding might be issue.
+        // Let's verify if standard encoding works. Standard usually encodes [ ] as %5B %5D.
+        // If API fails, we might need manual query string construction. 
+        // We'll trust URLComponents for now as it's cleaner.
+
+        // Actually, let's use the helper assuming endpoint string. 
+        // But the helper `request` takes an endpoint string, not full URL.
+        // And it doesn't support complex query params in the argument list easily without building the string.
+        
+        // Let's build the query string manually to pass as endpoint
+        let queryString = ids.map { "ids[]=\($0)" }.joined(separator: "&")
+        let endpoint = "/api/v3/creator/list?\(queryString)"
+        
+        return try await request(endpoint: endpoint)
+    }
+
     /// Get captcha info
     func getCaptchaInfo() async throws -> CaptchaInfo {
         try await request(endpoint: "/api/v3/auth/captcha/info")

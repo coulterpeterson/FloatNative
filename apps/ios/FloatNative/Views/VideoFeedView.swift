@@ -46,6 +46,9 @@ struct VideoFeedView: View {
     @State private var isAddingToWatchLater = false
     @State private var watchLaterError: String?
 
+    // Live Stream state
+    @State private var selectedLiveCreator: Creator?
+
     // Playlist state
     enum SidebarViewState {
         case actionButtons
@@ -160,6 +163,30 @@ struct VideoFeedView: View {
 
                         ScrollView {
                             LazyVGrid(columns: gridColumns, spacing: 25) {
+                                // Live Stream Tile (First item if active)
+                                if let liveCreator = viewModel.liveCreators.first, !viewModel.filter.isFiltered {
+                                    #if os(tvOS)
+                                    // Calculate column width with dynamic column count
+                                    let gridWidth = showActionSidebar ? geometry.size.width * 0.7 : geometry.size.width
+                                    let columnCount: CGFloat = showActionSidebar ? 3 : 4
+                                    let horizontalPadding: CGFloat = 40
+                                    let columnSpacing: CGFloat = 20 * (columnCount - 1)
+                                    let totalSpacing = horizontalPadding + columnSpacing
+                                    let columnWidth = (gridWidth - totalSpacing) / columnCount
+                                    let thumbnailHeight = columnWidth / (16.0 / 9.0)
+                                    let metadataHeight: CGFloat = 125
+                                    let cardHeight = thumbnailHeight + metadataHeight
+
+                                    Button {
+                                        selectedLiveCreator = liveCreator
+                                    } label: {
+                                        LiveVideoCard(creator: liveCreator)
+                                    }
+                                    .buttonStyle(.card)
+                                    .frame(width: columnWidth, height: cardHeight)
+                                    #endif
+                                }
+
                                 ForEach(postsToDisplay) { post in
                                     #if os(tvOS)
                                     // Calculate column width with dynamic column count
@@ -309,6 +336,9 @@ struct VideoFeedView: View {
             .navigationDestination(item: $selectedPost) { post in
                 VideoPlayerTvosView(post: post)
             }
+            .navigationDestination(item: $selectedLiveCreator) { creator in
+                LivePlayerTvosView(creator: creator)
+            }
             .onChange(of: showActionSidebar) { _, isShowing in
                 if isShowing {
                     // Auto-focus sidebar when it opens
@@ -360,6 +390,16 @@ struct VideoFeedView: View {
                 ScrollView {
                     // iOS: Use clean NavigationLink-based grid (no custom wrappers)
                     LazyVGrid(columns: gridColumns, spacing: 20) {
+                        // Live Stream Tile (First item if active)
+                        if let liveCreator = viewModel.liveCreators.first, !viewModel.filter.isFiltered {
+                            Button {
+                                selectedLiveCreator = liveCreator
+                            } label: {
+                                LiveVideoCard(creator: liveCreator)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+
                         ForEach(postsToDisplay) { post in
                             NavigationLink(value: post) {
                                 VideoCard(
@@ -459,6 +499,9 @@ struct VideoFeedView: View {
             }
             .navigationTitle(displayTitle)
             .toolbarBackground(.visible, for: .navigationBar)
+            .navigationDestination(item: $selectedLiveCreator) { creator in
+                LivePlayerView(creator: creator)
+            }
             .sheet(isPresented: $showPlaylistSheet, onDismiss: {
                 // Reset state when sheet is dismissed
                 menuSelectedPost = nil
@@ -470,6 +513,7 @@ struct VideoFeedView: View {
             }
             #endif
         }
+
         .globalMenu()
         .task {
             // Sync displayPosts from preloadedPosts if viewing a playlist

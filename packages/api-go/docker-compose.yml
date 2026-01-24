@@ -3,7 +3,7 @@ services:
     build: .
     image: ghcr.io/coulterpeterson/floatnative-api:latest
     ports:
-      - "8080:8080"
+      - "${PORT:-8080}:8080"
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -28,6 +28,23 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app_network
+
+  db-backup:
+    image: postgres:16-alpine
+    environment:
+      - DB_HOST=postgres
+      - DB_USER=postgres
+      - DB_NAME=floatnative
+      - PGPASSWORD=postgres
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup-cron.sh:/usr/local/bin/backup-cron.sh
+    command: [ "/bin/sh", "/usr/local/bin/backup-cron.sh" ]
+    depends_on:
+      - postgres
+    networks:
+      - app_network
+    restart: always
 
 volumes:
   postgres_data:

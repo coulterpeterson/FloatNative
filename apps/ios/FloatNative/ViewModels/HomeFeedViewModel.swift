@@ -36,6 +36,14 @@ class HomeFeedViewModel: ObservableObject {
             if subscriptions.isEmpty {
                 subscriptions = try await api.getSubscriptions()
             }
+            
+            // Check for live creators whenever we load feed (if we have subscriptions)
+            if !subscriptions.isEmpty && filter == .all {
+                // Run in background task so we don't block feed loading
+                Task {
+                    await checkLiveCreators()
+                }
+            }
 
             // Load content based on filter
             switch filter {
@@ -215,5 +223,53 @@ class HomeFeedViewModel: ObservableObject {
     func refreshIfNeeded() async {
         guard shouldRefreshOnForeground() else { return }
         await refresh()
+    }
+    
+    // MARK: - Live Stream Detection
+
+    @Published var liveCreators: [Creator] = []
+
+    private func checkLiveCreators() async {
+        guard !subscriptions.isEmpty else { return }
+        
+        // Extract creator IDs from subscriptions
+        let creatorIds = subscriptions.map { $0.creator }
+        guard !creatorIds.isEmpty else { return }
+        
+        do {
+            // Fetch creator details including live stream info
+            let creators = try await api.getCreatorsByIds(ids: creatorIds)
+            
+            // Filter for active live streams:
+            // 1. liveStream object must exist
+            // 2. streamPath must not be empty
+            // 3. offline title being empty/null often indicates it's live (based on Android logic)
+            // The Android logic was: 
+            // it.liveStream != null && !it.liveStream.streamPath.isNullOrEmpty() && it.liveStream.offline.title.isNullOrEmpty()
+            
+            let activeLiveCreators = creators.filter { creator in
+                guard let liveStream = creator.liveStream else { return false }
+                
+                // If streamPath is empty, it's not live
+                if liveStream.streamPath == nil || liveStream.streamPath?.isEmpty == true {
+                    return false
+                }
+                
+                // If offline title exists and is not empty, it might be offline/upcoming
+                // The Android logic checked for empty offline title.
+                // Let's mirror that.
+                if let offlineTitle = liveStream.offline.title, !offlineTitle.isEmpty {
+                    return false
+                }
+                
+                return true
+            }
+            
+            self.liveCreators = activeLiveCreators
+            
+        } catch {
+            print("❌ Failed to check live creators: \(error)")
+            // Non-critical, don't show error to user
+        }
     }
 }
