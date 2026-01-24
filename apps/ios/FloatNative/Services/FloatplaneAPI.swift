@@ -853,7 +853,7 @@ class FloatplaneAPI: ObservableObject {
         let queryString = ids.map { "ids[]=\($0)" }.joined(separator: "&")
         let endpoint = "/api/v3/creator/list?\(queryString)"
         
-        return try await request(endpoint: endpoint)
+        return try await request(endpoint: endpoint, requiresAuth: true)
     }
 
     /// Get captcha info
@@ -1124,12 +1124,16 @@ class FloatplaneAPI: ObservableObject {
     }
 
     /// Get video delivery info (streaming URLs)
+    /// Get video delivery info (streaming URLs)
     func getDeliveryInfo(
         scenario: DeliveryScenario,
         entityId: String,
-        outputKind: OutputKind = .hlsFmp4
+        outputKind: OutputKind? = .hlsFmp4
     ) async throws -> DeliveryInfo {
-        let endpoint = "/api/v3/delivery/info?scenario=\(scenario.rawValue)&entityId=\(entityId)&outputKind=\(outputKind.rawValue)"
+        var endpoint = "/api/v3/delivery/info?scenario=\(scenario.rawValue)&entityId=\(entityId)"
+        if let outputKind = outputKind {
+            endpoint += "&outputKind=\(outputKind.rawValue)"
+        }
         return try await request(endpoint: endpoint, requiresAuth: true)
     }
 

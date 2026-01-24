@@ -77,6 +77,7 @@ class AVPlayerManager: NSObject, ObservableObject {
     private(set) var currentVideoTitle: String?
     @Published var currentPost: BlogPost?
     @Published var shouldRestoreVideoPlayer: Bool = false
+    private(set) var isLiveStream: Bool = false
 
     // MARK: - Observers
 
@@ -218,13 +219,15 @@ class AVPlayerManager: NSObject, ObservableObject {
         title: String,
         post: BlogPost? = nil,
         startTime: Double = 0,
-        qualities: [QualityVariant]
+        qualities: [QualityVariant],
+        isLive: Bool = false
     ) async throws {
         self.currentVideoId = videoId
         self.currentVideoTitle = title
         self.currentPost = post
         self.availableQualities = qualities
         self.playerState = .loading
+        self.isLiveStream = isLive
 
         // Use highest quality by default
         guard let quality = qualities.first else {
@@ -233,31 +236,48 @@ class AVPlayerManager: NSObject, ObservableObject {
 
         self.currentQuality = quality
 
-        try await loadStream(url: quality.url, startTime: startTime)
+        print("🎬 [AVPlayerManager] Loading video: \(title) (Live: \(isLive))")
+        try await loadStream(url: quality.url, startTime: startTime, isLive: isLive)
     }
 
     private let resourceLoader = VideoResourceLoader()
     
     /// Load stream from URL
-    private func loadStream(url: String, startTime: Double = 0) async throws {
-        // Convert HTTP/HTTPS to custom scheme to force interception
-        guard var components = URLComponents(string: url) else {
-            throw FloatplaneAPIError.invalidURL
-        }
-        components.scheme = "floatnative" // Must match VideoResourceLoader.customScheme
-        
-        guard let streamURL = components.url else {
-            throw FloatplaneAPIError.invalidURL
-        }
-
+    private func loadStream(url: String, startTime: Double = 0, isLive: Bool) async throws {
         // Clean up old player
         cleanupPlayer()
-
-        // Create new player with Interceptor
-        // We do NOT pass headers here because the ResourceLoader will handle the request.
-        let asset = AVURLAsset(url: streamURL)
-        asset.resourceLoader.setDelegate(resourceLoader, queue: DispatchQueue.global(qos: .userInitiated))
         
+        let asset: AVURLAsset
+        
+        if isLive {
+            // Bypass VideoResourceLoader for Live Streams
+            // Use the original URL directly so AVPlayer handles HLS natively
+            guard let streamURL = URL(string: url) else {
+                throw FloatplaneAPIError.invalidURL
+            }
+            print("📡 [AVPlayerManager] Loading LIVE stream directly: \(streamURL)")
+            
+            // Create asset without custom resource loader
+            asset = AVURLAsset(url: streamURL)
+            // No resourceLoader delegate set for live streams
+        } else {
+            // Convert HTTP/HTTPS to custom scheme to force interception via VideoResourceLoader
+            guard var components = URLComponents(string: url) else {
+                throw FloatplaneAPIError.invalidURL
+            }
+            components.scheme = "floatnative" // Must match VideoResourceLoader.customScheme
+            
+            guard let streamURL = components.url else {
+                throw FloatplaneAPIError.invalidURL
+            }
+            print("📼 [AVPlayerManager] Loading VOD stream with interception: \(streamURL)")
+
+            // Create new player with Interceptor
+            // We do NOT pass headers here because the ResourceLoader will handle the request.
+            asset = AVURLAsset(url: streamURL)
+            asset.resourceLoader.setDelegate(resourceLoader, queue: DispatchQueue.global(qos: .userInitiated))
+        }
+
         let playerItem = AVPlayerItem(asset: asset)
 
         // Configure buffer limits for tvOS to prevent memory issues during long playback
@@ -280,6 +300,9 @@ class AVPlayerManager: NSObject, ObservableObject {
         }
 
         self.player = newPlayer
+        
+        // Add observers for detailed logging
+        addDebugObservers(to: playerItem)
 
         // Observe player status
         observePlayer()
@@ -288,12 +311,32 @@ class AVPlayerManager: NSObject, ObservableObject {
         setupVideoEndObserver()
 
         // Seek to start time if specified
-        if startTime > 0 {
-            await seek(to: startTime)
+        if startTime > 0 && !isLive {
+            seek(to: startTime)
         }
 
         // Update state
         playerState = .paused
+    }
+    
+    private func addDebugObservers(to item: AVPlayerItem) {
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemNewErrorLogEntry, object: item, queue: .main) { notification in
+            guard let playerItem = notification.object as? AVPlayerItem,
+                  let errorLog = playerItem.errorLog()?.events.last else { return }
+            print("🚨 [AVPlayer] Error Log: \(errorLog.errorDomain) \(errorLog.errorStatusCode) - \(errorLog.errorComment ?? "")")
+        }
+        
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemNewAccessLogEntry, object: item, queue: .main) { notification in
+            guard let playerItem = notification.object as? AVPlayerItem,
+                  let accessLog = playerItem.accessLog()?.events.last else { return }
+            print("ℹ️ [AVPlayer] Access Log: URI: \(accessLog.uri ?? "") | Bitrate: \(accessLog.indicatedBitrate)")
+        }
+        
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) { notification in
+            if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
+                print("❌ [AVPlayer] Failed to play to end: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Change Quality
@@ -304,7 +347,7 @@ class AVPlayerManager: NSObject, ObservableObject {
         let currentTime = player.currentTime().seconds
         self.currentQuality = quality
 
-        try await loadStream(url: quality.url, startTime: currentTime)
+        try await loadStream(url: quality.url, startTime: currentTime, isLive: isLiveStream)
 
         if isPlaying {
             play()

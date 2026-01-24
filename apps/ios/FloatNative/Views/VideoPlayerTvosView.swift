@@ -680,10 +680,11 @@ struct VideoPlayerTvosView: View {
 
     /// Parse HTML into paragraphs with character-based grouping for better readability
     /// Groups consecutive <p> tags until reaching ~400 characters for natural reading chunks
-    private nonisolated static func parseHTMLParagraphsStatic(_ html: String) -> [AttributedString] {
+    nonisolated static func parseHTMLParagraphsStatic(_ html: String) -> [AttributedString] {
         // Split by closing </p> tags to get individual <p> chunks
         let paragraphChunks = html.components(separatedBy: "</p>")
         var groupedParagraphs: [AttributedString] = []
+        var groupedAttributedStrings: [AttributedString] = [] // Unused but consistent? No, just copy logic.
         var currentGroupHTML = ""
         var currentGroupCharCount = 0
         let targetCharsPerGroup = 400
@@ -740,7 +741,7 @@ struct VideoPlayerTvosView: View {
         return groupedParagraphs
     }
 
-    private nonisolated static func htmlToAttributedStringStatic(_ html: String) -> AttributedString {
+    nonisolated static func htmlToAttributedStringStatic(_ html: String) -> AttributedString {
         guard let data = html.data(using: .utf8) else {
             return AttributedString(html)
         }
@@ -950,7 +951,8 @@ struct VideoPlayerTvosView: View {
                 title: post.title,
                 post: post,
                 startTime: 0,  // No start time for livestreams
-                qualities: qualities
+                qualities: qualities,
+                isLive: true
             )
 
             // Auto-play

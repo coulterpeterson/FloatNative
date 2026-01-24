@@ -240,32 +240,56 @@ class HomeFeedViewModel: ObservableObject {
             // Fetch creator details including live stream info
             let creators = try await api.getCreatorsByIds(ids: creatorIds)
             
-            // Filter for active live streams:
-            // 1. liveStream object must exist
-            // 2. streamPath must not be empty
-            // 3. offline title being empty/null often indicates it's live (based on Android logic)
-            // The Android logic was: 
-            // it.liveStream != null && !it.liveStream.streamPath.isNullOrEmpty() && it.liveStream.offline.title.isNullOrEmpty()
-            
-            let activeLiveCreators = creators.filter { creator in
-                guard let liveStream = creator.liveStream else { return false }
-                
-                // If streamPath is empty, it's not live
-                if liveStream.streamPath == nil || liveStream.streamPath?.isEmpty == true {
-                    return false
-                }
-                
-                // If offline title exists and is not empty, it might be offline/upcoming
-                // The Android logic checked for empty offline title.
-                // Let's mirror that.
-                if let offlineTitle = liveStream.offline.title, !offlineTitle.isEmpty {
-                    return false
-                }
-                
-                return true
+            // Filter creators that have potential live streams (just existence of object)
+            // We ignore streamPath and offline.title checks to strictly match Android logic
+            // relying purely on the delivery info check below.
+            let potentialLiveCreators = creators.filter { creator in
+                return creator.liveStream != nil
             }
             
-            self.liveCreators = activeLiveCreators
+            var confirmedLiveCreators: [Creator] = []
+            
+            // verify each potential stream by checking delivery info
+            // This confirms the stream is actually live and serving content
+            await withTaskGroup(of: Creator?.self) { group in
+                for creator in potentialLiveCreators {
+                    guard let liveStreamId = creator.liveStream?.id else { continue }
+                    
+                    group.addTask {
+                        do {
+                            // Try to get delivery info for the live stream
+                            // If this succeeds, the stream is truly live (Android logic: treat successful 200 OK as live)
+                            let deliveryInfo = try await self.api.getDeliveryInfo(
+                                scenario: .live,
+                                entityId: liveStreamId,
+                                outputKind: nil
+                            )
+                            
+                            // On Android, we just check if the call succeeds. 
+                            // If we get a response, we assume it's live.
+                            // However, let's be slightly safer and check if we got *any* delivery groups or variants.
+                            // But keeping strictly to "if this call works, it's live" seems to be the instruction.
+                            // Let's check if the response contains usable data just in case.
+                            let variants = deliveryInfo.availableVariants()
+                            if !deliveryInfo.groups.isEmpty {
+                                return creator
+                            }
+                        } catch {
+                            // 403/404 or other error means mostly likely offline
+                            // print("Stream for \(creator.title) is offline or inaccessible: \(error)")
+                        }
+                        return nil
+                    }
+                }
+                
+                for await result in group {
+                    if let creator = result {
+                        confirmedLiveCreators.append(creator)
+                    }
+                }
+            }
+            
+            self.liveCreators = confirmedLiveCreators
             
         } catch {
             print("❌ Failed to check live creators: \(error)")

@@ -482,7 +482,8 @@ struct VideoPlayerView: View {
                 title: post.title,
                 post: post,
                 startTime: 0,  // No start time for livestreams
-                qualities: qualities
+                qualities: qualities,
+                isLive: true
             )
 
             // Auto-play
@@ -1507,7 +1508,7 @@ struct VideoPlayerView: View {
 
     // MARK: - HTML Parsing Helper
 
-    private nonisolated static func htmlToAttributedString(_ html: String) -> AttributedString {
+    nonisolated static func htmlToAttributedString(_ html: String) -> AttributedString {
         guard let data = html.data(using: .utf8) else {
             return AttributedString(html)
         }

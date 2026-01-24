@@ -226,10 +226,11 @@ struct LivePlayerView: View {
         errorMessage = nil
         
         do {
+            // Revert to nil (Android behavior) as hls.mpegts didn't fix video
             let deliveryInfo = try await api.getDeliveryInfo(
                 scenario: .live,
                 entityId: liveStream.id,
-                outputKind: .hlsFmp4
+                outputKind: nil
             )
             
             let qualities = deliveryInfo.availableVariants()
@@ -241,27 +242,64 @@ struct LivePlayerView: View {
             // Ideally PlayerManager shouldn't require a full BlogPost, but let's check AVPlayerManager later if it crashes.
             // For now, constructing a dummy post since we don't have one.
             
-            // Actually, we can just pass nil for `post` if we update AVPlayerManager, or pass a dummy one.
-            // Generating dummy post...
+            // Dummy post construction for player manager interface
+            // We must map CreatorModelV3 to BlogPostModelV3Creator
+            let postCreator = BlogPostModelV3Creator(
+                id: creator.id,
+                owner: BlogPostModelV3CreatorOwner(id: creator.owner.id, username: creator.owner.username),
+                title: creator.title,
+                urlname: creator.urlname,
+                description: creator.description,
+                about: creator.about,
+                category: creator.category,
+                cover: creator.cover,
+                icon: creator.icon,
+                liveStream: creator.liveStream,
+                
+                // Fields required by BlogPostModelV3Creator but optional in CreatorModelV3
+                subscriptionPlans: creator.subscriptionPlans ?? [],
+                discoverable: creator.discoverable,
+                subscriberCountDisplay: creator.subscriberCountDisplay,
+                incomeDisplay: creator.incomeDisplay,
+                
+                // Mismatched types: [ChannelModel] vs [String]?
+                defaultChannel: creator.defaultChannel,
+                channels: creator.channels.map { $0.id }, // Map Channel objects to IDs
+                card: creator.card
+            )
+            
             let dummyPost = BlogPost(
                 id: liveStream.id,
                 guid: liveStream.id,
                 title: liveStream.title,
                 text: liveStream.description,
-                type: .blogPost,
+                type: .blogpost, // Corrected case
+                channel: .typeString(creator.defaultChannel), // Use default channel ID or empty
                 tags: [],
                 attachmentOrder: [],
-                metadata: BlogPost.Metadata(hasVideo: true, videoCount: 1, videoDuration: 0, hasAudio: false, audioCount: 0, audioDuration: 0, hasPicture: false, pictureCount: 0, hasGallery: false, galleryCount: 0, isFeatured: false),
+                metadata: PostMetadataModel( // Corrected type
+                    hasVideo: true,
+                    videoCount: 1,
+                    videoDuration: 0,
+                    hasAudio: false,
+                    audioCount: 0,
+                    audioDuration: 0,
+                    hasPicture: false,
+                    pictureCount: 0,
+                    hasGallery: false,
+                    galleryCount: 0,
+                    isFeatured: false
+                ),
                 releaseDate: Date(),
                 likes: 0,
                 dislikes: 0,
                 score: 0,
                 comments: 0,
-                creator: creator,
+                creator: postCreator, // Use converted creator
                 wasReleasedSilently: false,
                 thumbnail: liveStream.thumbnail,
-                canEdit: false,
-                canDelete: false
+                isAccessible: true
+                // Remove invalid args: canEdit, canDelete
             )
             
             try await playerManager.loadVideo(
@@ -269,7 +307,8 @@ struct LivePlayerView: View {
                 title: liveStream.title,
                 post: dummyPost,
                 startTime: 0,
-                qualities: qualities
+                qualities: qualities,
+                isLive: true
             )
             
             playerManager.play()
