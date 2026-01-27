@@ -78,6 +78,19 @@ fun VideoFeedScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
 
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                 viewModel.checkLiveCreators()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     androidx.compose.runtime.LaunchedEffect(Unit) {
         viewModel.loadPlaylists()
     }
@@ -175,7 +188,8 @@ fun VideoFeedScreen(
                     ) {
                         // Live Banner moved inside Grid
                         if (liveCreators.isNotEmpty() && filter is HomeFeedViewModel.FeedFilter.All) {
-                            item(span = { GridItemSpan(columns) }) {
+                            // Inject into the grid list instead of spanning full width
+                            item {
                                 val liveCreator = liveCreators.first()
                                 androidx.compose.material3.Card(
                                      modifier = Modifier

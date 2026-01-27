@@ -292,7 +292,7 @@ class HomeFeedViewModel : TvSidebarViewModel() {
 
     // Playlist, WatchProgress, and Sidebar logic is inherited from TvSidebarViewModel
 
-    private fun checkLiveCreators() {
+    fun checkLiveCreators() {
         val currentSubs = subscriptions
         if (currentSubs.isEmpty()) return
 
@@ -308,15 +308,37 @@ class HomeFeedViewModel : TvSidebarViewModel() {
                     val liveCreatorsList = creators.mapNotNull { creator ->
                         val liveStream = creator.liveStream
                         if (liveStream != null) {
-                            // Launch async check for delivery info
+                            // Launch async check for delivery info and HLS polling
                             viewModelScope.async {
                                 try {
                                     val delivery = FloatplaneApi.deliveryV3.getDeliveryInfoV3(
                                         scenario = DeliveryV3Api.ScenarioGetDeliveryInfoV3.live,
-                                        entityId = liveStream.id
+                                        entityId = liveStream.id,
+                                        outputKind = DeliveryV3Api.OutputKindGetDeliveryInfoV3.hlsPeriodMpegts
                                     )
-                                    if (delivery.isSuccessful && delivery.body()?.groups?.isNotEmpty() == true) {
-                                        creator
+                                    val body = delivery.body()
+                                    if (delivery.isSuccessful && body?.groups?.isNotEmpty() == true) {
+                                        // Construct Master HLS URL
+                                        // Logic: groups[0].origins[0].url + groups[0].variants[0].url
+                                        // (Or variant specific origin if available, but usually group origin is base)
+                                        val group = body.groups[0]
+                                        val variant = group.variants.firstOrNull()
+                                        
+                                        // Try to find a valid origin
+                                        val origin = variant?.origins?.firstOrNull() ?: group.origins?.firstOrNull()
+                                        
+                                        if (variant != null && origin != null) {
+                                            val masterUrl = origin.url.toString() + variant.url
+                                            
+                                            // POLL the URL to check if it returns 200 OK
+                                            if (isUrlReachable(masterUrl)) {
+                                                creator
+                                            } else {
+                                                null
+                                            }
+                                        } else {
+                                            null
+                                        }
                                     } else {
                                         null
                                     }
@@ -376,6 +398,23 @@ class HomeFeedViewModel : TvSidebarViewModel() {
                 }
             } catch (e: Exception) {
                e.printStackTrace()
+            }
+        }
+    }
+    
+    private suspend fun isUrlReachable(urlString: String): Boolean {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val url = java.net.URL(urlString)
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET" // Or HEAD, but sometimes HLS CDNs behave better with GET on master playlist
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
+                val code = connection.responseCode
+                connection.disconnect()
+                code == 200
+            } catch (e: Exception) {
+                false
             }
         }
     }

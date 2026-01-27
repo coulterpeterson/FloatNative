@@ -93,6 +93,7 @@ fun TvHomeFeedScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                  viewModel.loadPlaylists() // Refresh playlists on resume
+                 viewModel.checkLiveCreators()
                  if (lastFocusedId != null) {
                      try { focusRequesters[lastFocusedId]?.requestFocus() } catch (e: Exception) {}
                  }
