@@ -221,15 +221,19 @@ class HomeFeedViewModel: ObservableObject {
     /// Refresh the feed if enough time has passed since last refresh
     /// Called when app returns to foreground
     func refreshIfNeeded() async {
-        guard shouldRefreshOnForeground() else { return }
-        await refresh()
+        if shouldRefreshOnForeground() {
+            await refresh()
+        } else {
+            // Even if we don't refresh the full feed, check if anyone went live
+            await checkLiveCreators()
+        }
     }
     
     // MARK: - Live Stream Detection
 
     @Published var liveCreators: [Creator] = []
 
-    private func checkLiveCreators() async {
+    func checkLiveCreators() async {
         guard !subscriptions.isEmpty else { return }
         
         // Extract creator IDs from subscriptions
@@ -240,43 +244,48 @@ class HomeFeedViewModel: ObservableObject {
             // Fetch creator details including live stream info
             let creators = try await api.getCreatorsByIds(ids: creatorIds)
             
-            // Filter creators that have potential live streams (just existence of object)
-            // We ignore streamPath and offline.title checks to strictly match Android logic
-            // relying purely on the delivery info check below.
+            // Filter creators that have potential live streams
             let potentialLiveCreators = creators.filter { creator in
                 return creator.liveStream != nil
             }
             
             var confirmedLiveCreators: [Creator] = []
             
-            // verify each potential stream by checking delivery info
-            // This confirms the stream is actually live and serving content
+            // verify each potential stream by checking delivery info AND polling HLS
             await withTaskGroup(of: Creator?.self) { group in
                 for creator in potentialLiveCreators {
                     guard let liveStreamId = creator.liveStream?.id else { continue }
                     
                     group.addTask {
                         do {
-                            // Try to get delivery info for the live stream
-                            // If this succeeds, the stream is truly live (Android logic: treat successful 200 OK as live)
+                            // 1. Get Delivery Info
                             let deliveryInfo = try await self.api.getDeliveryInfo(
                                 scenario: .live,
                                 entityId: liveStreamId,
-                                outputKind: nil
+                                outputKind: .hlsFmp4 // Use HLS just like Android's hlsPeriodMpegts/fmp4 choice
                             )
                             
-                            // On Android, we just check if the call succeeds. 
-                            // If we get a response, we assume it's live.
-                            // However, let's be slightly safer and check if we got *any* delivery groups or variants.
-                            // But keeping strictly to "if this call works, it's live" seems to be the instruction.
-                            // Let's check if the response contains usable data just in case.
-                            let variants = deliveryInfo.availableVariants()
-                            if !deliveryInfo.groups.isEmpty {
-                                return creator
+                            // 2. Extract Master URL
+                            // Logic: groups[0].origins[0].url + groups[0].variants[0].url
+                            if let group = deliveryInfo.groups.first,
+                               let variant = group.variants.first {
+                                
+                                let origin = variant.origins?.first ?? group.origins?.first
+                                
+                                if let origin = origin {
+                                    // origin.url is likely a String based on the error, or needs to be cast. 
+                                    // OpenAPI generator sometimes treats URI as String or URL.
+                                    // Error says "Value of type 'String' has no member 'absoluteString'", so it IS a String.
+                                    let masterURLString = origin.url + variant.url
+                                    
+                                    // 3. Poll the URL
+                                    if await self.isURLReachable(urlString: masterURLString) {
+                                        return creator
+                                    }
+                                }
                             }
                         } catch {
-                            // 403/404 or other error means mostly likely offline
-                            // print("Stream for \(creator.title) is offline or inaccessible: \(error)")
+                            // Offline or error
                         }
                         return nil
                     }
@@ -293,7 +302,24 @@ class HomeFeedViewModel: ObservableObject {
             
         } catch {
             print("❌ Failed to check live creators: \(error)")
-            // Non-critical, don't show error to user
+        }
+    }
+
+    private func isURLReachable(urlString: String) async -> Bool {
+        guard let url = URL(string: urlString) else { return false }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET" // Using GET as some CDNs dislike HEAD for HLS masters
+        request.timeoutInterval = 5
+        
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse {
+                return httpResponse.statusCode == 200
+            }
+            return false
+        } catch {
+            return false
         }
     }
 }

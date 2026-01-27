@@ -199,7 +199,9 @@ struct LivePlayerView: View {
                             Text(parsedDescription)
                                 .font(.body)
                                 .foregroundColor(Color.adaptiveText)
+                                #if !os(tvOS)
                                 .textSelection(.enabled)
+                                #endif
                         } else {
                             Text(parsedDescription)
                                 .font(.body)
