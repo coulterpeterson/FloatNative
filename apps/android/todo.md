@@ -15,6 +15,7 @@
 - [X] Ensure watch progress calls are implemented
 - [X] Android TV styles/versions of screens
 - [X] Chromecast support that triggers the Android TV version to open to that video(?)
+- [] Add support for posts without video (image/text posts)
 - [] Implement live support in iOS/tvOS/test android TV
 - [] Android: Add Live feed description to phone and tv live views (tv version should show up in a dark mode)
 - [] Pollsplane integration on the VODs(?)

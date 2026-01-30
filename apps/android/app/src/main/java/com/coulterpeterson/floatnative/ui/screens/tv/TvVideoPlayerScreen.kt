@@ -47,6 +47,7 @@ import com.coulterpeterson.floatnative.viewmodels.VideoPlayerViewModel
 fun TvVideoPlayerScreen(
     videoId: String,
     onBack: () -> Unit,
+    startTimestamp: Long = 0L,
     viewModel: VideoPlayerViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -57,16 +58,31 @@ fun TvVideoPlayerScreen(
     LaunchedEffect(videoId) {
         viewModel.loadVideo(videoId)
     }
+    
+    // Initial Seek for Cast Resume
+    // We only want to do this ONCE when the content is first loaded and matches our requested video
+    // Use a remembered boolean that resets when videoId changes
+    var hasPerformedInitialSeek by remember(videoId) { mutableStateOf(false) }
 
     // Handle Player state updates
-    LaunchedEffect(state) {
+    LaunchedEffect(state, hasPerformedInitialSeek) {
         if (state is VideoPlayerState.Content) {
             val contentState = state as VideoPlayerState.Content
             if (exoPlayer.currentMediaItem == null || exoPlayer.currentMediaItem?.localConfiguration?.uri.toString() != contentState.videoUrl) {
                 val mediaItem = MediaItem.fromUri(contentState.videoUrl)
                 exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
+                
+                 if (startTimestamp > 0 && !hasPerformedInitialSeek) {
+                    exoPlayer.seekTo(startTimestamp)
+                    hasPerformedInitialSeek = true
+                }
+                
                 exoPlayer.play() 
+            } else if (startTimestamp > 0 && !hasPerformedInitialSeek) {
+                // If the player was somehow already holding this item (unlikely with new VM scope, but safe)
+                 exoPlayer.seekTo(startTimestamp)
+                 hasPerformedInitialSeek = true
             }
         }
     }
