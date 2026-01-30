@@ -24,6 +24,10 @@ class TvMainActivity : ComponentActivity() {
     @OptIn(ExperimentalTvMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Register Cast Receiver lifecycle observer
+        lifecycle.addObserver(com.coulterpeterson.floatnative.cast.CastReceiverLifecycleObserver())
+        
         setContent {
             val darkColorScheme = darkColorScheme(
                 primary = Purple80,

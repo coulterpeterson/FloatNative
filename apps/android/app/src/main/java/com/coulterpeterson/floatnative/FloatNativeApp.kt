@@ -16,6 +16,16 @@ class FloatNativeApp : Application(), ImageLoaderFactory {
         
         // Initialize API Singleton
         FloatplaneApi.init(this)
+        
+        // Initialize Cast Receiver Context on TV devices only
+        if (packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) {
+            try {
+                com.google.android.gms.cast.tv.CastReceiverContext.initInstance(this)
+                android.util.Log.d("CastReceiver", "CastReceiverContext initialized")
+            } catch (e: Exception) {
+                android.util.Log.e("CastReceiver", "Failed to initialize CastReceiverContext", e)
+            }
+        }
     }
 
     override fun newImageLoader(): ImageLoader {
