@@ -40,6 +40,19 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.coulterpeterson.floatnative.viewmodels.VideoPlayerState
 import com.coulterpeterson.floatnative.viewmodels.VideoPlayerViewModel
+import androidx.compose.ui.layout.ContentScale
+import androidx.tv.material3.IconButton
+import androidx.tv.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import coil.compose.AsyncImage
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 
 @androidx.annotation.OptIn(UnstableApi::class)
 @kotlin.OptIn(ExperimentalTvMaterial3Api::class)
@@ -138,115 +151,206 @@ fun TvVideoPlayerScreen(
                     )
                 }
                 is VideoPlayerState.Content -> {
-                    var showSettings by remember { mutableStateOf(false) }
-
-                    AndroidView(
-                        factory = { ctx ->
-                            // Inflate the wrapper layout which sets the custom controller attribute
-                            val view = android.view.LayoutInflater.from(ctx).inflate(
-                                com.coulterpeterson.floatnative.R.layout.tv_player_wrapper, 
-                                null
-                            ) as PlayerView
-                            
-                            view.apply {
-                                player = exoPlayer
-                                // XML sets resize_mode="fit", show_buffering="always", etc.
+                    val contentState = state as VideoPlayerState.Content
+                    
+                    if (contentState.videoUrl != null) {
+                        // Video Player Layout
+                        var showSettings by remember { mutableStateOf(false) }
+    
+                        AndroidView(
+                            factory = { ctx ->
+                                // Inflate the wrapper layout which sets the custom controller attribute
+                                val view = android.view.LayoutInflater.from(ctx).inflate(
+                                    com.coulterpeterson.floatnative.R.layout.tv_player_wrapper, 
+                                    null
+                                ) as PlayerView
                                 
-                                // Handle D-pad wakeup using KeyListener instead of overriding dispatchKeyEvent
-                                setOnKeyListener { _, keyCode, event ->
-                                    if (event.action == android.view.KeyEvent.ACTION_DOWN && !isControllerFullyVisible) {
-                                        when (keyCode) {
-                                            android.view.KeyEvent.KEYCODE_DPAD_CENTER,
-                                            android.view.KeyEvent.KEYCODE_ENTER,
-                                            android.view.KeyEvent.KEYCODE_DPAD_UP,
-                                            android.view.KeyEvent.KEYCODE_DPAD_DOWN,
-                                            android.view.KeyEvent.KEYCODE_DPAD_LEFT,
-                                            android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                                                showController()
-                                                return@setOnKeyListener true
+                                view.apply {
+                                    player = exoPlayer
+                                    // XML sets resize_mode="fit", show_buffering="always", etc.
+                                    
+                                    // Handle D-pad wakeup using KeyListener instead of overriding dispatchKeyEvent
+                                    setOnKeyListener { _, keyCode, event ->
+                                        if (event.action == android.view.KeyEvent.ACTION_DOWN && !isControllerFullyVisible) {
+                                            when (keyCode) {
+                                                android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                                                android.view.KeyEvent.KEYCODE_ENTER,
+                                                android.view.KeyEvent.KEYCODE_DPAD_UP,
+                                                android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+                                                android.view.KeyEvent.KEYCODE_DPAD_LEFT,
+                                                android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                                                    showController()
+                                                    return@setOnKeyListener true
+                                                }
                                             }
                                         }
+                                        false
                                     }
-                                    false
+    
+                                    setControllerVisibilityListener(androidx.media3.ui.PlayerView.ControllerVisibilityListener { visibility ->
+                                        if (visibility == android.view.View.GONE && sidebarMode == com.coulterpeterson.floatnative.viewmodels.PlayerSidebarMode.None) {
+                                          requestFocus()
+                                        }
+                                    })
+    
+                                    // Ensure the view takes focus to handle D-pad events
+                                    descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+                                    requestFocus()
                                 }
-
-                                setControllerVisibilityListener(androidx.media3.ui.PlayerView.ControllerVisibilityListener { visibility ->
-                                    if (visibility == android.view.View.GONE && sidebarMode == com.coulterpeterson.floatnative.viewmodels.PlayerSidebarMode.None) {
-                                      requestFocus()
-                                    }
-                                })
-
-                                // Ensure the view takes focus to handle D-pad events
-                                descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-                                requestFocus()
-                            }
-                        },
-                        update = { playerView ->
-                            // Bind Custom Controls
-                            val btnLike = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_like)
-                            val btnDislike = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_dislike)
-                            val btnDesc = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_description)
-                            val btnComments = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_comments)
-                            val btnSettings = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_settings)
-
-                            // Update UI State (Colors)
-                            val redColor = android.graphics.Color.RED
-                            val whiteColor = android.graphics.Color.WHITE
-                            val grayColor = android.graphics.Color.LTGRAY
-
-                            val interaction = (state as? VideoPlayerState.Content)?.userInteraction
-                            
-                            btnLike?.setColorFilter(if (interaction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.like) 
-                                redColor else whiteColor)
-                            
-                            btnDislike?.setColorFilter(if (interaction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.dislike) 
-                                redColor else whiteColor)
-
-                            // Set Listeners
-                            btnLike?.setOnClickListener { viewModel.toggleLike() }
-                            btnDislike?.setOnClickListener { viewModel.toggleDislike() }
-                            
-                            btnDesc?.setOnClickListener { 
-                                viewModel.openDescription()
-                            }
-                            btnComments?.setOnClickListener { 
-                                viewModel.openComments()
-                            }
-                             btnSettings?.setOnClickListener { 
-                                showSettings = true
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    
-                    if (showSettings) {
-                       val contentState = state as VideoPlayerState.Content
-                       Dialog(onDismissRequest = { showSettings = false }) {
-                           Box(
-                               modifier = Modifier
-                                   .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-                                   .padding(16.dp)
-                                   .width(300.dp)
-                           ) {
-                               Column {
-                                   Text("Quality", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                                   LazyColumn {
-                                       items(contentState.availableQualities.size) { index ->
-                                           val quality = contentState.availableQualities[index]
-                                           val isSelected = quality == contentState.currentQuality
-                                           ListItem(
-                                               selected = isSelected,
-                                               onClick = {
-                                                   viewModel.changeQuality(quality)
-                                                   showSettings = false
-                                               },
-                                               headlineContent = { Text(quality.label) }
-                                           )
+                            },
+                            update = { playerView ->
+                                // Bind Custom Controls
+                                val btnLike = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_like)
+                                val btnDislike = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_dislike)
+                                val btnDesc = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_description)
+                                val btnComments = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_comments)
+                                val btnSettings = playerView.findViewById<android.widget.ImageButton>(com.coulterpeterson.floatnative.R.id.btn_settings)
+    
+                                // Update UI State (Colors)
+                                val redColor = android.graphics.Color.RED
+                                val whiteColor = android.graphics.Color.WHITE
+                                val grayColor = android.graphics.Color.LTGRAY
+    
+                                val interaction = (state as? VideoPlayerState.Content)?.userInteraction
+                                
+                                btnLike?.setColorFilter(if (interaction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.like) 
+                                    redColor else whiteColor)
+                                
+                                btnDislike?.setColorFilter(if (interaction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.dislike) 
+                                    redColor else whiteColor)
+    
+                                // Set Listeners
+                                btnLike?.setOnClickListener { viewModel.toggleLike() }
+                                btnDislike?.setOnClickListener { viewModel.toggleDislike() }
+                                
+                                btnDesc?.setOnClickListener { 
+                                    viewModel.openDescription()
+                                }
+                                btnComments?.setOnClickListener { 
+                                    viewModel.openComments()
+                                }
+                                 btnSettings?.setOnClickListener { 
+                                    showSettings = true
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        
+                        if (showSettings) {
+                           val contentState = state as VideoPlayerState.Content
+                           Dialog(onDismissRequest = { showSettings = false }) {
+                               Box(
+                                   modifier = Modifier
+                                       .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                                       .padding(16.dp)
+                                       .width(300.dp)
+                               ) {
+                                   Column {
+                                       Text("Quality", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+                                       LazyColumn {
+                                           items(contentState.availableQualities.size) { index ->
+                                               val quality = contentState.availableQualities[index]
+                                               val isSelected = quality == contentState.currentQuality
+                                               ListItem(
+                                                   selected = isSelected,
+                                                   onClick = {
+                                                       viewModel.changeQuality(quality)
+                                                       showSettings = false
+                                                   },
+                                                   headlineContent = { Text(quality.label) }
+                                               )
+                                           }
                                        }
                                    }
                                }
                            }
-                       }
+                        }
+                    } else {
+                        // Non-Video Layout (Text/Image)
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            // 1. Thumbnail
+                            if (contentState.blogPost.thumbnail != null) {
+                                item {
+                                    AsyncImage(
+                                        model = contentState.blogPost.thumbnail.path.toString(),
+                                        contentDescription = contentState.blogPost.title,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(300.dp),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+                            
+                            // 2. Info Row
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    // Channel Icon
+                                    val channelIcon = contentState.blogPost.channel.icon?.childImages?.firstOrNull()?.path 
+                                        ?: contentState.blogPost.channel.icon?.path
+                                        
+                                    AsyncImage(
+                                        model = channelIcon?.toString(),
+                                        contentDescription = contentState.blogPost.channel.title,
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = contentState.blogPost.title,
+                                            style = MaterialTheme.typography.titleLarge
+                                        )
+                                        Text(
+                                            text = contentState.blogPost.channel.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    
+                                    // Like Button
+                                    val interaction = contentState.userInteraction
+                                    IconButton(onClick = { viewModel.toggleLike() }) {
+                                        Icon(
+                                            imageVector = Icons.Default.ThumbUp,
+                                            contentDescription = "Like",
+                                            tint = if (interaction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.like) 
+                                                Color.Red else MaterialTheme.colorScheme.onSurface 
+                                        )
+                                    }
+                                    
+                                     // Dislike Button
+                                    IconButton(onClick = { viewModel.toggleDislike() }) {
+                                        Icon(
+                                            imageVector = Icons.Default.ThumbDown,
+                                            contentDescription = "Dislike",
+                                            tint = if (interaction == com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.UserInteraction.dislike) 
+                                                Color.Red else MaterialTheme.colorScheme.onSurface 
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            // 3. Description
+                            item {
+                                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                     com.coulterpeterson.floatnative.ui.components.HtmlText(
+                                        html = contentState.blogPost.text,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

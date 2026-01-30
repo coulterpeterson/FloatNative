@@ -141,10 +141,15 @@ fun VideoPlayerScreen(
             // Avoid re-preparing if already playing same URL
             // Simple check
             // Ideally check currentMediaItem?.mediaId or similar
-            if (exoPlayer.currentMediaItem == null || exoPlayer.currentMediaItem?.localConfiguration?.uri.toString() != contentState.videoUrl) {
-                val mediaItem = MediaItem.fromUri(contentState.videoUrl)
-                exoPlayer.setMediaItem(mediaItem)
-                exoPlayer.prepare()
+            if (contentState.videoUrl != null) {
+                if (exoPlayer.currentMediaItem == null || exoPlayer.currentMediaItem?.localConfiguration?.uri.toString() != contentState.videoUrl) {
+                    val mediaItem = MediaItem.fromUri(contentState.videoUrl)
+                    exoPlayer.setMediaItem(mediaItem)
+                    exoPlayer.prepare()
+                }
+            } else {
+                 exoPlayer.stop()
+                 exoPlayer.clearMediaItems()
             }
         }
     }
@@ -215,67 +220,98 @@ fun VideoPlayerScreen(
                         .fillMaxSize()
                 ) {
                 // 1. Video Player (16:9)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .background(Color.Black)
-                ) {
-
-                    VideoPlayerView(exoPlayer)
-                    
-
-                    
-                    // Cast Session Logic
-                    val currentPos = exoPlayer.currentPosition
-                    val castSessionListener = remember(state, currentPos) {
-                        object : com.google.android.gms.cast.framework.SessionManagerListener<com.google.android.gms.cast.framework.CastSession> {
-                            override fun onSessionStarted(session: com.google.android.gms.cast.framework.CastSession, sessionId: String) {
-                                loadRemoteMedia(session)
-                            }
-                            override fun onSessionResumed(session: com.google.android.gms.cast.framework.CastSession, wasSuspended: Boolean) {
-                                loadRemoteMedia(session)
-                            }
-                            override fun onSessionEnded(session: com.google.android.gms.cast.framework.CastSession, error: Int) {}
-                            override fun onSessionStarting(session: com.google.android.gms.cast.framework.CastSession) {}
-                            override fun onSessionSuspended(session: com.google.android.gms.cast.framework.CastSession, reason: Int) {}
-                            override fun onSessionEnding(session: com.google.android.gms.cast.framework.CastSession) {}
-                            override fun onSessionResumeFailed(session: com.google.android.gms.cast.framework.CastSession, error: Int) {}
-                            override fun onSessionStartFailed(session: com.google.android.gms.cast.framework.CastSession, error: Int) {}
-                            override fun onSessionResuming(session: com.google.android.gms.cast.framework.CastSession, sessionId: String) {}
-
-                            private fun loadRemoteMedia(session: com.google.android.gms.cast.framework.CastSession) {
-                                if (state is VideoPlayerState.Content) {
-                                    val content = state as VideoPlayerState.Content
-                                    val metadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MOVIE)
-                                    metadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, content.blogPost.title)
-                                    metadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_SUBTITLE, content.blogPost.channel.title)
-                                    // Add Image if available
-                                    val imageUrl = content.blogPost.thumbnail?.path
-                                    if (imageUrl != null) {
-                                        metadata.addImage(com.google.android.gms.common.images.WebImage(android.net.Uri.parse(imageUrl.toString())))
+                val content = state as? VideoPlayerState.Content
+                val videoUrl = content?.videoUrl
+                
+                if (videoUrl != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .background(Color.Black)
+                    ) {
+                        VideoPlayerView(exoPlayer)
+                        
+                        // Cast Session Logic
+                        val currentPos = exoPlayer.currentPosition
+                        val castSessionListener = remember(state, currentPos) {
+                            object : com.google.android.gms.cast.framework.SessionManagerListener<com.google.android.gms.cast.framework.CastSession> {
+                                override fun onSessionStarted(session: com.google.android.gms.cast.framework.CastSession, sessionId: String) {
+                                    loadRemoteMedia(session)
+                                }
+                                override fun onSessionResumed(session: com.google.android.gms.cast.framework.CastSession, wasSuspended: Boolean) {
+                                    loadRemoteMedia(session)
+                                }
+                                override fun onSessionEnded(session: com.google.android.gms.cast.framework.CastSession, error: Int) {}
+                                override fun onSessionStarting(session: com.google.android.gms.cast.framework.CastSession) {}
+                                override fun onSessionSuspended(session: com.google.android.gms.cast.framework.CastSession, reason: Int) {}
+                                override fun onSessionEnding(session: com.google.android.gms.cast.framework.CastSession) {}
+                                override fun onSessionResumeFailed(session: com.google.android.gms.cast.framework.CastSession, error: Int) {}
+                                override fun onSessionStartFailed(session: com.google.android.gms.cast.framework.CastSession, error: Int) {}
+                                override fun onSessionResuming(session: com.google.android.gms.cast.framework.CastSession, sessionId: String) {}
+    
+                                private fun loadRemoteMedia(session: com.google.android.gms.cast.framework.CastSession) {
+                                    if (state is VideoPlayerState.Content) {
+                                        val content = state as VideoPlayerState.Content
+                                        val metadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MOVIE)
+                                        metadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, content.blogPost.title)
+                                        metadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_SUBTITLE, content.blogPost.channel.title)
+                                        // Add Image if available
+                                        val imageUrl = content.blogPost.thumbnail?.path
+                                        if (imageUrl != null) {
+                                            metadata.addImage(com.google.android.gms.common.images.WebImage(android.net.Uri.parse(imageUrl.toString())))
+                                        }
+    
+                                        val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(postId) // Use postId as contentId
+                                            .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_BUFFERED)
+                                            .setContentType("video/mp4") // Defaulting/Generic
+                                            .setMetadata(metadata)
+                                            .build()
+                                            
+                                        // Load
+                                        val remoteMediaClient = session.remoteMediaClient
+                                        remoteMediaClient?.load(mediaInfo, true, currentPos)
                                     }
-
-                                    val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(postId) // Use postId as contentId
-                                        .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_BUFFERED)
-                                        .setContentType("video/mp4") // Defaulting/Generic
-                                        .setMetadata(metadata)
-                                        .build()
-                                        
-                                    // Load
-                                    val remoteMediaClient = session.remoteMediaClient
-                                    remoteMediaClient?.load(mediaInfo, true, currentPos)
                                 }
                             }
                         }
+    
+                        DisposableEffect(Unit) {
+                             val castContext = com.google.android.gms.cast.framework.CastContext.getSharedInstance(context)
+                             castContext.sessionManager.addSessionManagerListener(castSessionListener, com.google.android.gms.cast.framework.CastSession::class.java)
+                             onDispose {
+                                 castContext.sessionManager.removeSessionManagerListener(castSessionListener, com.google.android.gms.cast.framework.CastSession::class.java)
+                             }
+                        }
                     }
-
-                    DisposableEffect(Unit) {
-                         val castContext = com.google.android.gms.cast.framework.CastContext.getSharedInstance(context)
-                         castContext.sessionManager.addSessionManagerListener(castSessionListener, com.google.android.gms.cast.framework.CastSession::class.java)
-                         onDispose {
-                             castContext.sessionManager.removeSessionManagerListener(castSessionListener, com.google.android.gms.cast.framework.CastSession::class.java)
-                         }
+                } else if (content?.blogPost?.thumbnail != null) {
+                     Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .background(Color.Black)
+                    ) {
+                        AsyncImage(
+                            model = content.blogPost.thumbnail?.path.toString(),
+                            contentDescription = content.blogPost.title,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        
+                        // Back Button specifically for this view since we don't have player controls overlay
+                         IconButton(
+                            onClick = onClose,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(8.dp)
+                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White
+                            )
+                        }
                     }
                 }
 

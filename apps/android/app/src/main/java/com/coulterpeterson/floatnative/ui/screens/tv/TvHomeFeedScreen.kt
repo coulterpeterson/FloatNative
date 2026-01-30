@@ -295,7 +295,7 @@ fun TvHomeFeedScreen(
                                     viewModel.setLastFocusedId(post.id)
                                     // VideoPlayerViewModel expects a BlogPost ID, NOT a VideoAttachment ID.
                                     // It will fetch the post and extract the video attached to it.
-                                    if (viewModel.sidebarState.value == null && !post.videoAttachments.isNullOrEmpty()) {
+                                    if (viewModel.sidebarState.value == null) {
                                         onPlayVideo(post.id)
                                     }
                                },
@@ -387,9 +387,7 @@ fun TvHomeFeedScreen(
                         ),
                         actions = SidebarActions(
                             onPlay = { 
-                                if (!currentSidebarState.post.videoAttachments.isNullOrEmpty()) {
-                                    onPlayVideo(currentSidebarState.post.id)
-                                }
+                                onPlayVideo(currentSidebarState.post.id)
                             },
                             onLike = { viewModel.toggleSidebarLike() },
                             onDislike = { viewModel.toggleSidebarDislike() },

@@ -34,7 +34,7 @@ sealed class VideoPlayerState {
     object Loading : VideoPlayerState()
     data class Content(
         val blogPost: ContentPostV3Response,
-        val videoUrl: String,
+        val videoUrl: String?,
         // Interaction State
         val likes: Int,
         val dislikes: Int,
@@ -285,11 +285,41 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 val initialInteraction = post.userInteraction?.firstOrNull()
 
                 // 2. Get Video ID (first attachment)
+                // 2. Get Video ID (first attachment)
                 val videoId = post.videoAttachments?.firstOrNull()?.id
                 if (videoId == null) {
-                    // It might be a text/image post, but strictly for VideoPlayerScreen we expect video?
-                    // For parity with iOS, if no video, we just show content. But let's handle video flow first.
-                     _state.value = VideoPlayerState.Error("No video found in this post")
+                    // Non-video post (Text/Image)
+                    _state.value = VideoPlayerState.Content(
+                        blogPost = post,
+                        videoUrl = null,
+                        likes = post.likes,
+                        dislikes = post.dislikes,
+                        userInteraction = initialInteraction
+                    )
+                     // Load comments
+                    loadComments(postId)
+                    
+                    // Fetch user info
+                    launch {
+                         try {
+                                val userResponse = FloatplaneApi.userV3.getSelf()
+                                if (userResponse.isSuccessful && userResponse.body() != null) {
+                                    val userSelf = userResponse.body()!!
+                                    val userModel = UserModel(
+                                        id = userSelf.id,
+                                        username = userSelf.username,
+                                        profileImage = userSelf.profileImage
+                                    )
+                                    // Update state with current user
+                                    val updateState = _state.value as? VideoPlayerState.Content
+                                    if (updateState != null) {
+                                        _state.value = updateState.copy(currentUser = userModel)
+                                    }
+                                }
+                        } catch (e: Exception) {
+                            // Ignore
+                        }
+                    }
                     return@launch
                 }
 
