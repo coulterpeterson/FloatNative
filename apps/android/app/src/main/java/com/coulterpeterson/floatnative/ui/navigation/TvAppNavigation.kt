@@ -18,8 +18,8 @@ sealed class TvScreen(val route: String) {
     object LivePlayer : TvScreen("live_player/{liveStreamId}") {
         fun createRoute(liveStreamId: String) = "live_player/$liveStreamId"
     }
-    object Player : TvScreen("player/{videoId}?startTimestamp={startTimestamp}") {
-        fun createRoute(videoId: String, startTimestamp: Long = 0L) = "player/$videoId?startTimestamp=$startTimestamp"
+    object Player : TvScreen("player/{videoId}") {
+        fun createRoute(videoId: String) = "player/$videoId"
     }
 }
 
@@ -66,19 +66,11 @@ fun TvAppNavigation(
         
         composable(
             route = TvScreen.Player.route,
-            arguments = listOf(
-                navArgument("videoId") { type = NavType.StringType },
-                navArgument("startTimestamp") { 
-                    type = NavType.LongType 
-                    defaultValue = 0L
-                }
-            )
+            arguments = listOf(navArgument("videoId") { type = NavType.StringType })
         ) { backStackEntry ->
             val videoId = backStackEntry.arguments?.getString("videoId") ?: return@composable
-            val startTimestamp = backStackEntry.arguments?.getLong("startTimestamp") ?: 0L
             TvVideoPlayerScreen(
                 videoId = videoId,
-                startTimestamp = startTimestamp,
                 onBack = { navController.popBackStack() }
             )
         }
