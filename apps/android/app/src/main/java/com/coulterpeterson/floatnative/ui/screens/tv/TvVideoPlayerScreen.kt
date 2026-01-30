@@ -47,9 +47,13 @@ import com.coulterpeterson.floatnative.viewmodels.VideoPlayerViewModel
 fun TvVideoPlayerScreen(
     videoId: String,
     onBack: () -> Unit,
+    startTimestamp: Long = 0L,
     viewModel: VideoPlayerViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val sidebarMode by viewModel.sidebarMode.collectAsState()
+    
+    // ExoPlayer instance from ViewModel
     val exoPlayer = viewModel.player
     val context = LocalContext.current
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
@@ -58,15 +62,32 @@ fun TvVideoPlayerScreen(
         viewModel.loadVideo(videoId)
     }
 
+    // Initial Seek for Cast Resume
+    var hasPerformedInitialSeek by remember(videoId) { mutableStateOf(false) }
+
     // Handle Player state updates
     LaunchedEffect(state) {
         if (state is VideoPlayerState.Content) {
             val contentState = state as VideoPlayerState.Content
-            if (exoPlayer.currentMediaItem == null || exoPlayer.currentMediaItem?.localConfiguration?.uri.toString() != contentState.videoUrl) {
-                val mediaItem = MediaItem.fromUri(contentState.videoUrl)
-                exoPlayer.setMediaItem(mediaItem)
-                exoPlayer.prepare()
-                exoPlayer.play() 
+            if (contentState.videoUrl != null) {
+                if (exoPlayer.currentMediaItem == null || exoPlayer.currentMediaItem?.localConfiguration?.uri.toString() != contentState.videoUrl) {
+                    val mediaItem = MediaItem.fromUri(contentState.videoUrl)
+                    exoPlayer.setMediaItem(mediaItem)
+                    exoPlayer.prepare()
+                    
+                    if (startTimestamp > 0 && !hasPerformedInitialSeek) {
+                        exoPlayer.seekTo(startTimestamp)
+                        hasPerformedInitialSeek = true
+                    }
+                    
+                    exoPlayer.play() 
+                } else if (startTimestamp > 0 && !hasPerformedInitialSeek) {
+                     exoPlayer.seekTo(startTimestamp)
+                     hasPerformedInitialSeek = true
+                }
+            } else {
+                 exoPlayer.stop()
+                 exoPlayer.clearMediaItems()
             }
         }
     }
@@ -92,8 +113,7 @@ fun TvVideoPlayerScreen(
         }
     }
 
-    // Sidebar State
-    val sidebarMode by viewModel.sidebarMode.collectAsState()
+    // Sidebar State already collected above
 
     Row(
         modifier = Modifier
