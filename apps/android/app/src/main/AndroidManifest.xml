@@ -71,6 +71,8 @@
             android:name="com.google.android.gms.cast.tv.RECEIVER_OPTIONS_PROVIDER_CLASS_NAME"
             android:value="com.coulterpeterson.floatnative.cast.CastReceiverOptionsProvider" />
 
+
+
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
             android:value="com.coulterpeterson.floatnative.cast.CastOptionsProvider" />

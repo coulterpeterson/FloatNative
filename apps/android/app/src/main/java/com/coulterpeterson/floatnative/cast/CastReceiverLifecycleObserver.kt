@@ -7,22 +7,11 @@ import com.google.android.gms.cast.tv.CastReceiverContext
 
 /**
  * Manages CastReceiverContext lifecycle.
- * Start the receiver when activity is visible, stop when backgrounded.
+ * NOTE: CastReceiverContext.start() is called synchronously in TvMainActivity.onCreate()
+ * to ensure proper initialization order. This observer only handles stopping the context
+ * when the activity is backgrounded.
  */
-class CastReceiverLifecycleObserver(
-    private val onContextStarted: (() -> Unit)? = null
-) : DefaultLifecycleObserver {
-    
-    override fun onStart(owner: LifecycleOwner) {
-        try {
-            CastReceiverContext.getInstance().start()
-            Log.d("CastReceiver", "CastReceiverContext started")
-            // Invoke callback after context is started
-            onContextStarted?.invoke()
-        } catch (e: Exception) {
-            Log.e("CastReceiver", "Failed to start CastReceiverContext", e)
-        }
-    }
+class CastReceiverLifecycleObserver : DefaultLifecycleObserver {
     
     override fun onStop(owner: LifecycleOwner) {
         try {

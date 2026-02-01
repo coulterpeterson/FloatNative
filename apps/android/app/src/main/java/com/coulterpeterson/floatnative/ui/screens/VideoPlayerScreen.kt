@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
@@ -253,24 +255,35 @@ fun VideoPlayerScreen(
                                 private fun loadRemoteMedia(session: com.google.android.gms.cast.framework.CastSession) {
                                     if (state is VideoPlayerState.Content) {
                                         val content = state as VideoPlayerState.Content
-                                        val metadata = com.google.android.gms.cast.MediaMetadata(com.google.android.gms.cast.MediaMetadata.MEDIA_TYPE_MOVIE)
-                                        metadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_TITLE, content.blogPost.title)
-                                        metadata.putString(com.google.android.gms.cast.MediaMetadata.KEY_SUBTITLE, content.blogPost.channel.title)
-                                        // Add Image if available
-                                        val imageUrl = content.blogPost.thumbnail?.path
-                                        if (imageUrl != null) {
-                                            metadata.addImage(com.google.android.gms.common.images.WebImage(android.net.Uri.parse(imageUrl.toString())))
+                                        
+                                        val namespace = "urn:x-cast:com.floatnative.cast"
+                                        val jsonMessage = org.json.JSONObject().apply {
+                                            put("videoId", postId)
+                                            put("timestamp", currentPos)
+                                        }.toString()
+
+                                        // Launch a coroutine to retry sending the message a few times
+                                        // This handles the race condition where the TV app is still launching
+                                        (context as? androidx.lifecycle.LifecycleOwner)?.lifecycleScope?.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                            // Retry for 10 seconds (enough to cover the ~4s launch time)
+                                            repeat(10) { attempt ->
+                                                try {
+                                                    session.sendMessage(namespace, jsonMessage)
+                                                        .setResultCallback { result ->
+                                                            if (result.isSuccess) {
+                                                                android.util.Log.d("CastSender", "Message sent successfully (attempt $attempt): $jsonMessage")
+                                                            } else {
+                                                                android.util.Log.e("CastSender", "Result Error sending message (attempt $attempt): ${result.status}")
+                                                            }
+                                                        }
+                                                } catch (e: Exception) {
+                                                    android.util.Log.e("CastSender", "Exception sending message (attempt $attempt)", e)
+                                                }
+                                                
+                                                // Wait 1 second before next attempt
+                                                kotlinx.coroutines.delay(1000)
+                                            }
                                         }
-    
-                                        val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(postId) // Use postId as contentId
-                                            .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_BUFFERED)
-                                            .setContentType("video/mp4") // Defaulting/Generic
-                                            .setMetadata(metadata)
-                                            .build()
-                                            
-                                        // Load
-                                        val remoteMediaClient = session.remoteMediaClient
-                                        remoteMediaClient?.load(mediaInfo, true, currentPos)
                                     }
                                 }
                             }

@@ -122,6 +122,7 @@ fun LivePlayerScreen(
                             } catch (e: Exception) {}
 
                             val mediaInfo = com.google.android.gms.cast.MediaInfo.Builder(liveStreamId)
+                                .setEntity("https://www.floatplane.com/live/$liveStreamId") // Satisfy WargLoadHandler's URI check
                                 .setStreamType(com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE)
                                 .setContentType("application/x-mpegurl") // HLS usually
                                 .setMetadata(metadata)
