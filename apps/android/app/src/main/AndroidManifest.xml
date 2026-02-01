@@ -68,7 +68,7 @@
         </provider>
 
         <meta-data
-            android:name="com.google.android.gms.cast.tv.OPTIONS_PROVIDER_CLASS_NAME"
+            android:name="com.google.android.gms.cast.tv.RECEIVER_OPTIONS_PROVIDER_CLASS_NAME"
             android:value="com.coulterpeterson.floatnative.cast.CastReceiverOptionsProvider" />
 
         <meta-data

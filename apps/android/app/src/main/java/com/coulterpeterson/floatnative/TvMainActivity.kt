@@ -1,6 +1,8 @@
 package com.coulterpeterson.floatnative
 
+import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,14 +21,34 @@ import com.coulterpeterson.floatnative.ui.theme.Pink80
 import com.coulterpeterson.floatnative.ui.theme.Purple80
 import com.coulterpeterson.floatnative.ui.theme.PurpleGrey80
 import kotlinx.coroutines.launch
+import com.google.android.gms.cast.tv.CastReceiverContext
+import com.google.android.gms.cast.tv.media.MediaLoadCommandCallback
+import com.google.android.gms.cast.MediaLoadRequestData
+import com.google.android.gms.tasks.Task
+import com.google.android.gms.tasks.Tasks
 
 class TvMainActivity : ComponentActivity() {
+    
+    // Pending cast load data - set when a LOAD request comes in before navigation is ready
+    private var pendingCastLoad: CastLoadData? = null
+    
+    data class CastLoadData(
+        val contentId: String,
+        val isLive: Boolean,
+        val startPosition: Long
+    )
+    
     @OptIn(ExperimentalTvMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Register Cast Receiver lifecycle observer
-        lifecycle.addObserver(com.coulterpeterson.floatnative.cast.CastReceiverLifecycleObserver())
+        // Register Cast Receiver lifecycle observer with callback to set up media handling
+        // The callback is invoked AFTER CastReceiverContext.start() so MediaManager is ready
+        lifecycle.addObserver(
+            com.coulterpeterson.floatnative.cast.CastReceiverLifecycleObserver(
+                onContextStarted = { setupCastMediaCallback() }
+            )
+        )
         
         setContent {
             val darkColorScheme = darkColorScheme(
@@ -61,41 +83,21 @@ class TvMainActivity : ComponentActivity() {
                     } else {
                         val navController = androidx.navigation.compose.rememberNavController()
                         
-                        // Setup Cast Receiver
+                        // Check for pending cast load when navigation is ready
                         androidx.compose.runtime.LaunchedEffect(Unit) {
-                            try {
-                                val castContext = com.google.android.gms.cast.tv.CastReceiverContext.getInstance()
-                                val mediaManager = castContext.mediaManager
-                                
-                                mediaManager.setMediaLoadCommandCallback(object : com.google.android.gms.cast.tv.media.MediaLoadCommandCallback() {
-                                    override fun onLoad(senderId: String?, loadRequestData: com.google.android.gms.cast.MediaLoadRequestData): com.google.android.gms.tasks.Task<com.google.android.gms.cast.MediaLoadRequestData> {
-                                        if (loadRequestData != null) {
-                                            val mediaInfo = loadRequestData.mediaInfo
-                                            if (mediaInfo != null) {
-                                                val contentId = mediaInfo.contentId
-                                                val customData = mediaInfo.customData
-                                                val isLive = customData?.optString("type") == "LIVE" || mediaInfo.streamType == com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE
-                                                
-                                                val startPosition = loadRequestData.currentTime
-                                                
-                                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                                                    android.util.Log.d("CastReceiver", "Received Load Request: $contentId, isLive=$isLive, startPos=$startPosition")
-                                                    if (isLive) {
-                                                        navController.navigate("live_player/$contentId")
-                                                    } else {
-                                                        // Pass startTimestamp to the route
-                                                        navController.navigate(com.coulterpeterson.floatnative.ui.navigation.TvScreen.Player.createRoute(contentId, startPosition))
-                                                    }
-                                                }
-                                            }
-                                            // Return the request data as success
-                                            return com.google.android.gms.tasks.Tasks.forResult(loadRequestData)
-                                        }
-                                        return com.google.android.gms.tasks.Tasks.forResult(null)
-                                    }
-                                })
-                            } catch (e: Exception) {
-                                android.util.Log.e("CastReceiver", "Error initializing Cast Context", e)
+                            pendingCastLoad?.let { loadData ->
+                                Log.d("CastReceiver", "Processing pending cast load: ${loadData.contentId}")
+                                if (loadData.isLive) {
+                                    navController.navigate("live_player/${loadData.contentId}")
+                                } else {
+                                    navController.navigate(
+                                        com.coulterpeterson.floatnative.ui.navigation.TvScreen.Player.createRoute(
+                                            loadData.contentId, 
+                                            loadData.startPosition
+                                        )
+                                    )
+                                }
+                                pendingCastLoad = null
                             }
                         }
 
@@ -106,6 +108,65 @@ class TvMainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+    
+    override fun onStart() {
+        super.onStart()
+        // Pass the intent to MediaManager to handle Cast LOAD intents
+        try {
+            val mediaManager = CastReceiverContext.getInstance().mediaManager
+            if (mediaManager.onNewIntent(intent)) {
+                Log.d("CastReceiver", "onStart: MediaManager handled the intent")
+            }
+        } catch (e: Exception) {
+            Log.e("CastReceiver", "onStart: Error passing intent to MediaManager", e)
+        }
+    }
+    
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // For cases where a new load intent triggers onNewIntent() instead of onStart()
+        try {
+            val mediaManager = CastReceiverContext.getInstance().mediaManager
+            if (mediaManager.onNewIntent(intent)) {
+                Log.d("CastReceiver", "onNewIntent: MediaManager handled the intent")
+            }
+        } catch (e: Exception) {
+            Log.e("CastReceiver", "onNewIntent: Error passing intent to MediaManager", e)
+        }
+    }
+    
+    private fun setupCastMediaCallback() {
+        try {
+            val castContext = CastReceiverContext.getInstance()
+            val mediaManager = castContext.mediaManager
+            
+            mediaManager.setMediaLoadCommandCallback(object : MediaLoadCommandCallback() {
+                override fun onLoad(senderId: String?, loadRequestData: MediaLoadRequestData): Task<MediaLoadRequestData> {
+                    Log.d("CastReceiver", "Received Load Request from sender: $senderId")
+                    
+                    val mediaInfo = loadRequestData.mediaInfo
+                    if (mediaInfo != null) {
+                        val contentId = mediaInfo.contentId ?: ""
+                        val customData = mediaInfo.customData
+                        val isLive = customData?.optString("type") == "LIVE" || 
+                                     mediaInfo.streamType == com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE
+                        val startPosition = loadRequestData.currentTime
+                        
+                        Log.d("CastReceiver", "Load Request details: contentId=$contentId, isLive=$isLive, startPos=$startPosition")
+                        
+                        // Store pending load data - will be processed when navigation is ready
+                        pendingCastLoad = CastLoadData(contentId, isLive, startPosition)
+                    }
+                    
+                    return Tasks.forResult(loadRequestData)
+                }
+            })
+            
+            Log.d("CastReceiver", "MediaLoadCommandCallback set up successfully")
+        } catch (e: Exception) {
+            Log.e("CastReceiver", "Error setting up MediaLoadCommandCallback", e)
         }
     }
 }
