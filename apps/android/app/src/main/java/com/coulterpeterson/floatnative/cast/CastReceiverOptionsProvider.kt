@@ -10,6 +10,7 @@ class CastReceiverOptionsProvider : ReceiverOptionsProvider {
         return CastReceiverOptions.Builder(context)
             .setStatusText("Casting to FloatNative")
             .setVersionCode(1)
+            .setCustomNamespaces(listOf("urn:x-cast:com.coulterpeterson.floatnative.handshake"))
             .build()
     }
 }

@@ -62,25 +62,33 @@ class TvMainActivity : ComponentActivity() {
             Log.d("CastReceiver", "CastReceiverContext initialized via initInstance")
             
             // Custom Message Listener
-            val namespace = "urn:x-cast:com.floatnative.cast"
-            CastReceiverContext.getInstance().setMessageReceivedListener(namespace) { p1: String, p2: String?, p3: String ->
-                Log.d("CastReceiver", "Received Custom Message: p1=$p1, p2=$p2, p3=$p3")
-                // Assuming p3 is message based on typical (namespace, senderId, message) or similar.
-                // Let's try to parse the one that looks like JSON.
-                val message = if (p3.trim().startsWith("{")) p3 else if (p1.trim().startsWith("{")) p1 else ""
+            val namespace = "urn:x-cast:com.coulterpeterson.floatnative.handshake"
+            CastReceiverContext.getInstance().setMessageReceivedListener(namespace) { castDevice, namespace, message ->
+                Log.d("CastReceiver", "Received Custom Message: $message from $namespace")
+                
+                if (message == "PING") {
+                    Log.d("CastReceiver", "Received PING. Sending PONG...")
+                    try {
+                         CastReceiverContext.getInstance().sendMessage(castDevice, namespace, "PONG")
+                    } catch (e: Exception) {
+                        Log.e("CastReceiver", "Failed to send PONG", e)
+                    }
+                    return@setMessageReceivedListener
+                }
+                
+                // Legacy JSON handling (if needed)
+                val jsonMessage = if (message.trim().startsWith("{")) message else ""
                 
                 try {
-                    val json = JSONObject(message)
+                    val json = JSONObject(jsonMessage)
                     val videoId = json.getString("videoId")
                     val timestamp = json.optLong("timestamp", 0L)
-                    val isLive = false // Assume VOD for now via this channel
+                    val isLive = false 
                     
                     Log.d("CastReceiver", "Parsed Custom Message: videoId=$videoId, timestamp=$timestamp")
-                    
-                    // Directly set pending load - LaunchedEffect in setContent will pick it up
                     pendingCastLoad = CastLoadData(videoId, isLive, timestamp)
                 } catch (e: Exception) {
-                    Log.e("CastReceiver", "Failed to parse custom message", e)
+                    // Ignore non-JSON or malformed
                 }
             }
             

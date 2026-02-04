@@ -14,8 +14,8 @@ android {
         applicationId = "com.coulterpeterson.floatnative"
         minSdk = 26
         targetSdk = 36
-        versionCode = 19
-        versionName = "1.18"
+        versionCode = 28
+        versionName = "1.27"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

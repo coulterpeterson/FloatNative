@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.isActive
 import androidx.core.content.FileProvider
 import okhttp3.Request
 import java.io.InputStream
@@ -951,6 +952,97 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun closeSidebar() {
         _sidebarMode.value = PlayerSidebarMode.None
+    }
+
+    // Cast Debounce State
+    private var lastCastLoadTime = 0L
+    
+    // Checks if we should proceed with a cast load request
+    // Returns true only once every 3 seconds
+    fun shouldCastLoad(): Boolean {
+        val now = System.currentTimeMillis()
+        val diff = now - lastCastLoadTime
+        if (diff < 3000) {
+            android.util.Log.w("CastSender", "Debounce BLOCKED: Diff=${diff}ms < 3000ms. Last=$lastCastLoadTime, Now=$now")
+            return false
+        }
+        android.util.Log.d("CastSender", "Debounce ALLOWED: Diff=${diff}ms > 3000ms. Last=$lastCastLoadTime, Now=$now")
+        lastCastLoadTime = now
+        return true
+    }
+
+    // Handshake Event
+    private val _castLoadCommandEvent = MutableSharedFlow<Unit>()
+    val castLoadCommandEvent = _castLoadCommandEvent.asSharedFlow()
+
+    private var handshakeJob: kotlinx.coroutines.Job? = null
+
+    fun startCastHandshake(session: com.google.android.gms.cast.framework.CastSession) {
+        handshakeJob?.cancel()
+        handshakeJob = viewModelScope.launch {
+            val namespace = "urn:x-cast:com.coulterpeterson.floatnative.handshake"
+            android.util.Log.d("CastSender", "[Handshake] Starting... Registering Listener")
+            
+            try {
+                session.setMessageReceivedCallbacks(namespace) { castSession, channel, message ->
+                    android.util.Log.d("CastSender", "[Handshake] Received message: $message")
+                    if (message == "PONG") {
+                         android.util.Log.d("CastSender", "[Handshake] PONG Received! Receiver is READY.")
+                         android.util.Log.d("CastSender", "[Handshake] Triggering Load Request")
+                         // Cancel the retry loop
+                         handshakeJob?.cancel()
+                         // Signal UI to load
+                         launch { _castLoadCommandEvent.emit(Unit) }
+                    }
+                }
+            } catch (e: Exception) {
+                 android.util.Log.e("CastSender", "[Handshake] Failed to register callback", e)
+            }
+            
+            var attempt = 1
+            // Increased to 30 attempts (30 seconds) because some TVs are slow to wake up/init
+            while (isActive && attempt <= 30) {
+                 android.util.Log.d("CastSender", "[Handshake] Sending PING (Attempt $attempt)")
+                 try {
+                     session.sendMessage(namespace, "PING")
+                        .setResultCallback { result ->
+                            if (!result.status.isSuccess) {
+                                android.util.Log.w("CastSender", "[Handshake] PING failed to send: ${result.status.statusCode}")
+                            }
+                        }
+                 } catch (e: Exception) {
+                     android.util.Log.e("CastSender", "[Handshake] PING exception", e)
+                 }
+                 
+                 kotlinx.coroutines.delay(1000)
+                 attempt++
+            }
+            
+            if (isActive) {
+                android.util.Log.e("CastSender", "[Handshake] Timed out waiting for PONG after 30 attempts.")
+                // Fallback? Or just fail? Let's assume fail for now to be deterministic.
+            }
+        }
+    }
+    fun sendCustomLoadMessage(session: com.google.android.gms.cast.framework.CastSession, videoId: String, position: Long) {
+        val namespace = "urn:x-cast:com.coulterpeterson.floatnative.handshake"
+        // Manual JSON construction to avoid import issues
+        val message = "{ \"videoId\": \"$videoId\", \"isLive\": false, \"timestamp\": $position }"
+        
+        android.util.Log.d("CastSender", "Sending Custom Load Message: $message")
+        
+        try {
+             session.sendMessage(namespace, message)
+                .setResultCallback { result ->
+                     if (result.status.isSuccess) {
+                         android.util.Log.d("CastSender", "Custom Load Message sent successfully")
+                     } else {
+                         android.util.Log.e("CastSender", "Failed to send Custom Load Message: ${result.status.statusCode}")
+                     }
+                }
+        } catch (e: Exception) {
+             android.util.Log.e("CastSender", "Exception sending Custom Load Message", e)
+        }
     }
 }
 
