@@ -40,7 +40,8 @@ class TvMainActivity : ComponentActivity() {
         set(value) { pendingCastLoadState.value = value }
     
     data class CastLoadData(
-        val contentId: String,
+        val postId: String,
+        val videoId: String?,
         val isLive: Boolean,
         val startPosition: Long
     )
@@ -81,12 +82,14 @@ class TvMainActivity : ComponentActivity() {
                 
                 try {
                     val json = JSONObject(jsonMessage)
-                    val videoId = json.getString("videoId")
+                    val videoId = json.optString("videoId")
+                    // Parse postId - fallback to videoId if missing (desperate attempt, or assume sender is old)
+                    val postId = json.optString("postId", videoId) 
                     val timestamp = json.optLong("timestamp", 0L)
                     val isLive = false 
                     
-                    Log.d("CastReceiver", "Parsed Custom Message: videoId=$videoId, timestamp=$timestamp")
-                    pendingCastLoad = CastLoadData(videoId, isLive, timestamp)
+                    Log.d("CastReceiver", "Parsed Custom Message: postId=$postId, videoId=$videoId, timestamp=$timestamp")
+                    pendingCastLoad = CastLoadData(postId, videoId, isLive, timestamp)
                 } catch (e: Exception) {
                     // Ignore non-JSON or malformed
                 }
@@ -103,7 +106,7 @@ class TvMainActivity : ComponentActivity() {
             Log.e("CastReceiver", "Failed to start CastReceiverContext", e)
         }
         
-
+        
 
         // Set up the callback BEFORE calling onNewIntent
         setupCastMediaCallback()
@@ -161,13 +164,15 @@ class TvMainActivity : ComponentActivity() {
                         // We use a side-effect that triggers whenever our 'pendingCastLoadState' changes
                         androidx.compose.runtime.LaunchedEffect(pendingCastLoadState.value) {
                             pendingCastLoadState.value?.let { loadData ->
-                                Log.d("CastReceiver", "Processing pending cast load: ${loadData.contentId}")
+                                Log.d("CastReceiver", "Processing pending cast load: postId=${loadData.postId}")
                                 if (loadData.isLive) {
-                                    navController.navigate("live_player/${loadData.contentId}")
+                                    // For live, we might use videoId or contentId depending on what LivePlayer expects,
+                                    // but usually it's the stream ID. Assuming postId maps to it or using videoId if available.
+                                    navController.navigate("live_player/${loadData.postId}")
                                 } else {
                                     navController.navigate(
                                         com.coulterpeterson.floatnative.ui.navigation.TvScreen.Player.createRoute(
-                                            loadData.contentId, 
+                                            loadData.postId, 
                                             loadData.startPosition
                                         )
                                     )
@@ -242,8 +247,8 @@ class TvMainActivity : ComponentActivity() {
                         
                         Log.d("CastReceiver", "Load Request details: contentId=$contentId, isLive=$isLive, startPos=$startPosition")
                         
-                        // Store pending load data - will be processed when navigation is ready
-                        pendingCastLoad = CastLoadData(contentId, isLive, startPosition)
+                        // Treat contentId as postId for now
+                        pendingCastLoad = CastLoadData(contentId, null, isLive, startPosition)
                     }
                     
                     return Tasks.forResult(loadRequestData)

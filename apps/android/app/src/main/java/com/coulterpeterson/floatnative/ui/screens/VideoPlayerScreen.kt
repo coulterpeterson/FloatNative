@@ -242,69 +242,10 @@ fun VideoPlayerScreen(
                         // Generate a unique ID for this listener instance to track if it's being recreated
                         val listenerId = remember { java.util.UUID.randomUUID().toString().substring(0, 8) }
                         
-                        // Listen for Handshake Success Event from ViewModel
-                        LaunchedEffect(Unit) {
-                            viewModel.castLoadCommandEvent.collect {
-                                com.google.android.gms.cast.framework.CastContext.getSharedInstance(context).sessionManager.currentCastSession?.let { session ->
-                                     android.util.Log.d("CastSender", "[$listenerId] Handshake Success Event Received. Loading Media NOW.")
-                                     // We can call loadRemoteMedia directly here. 
-                                     // The debounce inside loadRemoteMedia will still protect us if multiple events fire somehow,
-                                     // but the event should be singular.
-                                     // We need to access the private loadRemoteMedia... wait, we can't calls private functions from outside the object.
-                                     // We need a way to trigger the load.
-                                     // Actually, since this listener is created inside the composable, we can't easily call it from here 
-                                     // unless we expose the session to the viewModel or have the viewModel trigger a callback we pass to it.
-                                     
-                                     // BETTER APPROACH: 
-                                     // The listener calls viewModel.startCastHandshake(session).
-                                     // The viewModel emits the event.
-                                     // BUT the ACT of loading media uses `session.remoteMediaClient`. 
-                                     // We can just execute the load logic HERE in the LaunchedEffect if we have the session.
-                                     // OR we just define the load function outside the listener object but inside the remember block?
-                                     // Let's refactor slightly to make `loadRemoteMedia` a lambda or accessible function.
-                                }
-                            }
-                        }
+
 
                         // Define load logic as a lambda so it can be called from both the listener (if needed) and the event 
-                        val loadRemoteMedia = remember(currentVideoState, exoPlayer, postId) {
-                             { session: com.google.android.gms.cast.framework.CastSession -> 
-                                    android.util.Log.d("CastSender", "[$listenerId] loadRemoteMedia called")
-                                    
-                                    // Use ViewModel for global/stable debounce
-                                    if (!viewModel.shouldCastLoad()) {
-                                        android.util.Log.w("CastSender", "[$listenerId] Skipping duplicate load request (Debounced by ViewModel)")
-                                    } else {
-                                        if (currentVideoState is VideoPlayerState.Content) {
-                                            val content = currentVideoState as VideoPlayerState.Content
-                                            
-                                            val videoId = content.blogPost.videoAttachments?.firstOrNull()?.id
-                                            val currentMs = exoPlayer.currentPosition
-                                            
-                                            if (videoId != null) {
-                                                 android.util.Log.d("CastSender", "[$listenerId] Loading media via Custom Message: videoId=$videoId, position=$currentMs")
-                                                 viewModel.sendCustomLoadMessage(session, videoId, currentMs)
-                                            } else {
-                                                 android.util.Log.e("CastSender", "[$listenerId] Cannot cast: No video ID found in content.")
-                                            }
-                                        }
-                                    }
-                             }
-                        }
 
-                        // Listen for Handshake Success Event
-                        LaunchedEffect(Unit) {
-                            viewModel.castLoadCommandEvent.collect {
-                                // Get current session
-                                val session = com.google.android.gms.cast.framework.CastContext.getSharedInstance(context).sessionManager.currentCastSession
-                                if (session != null && session.isConnected) {
-                                     android.util.Log.d("CastSender", "[$listenerId] Handshake Success Event Received. Loading Media NOW.")
-                                     loadRemoteMedia(session)
-                                } else {
-                                     android.util.Log.w("CastSender", "[$listenerId] Handshake Success received but Session is null or not connected.")
-                                }
-                            }
-                        }
 
                         val castSessionListener = remember(exoPlayer, postId) {
                             android.util.Log.d("CastSender", "Creating NEW SessionManagerListener with ID: $listenerId")

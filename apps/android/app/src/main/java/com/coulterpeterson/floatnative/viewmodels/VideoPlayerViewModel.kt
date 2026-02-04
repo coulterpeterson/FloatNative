@@ -971,9 +971,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         return true
     }
 
-    // Handshake Event
-    private val _castLoadCommandEvent = MutableSharedFlow<Unit>()
-    val castLoadCommandEvent = _castLoadCommandEvent.asSharedFlow()
+
 
     private var handshakeJob: kotlinx.coroutines.Job? = null
 
@@ -991,8 +989,22 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                          android.util.Log.d("CastSender", "[Handshake] Triggering Load Request")
                          // Cancel the retry loop
                          handshakeJob?.cancel()
-                         // Signal UI to load
-                         launch { _castLoadCommandEvent.emit(Unit) }
+                         
+                         // Get necessary data from ViewModel state
+                         val currentState = _state.value
+                         if (currentState is VideoPlayerState.Content) {
+                             val postId = currentState.blogPost.id
+                             val videoId = currentState.blogPost.videoAttachments?.firstOrNull()?.id
+                             val position = player.currentPosition
+                             
+                             if (videoId != null) {
+                                 sendCustomLoadMessage(session, videoId, postId, position)
+                             } else {
+                                  android.util.Log.e("CastSender", "[Handshake] Cannot cast: No video ID from state.")
+                             }
+                         } else {
+                              android.util.Log.e("CastSender", "[Handshake] Cannot cast: Not in Content state.")
+                         }
                     }
                 }
             } catch (e: Exception) {
@@ -1024,10 +1036,10 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
     }
-    fun sendCustomLoadMessage(session: com.google.android.gms.cast.framework.CastSession, videoId: String, position: Long) {
+    fun sendCustomLoadMessage(session: com.google.android.gms.cast.framework.CastSession, videoId: String, postId: String, position: Long) {
         val namespace = "urn:x-cast:com.coulterpeterson.floatnative.handshake"
-        // Manual JSON construction to avoid import issues
-        val message = "{ \"videoId\": \"$videoId\", \"isLive\": false, \"timestamp\": $position }"
+        // Manual JSON construction
+        val message = "{ \"videoId\": \"$videoId\", \"postId\": \"$postId\", \"isLive\": false, \"timestamp\": $position }"
         
         android.util.Log.d("CastSender", "Sending Custom Load Message: $message")
         
