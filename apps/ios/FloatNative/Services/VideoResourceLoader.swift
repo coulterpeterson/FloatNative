@@ -83,6 +83,12 @@ class VideoResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
             throw URLError(.cannotDecodeContentData)
         }
         
+        // Extract Token from Master URL (if present)
+        var masterToken: String?
+        if let components = URLComponents(url: realURL, resolvingAgainstBaseURL: true) {
+            masterToken = components.queryItems?.first(where: { $0.name == "token" })?.value
+        }
+        
         // 2. Rewrite Manifest
         // Base URL for resolving relative paths
         let baseURL = realURL.deletingLastPathComponent()
@@ -92,18 +98,30 @@ class VideoResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
         manifestString.enumerateLines { line, _ in
             var processedLine = line
             
-            // A. Rewrite KEY URIs to force interception
+            // A. Rewrite KEY URIs
             // Format: #EXT-X-KEY:METHOD=AES-128,URI="https://..."
             if line.contains("#EXT-X-KEY") {
                 if let range = line.range(of: "URI=\"") {
                      let rest = line[range.upperBound...]
                      if let endQuote = rest.firstIndex(of: "\"") {
                          let keyUriString = String(rest[..<endQuote])
-                         // If it's already absolute http/s, replace scheme.
-                         // If relative, make absolute first, then replace scheme.
+                         
+                         // Resolve to absolute URL
                          if let keyURL = URL(string: keyUriString, relativeTo: baseURL) {
                              var keyComponents = URLComponents(url: keyURL, resolvingAgainstBaseURL: true)
-                             keyComponents?.scheme = self.customScheme
+                             
+                             // 1. Force HTTPS (Bypass Interception/Auth Headers)
+                             keyComponents?.scheme = "https"
+                             
+                             // 2. Inject Token
+                             if let token = masterToken {
+                                 var queryItems = keyComponents?.queryItems ?? []
+                                 if !queryItems.contains(where: { $0.name == "token" }) {
+                                     queryItems.append(URLQueryItem(name: "token", value: token))
+                                     keyComponents?.queryItems = queryItems
+                                 }
+                             }
+                             
                              if let newKeyUri = keyComponents?.string {
                                  processedLine = line.replacingOccurrences(of: keyUriString, with: newKeyUri)
                              }
@@ -111,13 +129,27 @@ class VideoResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
                      }
                 }
             }
-            // B. Rewrite Segment URLs to Absolute HTTPS (to bypass interception)
+            // B. Rewrite Segment/Variant URLs
             // Lines that are not tags (#) and not empty are URIs
             else if !line.hasPrefix("#") && !line.isEmpty {
                  if let segmentURL = URL(string: line, relativeTo: baseURL) {
-                     // Ensure scheme is http/https
-                     if segmentURL.scheme == "http" || segmentURL.scheme == "https" {
-                         processedLine = segmentURL.absoluteString
+                     // Resolve absolute URL
+                     if var components = URLComponents(url: segmentURL, resolvingAgainstBaseURL: true) {
+                         // 1. Force HTTPS (Bypass Interception/Auth Headers)
+                         components.scheme = "https"
+                         
+                         // 2. Inject Token
+                         if let token = masterToken {
+                             var queryItems = components.queryItems ?? []
+                             if !queryItems.contains(where: { $0.name == "token" }) {
+                                 queryItems.append(URLQueryItem(name: "token", value: token))
+                                 components.queryItems = queryItems
+                             }
+                         }
+                         
+                         if let absString = components.string {
+                             processedLine = absString
+                         }
                      }
                  }
             }
