@@ -262,7 +262,7 @@ class HomeFeedViewModel: ObservableObject {
                             let deliveryInfo = try await self.api.getDeliveryInfo(
                                 scenario: .live,
                                 entityId: liveStreamId,
-                                outputKind: .hlsFmp4 // Use HLS just like Android's hlsPeriodMpegts/fmp4 choice
+                                outputKind: .hlsMpegts // Use HLS just like Android's hlsPeriodMpegts choice
                             )
                             
                             // 2. Extract Master URL
