@@ -10,6 +10,8 @@ services:
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - DB_NAME=floatnative
+      - FLOATPLANE_SAILS_SID=${FLOATPLANE_SAILS_SID}
+      - FLOATPLANE_API_URL=${FLOATPLANE_API_URL}
     depends_on:
       - postgres
     networks:
