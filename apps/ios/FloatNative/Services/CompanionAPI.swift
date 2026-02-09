@@ -181,9 +181,9 @@ class CompanionAPI: ObservableObject {
         
         do {
             return try await login(accessToken: accessToken)
-        } catch {
-            // If login failed (e.g. token expired), try refreshing the token
-            print("⚠️ Companion API login failed: \(error.localizedDescription). Attempting token refresh...")
+        } catch CompanionAPIError.httpError(let statusCode, _) where statusCode == 401 {
+            // Only try to refresh if we get a 401 Unauthorized
+            print("⚠️ Companion API login 401 Unauthorized. Attempting token refresh...")
             try await FloatplaneAPI.shared.refreshAccessToken()
             
             guard let newToken = FloatplaneAPI.shared.accessToken else {
@@ -191,6 +191,10 @@ class CompanionAPI: ObservableObject {
             }
             
             return try await login(accessToken: newToken)
+        } catch {
+            // For other errors (network, 500, etc), rethrow without refreshing token
+            print("❌ Companion API login failed: \(error.localizedDescription).")
+            throw error
         }
     }
 
