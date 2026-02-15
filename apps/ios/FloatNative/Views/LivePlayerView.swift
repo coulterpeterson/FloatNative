@@ -228,12 +228,11 @@ struct LivePlayerView: View {
         errorMessage = nil
         
         do {
-            // Use .hlsMpegts for robust AVPlayer playback (solves "Bad Data" / err=-8969).
-            // We are using Token Injection via VideoResourceLoader to handle auth.
+            // Revert to nil (Android behavior) as hls.mpegts didn't fix video
             let deliveryInfo = try await api.getDeliveryInfo(
                 scenario: .live,
                 entityId: liveStream.id,
-                outputKind: .hlsMpegts
+                outputKind: nil
             )
             
             let qualities = deliveryInfo.availableVariants()

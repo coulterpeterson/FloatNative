@@ -247,23 +247,36 @@ class AVPlayerManager: NSObject, ObservableObject {
         // Clean up old player
         cleanupPlayer()
         
-        // Convert URL to custom scheme to force interception via VideoResourceLoader
-        // This allows us to Inject Tokens into the manifest for Live streams,
-        // and inject Auth Headers for VOD streams.
-        guard var components = URLComponents(string: url) else {
-            throw FloatplaneAPIError.invalidURL
-        }
-        components.scheme = "floatnative" // Must match VideoResourceLoader.customScheme
+        let asset: AVURLAsset
         
-        guard let streamURL = components.url else {
-            throw FloatplaneAPIError.invalidURL
-        }
-        
-        print("📼 [AVPlayerManager] Loading stream with interception (Live: \(isLive)): \(streamURL)")
+        if isLive {
+            // Bypass VideoResourceLoader for Live Streams
+            // Use the original URL directly so AVPlayer handles HLS natively
+            guard let streamURL = URL(string: url) else {
+                throw FloatplaneAPIError.invalidURL
+            }
+            print("📡 [AVPlayerManager] Loading LIVE stream directly: \(streamURL)")
+            
+            // Create asset without custom resource loader
+            asset = AVURLAsset(url: streamURL)
+            // No resourceLoader delegate set for live streams
+        } else {
+            // Convert HTTP/HTTPS to custom scheme to force interception via VideoResourceLoader
+            guard var components = URLComponents(string: url) else {
+                throw FloatplaneAPIError.invalidURL
+            }
+            components.scheme = "floatnative" // Must match VideoResourceLoader.customScheme
+            
+            guard let streamURL = components.url else {
+                throw FloatplaneAPIError.invalidURL
+            }
+            print("📼 [AVPlayerManager] Loading VOD stream with interception: \(streamURL)")
 
-        // Create new player with Interceptor
-        let asset = AVURLAsset(url: streamURL)
-        asset.resourceLoader.setDelegate(resourceLoader, queue: DispatchQueue.global(qos: .userInitiated))
+            // Create new player with Interceptor
+            // We do NOT pass headers here because the ResourceLoader will handle the request.
+            asset = AVURLAsset(url: streamURL)
+            asset.resourceLoader.setDelegate(resourceLoader, queue: DispatchQueue.global(qos: .userInitiated))
+        }
 
         let playerItem = AVPlayerItem(asset: asset)
 
