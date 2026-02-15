@@ -324,9 +324,36 @@ struct PlaylistsView: View {
         playlistPosts = []
 
         Task {
-            await playlistVideoViewModel.loadPostsFromPlaylist(playlist: playlist)
-            playlistPosts = playlistVideoViewModel.posts
-            isLoadingPlaylistPosts = false
+            // First, reload playlists to ensure we have the freshest data
+            // This prevents stale data when user taps playlist before .onAppear reload completes
+            do {
+                let freshPlaylists = try await companionAPI.getPlaylists(includeWatchLater: true)
+
+                // Find the fresh version of the selected playlist
+                guard let freshPlaylist = freshPlaylists.first(where: { $0.id == playlist.id }) else {
+                    print("❌ Playlist '\(playlist.name)' not found in fresh data")
+                    isLoadingPlaylistPosts = false
+                    return
+                }
+
+                // Update the playlists state with fresh data
+                playlists = freshPlaylists
+
+                // Update selectedPlaylist to the fresh version
+                selectedPlaylist = freshPlaylist
+
+                // Also reload thumbnails for the fresh playlists
+                await loadThumbnails(for: freshPlaylists)
+
+                // Now load posts from the fresh playlist
+                await playlistVideoViewModel.loadPostsFromPlaylist(playlist: freshPlaylist)
+
+                playlistPosts = playlistVideoViewModel.posts
+                isLoadingPlaylistPosts = false
+            } catch {
+                print("❌ Failed to reload playlists: \(error)")
+                isLoadingPlaylistPosts = false
+            }
         }
     }
 
