@@ -58,6 +58,19 @@ fun VideoPlayerScreen(
     onClose: () -> Unit = {},
     viewModel: VideoPlayerViewModel = viewModel()
 ) {
+    // Collect the playback state from ViewModel
+    val isPlaying by viewModel.isPlaying.collectAsState()
+
+    // Get the current Compose view
+    val view: View = LocalView.current
+
+    // Keep the screen awake while video is playing
+    DisposableEffect(isPlaying) {
+        view.keepScreenOn = isPlaying
+        onDispose {
+            view.keepScreenOn = false
+        }
+    }
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
     val downloadState by viewModel.downloadState.collectAsState()
