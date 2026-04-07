@@ -30,6 +30,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app_network
+    restart: always
 
   db-backup:
     image: postgres:16-alpine
