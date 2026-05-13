@@ -68,9 +68,6 @@ data class PlanInfoV2ResponsePlansInner (
     @Json(name = "logo")
     val logo: kotlin.String?,
 
-    @Json(name = "interval")
-    val interval: kotlin.String,
-
     @Json(name = "featured")
     val featured: kotlin.Boolean,
 
