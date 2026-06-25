@@ -60,6 +60,12 @@ struct VideoPlayerView: View {
     // Quality selector state
     @State private var isChangingQuality = false
 
+    /// Tracks physical device orientation for UI that must stay visible while
+    /// the keyboard is open. GeometryReader width/height flips to "landscape"
+    /// when the keyboard shrinks the available height, which was removing the
+    /// comment composer and immediately dismissing focus.
+    @State private var isDeviceLandscape = false
+
     // Computed properties for UI
     private var hasLiked: Bool {
         userInteraction == .like
@@ -74,82 +80,74 @@ struct VideoPlayerView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            let isLandscape = geometry.size.width > geometry.size.height
+        ZStack {
+            // Background
+            Color.adaptiveBackground
+                .ignoresSafeArea()
 
-            ZStack {
-                // Background
-                Color.adaptiveBackground
-                    .ignoresSafeArea()
+            // Persistent Layout (Always use portrait layout structure)
+            // When rotating to landscape, we trigger native fullscreen instead of swapping views
+            portraitLayout
 
-                // Persistent Layout (Always use portrait layout structure)
-                // When rotating to landscape, we trigger native fullscreen instead of swapping views
-                portraitLayout
+            // Error state
+            if let error = errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 50))
+                        .foregroundStyle(.red)
 
-                // Error state
-                if let error = errorMessage {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 50))
-                            .foregroundStyle(.red)
+                    Text(error)
+                        .foregroundStyle(Color.adaptiveText)
+                        .multilineTextAlignment(.center)
 
-                        Text(error)
-                            .foregroundStyle(Color.adaptiveText)
-                            .multilineTextAlignment(.center)
-
-                        Button("Retry") {
-                            Task {
-                                await loadVideo()
-                            }
+                    Button("Retry") {
+                        Task {
+                            await loadVideo()
                         }
-                        .buttonStyle(LiquidGlassButtonStyle(tint: .floatplaneBlue))
                     }
-                    .padding()
+                    .buttonStyle(LiquidGlassButtonStyle(tint: .floatplaneBlue))
                 }
+                .padding()
+            }
 
-                // Stream offline overlay (for livestreams that have ended)
-                if isStreamOffline && isLivestream {
-                    StreamOfflineOverlay {
-                        dismiss()
-                    }
-                }
-
-                // Bottom comment input overlay (only in portrait, not for livestreams, and when comments loaded successfully)
-                if !isLandscape && !isLivestream && !commentsLoadError {
-                    VStack {
-                        Spacer()
-                        bottomCommentInput
-                    }
+            // Stream offline overlay (for livestreams that have ended)
+            if isStreamOffline && isLivestream {
+                StreamOfflineOverlay {
+                    dismiss()
                 }
             }
-            #if !os(tvOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .navigationBarBackButtonHidden(false) // Always show back button in "portrait" view
-            #if !os(tvOS)
-            .statusBar(hidden: false) // Always show status bar in "portrait" view
-            #endif
-            .toolbar(isLandscape ? .hidden : .visible, for: .tabBar)
-            .globalMenu()
-            // We listen to device orientation change because GeometryReader doesn't update
-            // reliably when the native player is in fullscreen mode (covering this view).
-            #if !os(tvOS)
-            .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-                let orientation = UIDevice.current.orientation
-                
-                if orientation.isLandscape {
-                    AVPlayerManager.shared.enterFullScreen()
-                } else if orientation == .portrait {
-                    // Only exit fullscreen on standard portrait, ignore upside down
-                    AVPlayerManager.shared.exitFullScreen()
+
+            // Bottom comment input overlay (only in portrait, not for livestreams, and when comments loaded successfully)
+            if !isDeviceLandscape && !isLivestream && !commentsLoadError {
+                VStack {
+                    Spacer()
+                    bottomCommentInput
                 }
             }
-            #endif
         }
+        #if !os(tvOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .navigationBarBackButtonHidden(false) // Always show back button in "portrait" view
+        #if !os(tvOS)
+        .statusBar(hidden: false) // Always show status bar in "portrait" view
+        #endif
+        .toolbar(isDeviceLandscape ? .hidden : .visible, for: .tabBar)
+        .globalMenu()
+        // Device orientation drives landscape UI — not GeometryReader size, which
+        // falsely reads as landscape when the keyboard shrinks available height.
+        #if !os(tvOS)
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+            handleDeviceOrientationChange(UIDevice.current.orientation)
+        }
+        #endif
         .onAppear {
             // Initialize like/dislike counts from post
             currentLikes = post.likes
             currentDislikes = post.dislikes
+            #if !os(tvOS)
+            handleDeviceOrientationChange(UIDevice.current.orientation)
+            #endif
         }
         .task {
             await loadVideo()
@@ -348,8 +346,23 @@ struct VideoPlayerView: View {
                 .padding()
                 .padding(.bottom, 100) // Space for floating comment input
             }
+            .scrollDismissesKeyboard(.never)
         }
     }
+
+    #if !os(tvOS)
+    /// Update landscape UI state and fullscreen player from a device orientation.
+    /// Ignores face-up/face-down/unknown so incidental motion doesn't flicker UI.
+    private func handleDeviceOrientationChange(_ orientation: UIDeviceOrientation) {
+        if orientation.isLandscape {
+            isDeviceLandscape = true
+            AVPlayerManager.shared.enterFullScreen()
+        } else if orientation == .portrait {
+            isDeviceLandscape = false
+            AVPlayerManager.shared.exitFullScreen()
+        }
+    }
+    #endif
 
     // MARK: - Load Video
 
