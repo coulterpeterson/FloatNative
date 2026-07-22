@@ -44,6 +44,17 @@ class DPoPManager(context: Context) {
             prefs.edit().putLong(KEY_TIME_OFFSET, value).apply()
         }
 
+    /**
+     * Latest server-provided DPoP nonce (RFC 9449). Floatplane may require this
+     * on subsequent proofs after sending `DPoP-Nonce` / `use_dpop_nonce`.
+     */
+    @Volatile
+    var lastNonce: String? = null
+
+    fun captureNonce(headers: okhttp3.Headers) {
+        headers["DPoP-Nonce"]?.let { lastNonce = it }
+    }
+
     private var keyPair: KeyPair? = null
 
     @Synchronized
@@ -91,7 +102,12 @@ class DPoPManager(context: Context) {
         return map
     }
 
-    fun generateProof(httpMethod: String, httpUrl: String, accessToken: String? = null): String {
+    fun generateProof(
+        httpMethod: String,
+        httpUrl: String,
+        accessToken: String? = null,
+        nonce: String? = lastNonce
+    ): String {
         val keys = getOrGenerateKeyPair()
         val publicKey = keys.public as ECPublicKey
 
@@ -134,6 +150,10 @@ class DPoPManager(context: Context) {
            val md = MessageDigest.getInstance("SHA-256")
            val hash = md.digest(accessToken.toByteArray(Charsets.UTF_8))
            payload.put("ath", base64UrlEncode(hash))
+        }
+
+        if (nonce != null) {
+            payload.put("nonce", nonce)
         }
 
         // 3. Sign
