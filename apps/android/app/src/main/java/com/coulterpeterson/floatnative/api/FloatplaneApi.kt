@@ -95,8 +95,19 @@ object FloatplaneApi {
             redactHeader("DPoP-Nonce")
         }
 
+        dpopManager = com.coulterpeterson.floatnative.data.DPoPManager(context)
+
+        // Capture DPoP-Nonce from every response (auth + API) so subsequent proofs
+        // can satisfy Floatplane's RFC 9449 nonce challenges.
+        val dpopNonceInterceptor = okhttp3.Interceptor { chain ->
+            val response = chain.proceed(chain.request())
+            dpopManager.captureNonce(response.headers)
+            response
+        }
+
         // OAuth Client with logging but NO AuthInterceptor (to avoid cycles)
         val oauthClient = OkHttpClient.Builder()
+            .addInterceptor(dpopNonceInterceptor)
             .addInterceptor(loggingInterceptor)
             .build()
 
@@ -109,7 +120,6 @@ object FloatplaneApi {
             
         oauthApi = oauthRetrofit.create(OAuthApi::class.java)
 
-        dpopManager = com.coulterpeterson.floatnative.data.DPoPManager(context)
         val authInterceptor = AuthInterceptor(tokenManager, dpopManager) { oauthApi }
 
         okHttpClient = OkHttpClient.Builder()
@@ -149,18 +159,17 @@ object FloatplaneApi {
     suspend fun exchangeAuthCode(code: String, verifier: String) {
         val tokenEndpoint = "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/token"
         
-        // 1. Generate DPoP proof
-        val dpop = dpopManager.generateProof("POST", tokenEndpoint)
-        
-        // 2. Exchange Token
-        val response = oauthApi.getToken(
-            dpop = dpop,
-            grantType = "authorization_code",
-            clientId = "floatnative",
-            code = code,
-            codeVerifier = verifier,
-            redirectUri = "floatnative://auth"
-        )
+        // 1-2. Exchange Token (retry if auth server demands a DPoP nonce)
+        val response = withDpopNonceRetry(tokenEndpoint) { dpop ->
+            oauthApi.getToken(
+                dpop = dpop,
+                grantType = "authorization_code",
+                clientId = "floatnative",
+                code = code,
+                codeVerifier = verifier,
+                redirectUri = "floatnative://auth"
+            )
+        }
         
         // 3. Save Tokens
         tokenManager.accessToken = response.access_token
@@ -249,15 +258,16 @@ object FloatplaneApi {
                 // Refresh the access token
                 val refreshToken = tokenManager.refreshToken!!
                 val tokenEndpoint = "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/token"
-                val dpop = dpopManager.generateProof("POST", tokenEndpoint)
-                
+
                 android.util.Log.d("FloatplaneApi", "ensureCompanionLogin: Calling token refresh")
-                val tokenResponse = oauthApi.getToken(
-                    dpop = dpop,
-                    grantType = "refresh_token",
-                    clientId = "floatnative",
-                    refreshToken = refreshToken
-                )
+                val tokenResponse = withDpopNonceRetry(tokenEndpoint) { dpop ->
+                    oauthApi.getToken(
+                        dpop = dpop,
+                        grantType = "refresh_token",
+                        clientId = "floatnative",
+                        refreshToken = refreshToken
+                    )
+                }
                 
                 // Update tokens
                 tokenManager.accessToken = tokenResponse.access_token
@@ -308,15 +318,83 @@ object FloatplaneApi {
 
     suspend fun pollDeviceToken(deviceCode: String): OAuthTokenResponse {
         val tokenEndpoint = "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/token"
-        
-        // Generate DPoP for the token endpoint
+        // Do NOT wrap this in withDpopNonceRetry: authorization_pending is a normal
+        // 400 during TV polling, and reading the error body here would prevent the
+        // ViewModel from seeing `error=authorization_pending`. Nonce challenges are
+        // handled in TvLoginViewModel (capture nonce + continue); each poll already
+        // signs with dpopManager.lastNonce via generateProof().
         val dpop = dpopManager.generateProof("POST", tokenEndpoint)
-        
         return oauthApi.getToken(
             dpop = dpop,
             grantType = "urn:ietf:params:oauth:grant-type:device_code",
             clientId = "floatnative",
             deviceCode = deviceCode
         )
+    }
+
+    /**
+     * Persist device-flow tokens and prime the sails.sid cookie the same way the
+     * authorization-code path does. TV login previously skipped getSelf(), which
+     * left hybrid cookie+DPoP endpoints failing after an otherwise successful login.
+     */
+    suspend fun completeDeviceLogin(tokenResponse: OAuthTokenResponse) {
+        tokenManager.accessToken = tokenResponse.access_token
+        tokenManager.refreshToken = tokenResponse.refresh_token
+
+        try {
+            userV3.getSelf()
+        } catch (e: Exception) {
+            android.util.Log.e("FloatplaneApi", "completeDeviceLogin: failed to prime sails.sid via getSelf", e)
+        }
+
+        ensureCompanionLogin()
+    }
+
+    /**
+     * Run an OAuth token call, retrying when the auth server returns
+     * `error=use_dpop_nonce` (RFC 9449). Mirrors floatcli/auth.py.
+     *
+     * Only use for one-shot exchanges (authorization_code / refresh_token), not
+     * device-code polling — those 400 bodies must remain readable by the caller.
+     */
+    private suspend fun withDpopNonceRetry(
+        tokenEndpoint: String,
+        block: suspend (dpop: String) -> OAuthTokenResponse
+    ): OAuthTokenResponse {
+        var lastError: Exception? = null
+        repeat(3) { attempt ->
+            val dpop = dpopManager.generateProof("POST", tokenEndpoint)
+            try {
+                return block(dpop)
+            } catch (e: retrofit2.HttpException) {
+                e.response()?.headers()?.let { dpopManager.captureNonce(it) }
+                val www = e.response()?.headers()?.get("WWW-Authenticate").orEmpty()
+                val needsNonceFromHeader = www.contains("use_dpop_nonce", ignoreCase = true)
+
+                // Prefer WWW-Authenticate so we don't have to consume the body. Fall
+                // back to peeking the JSON error only when the header is absent.
+                val needsNonce = if (needsNonceFromHeader) {
+                    true
+                } else {
+                    val errBody = try {
+                        e.response()?.errorBody()?.string().orEmpty()
+                    } catch (_: Exception) {
+                        ""
+                    }
+                    errBody.contains("use_dpop_nonce")
+                }
+
+                if (needsNonce && attempt < 2) {
+                    android.util.Log.i(
+                        "FloatplaneApi",
+                        "OAuth token call demanded DPoP nonce; retrying (attempt ${attempt + 1})"
+                    )
+                    lastError = e
+                } else {
+                    throw e
+                }
+            }
+        }
+        throw lastError ?: IllegalStateException("DPoP nonce retry exhausted")
     }
 }

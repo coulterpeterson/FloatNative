@@ -69,12 +69,8 @@ class TvLoginViewModel : ViewModel() {
                 val tokenResponse = FloatplaneApi.pollDeviceToken(deviceCode)
                 android.util.Log.d("TvLoginViewModel", "pollForToken: Success! Token received. AccessToken length: ${tokenResponse.access_token.length}")
                 
-                // Success!
-                FloatplaneApi.tokenManager.accessToken = tokenResponse.access_token
-                FloatplaneApi.tokenManager.refreshToken = tokenResponse.refresh_token
-                
-                // Also trigger companion login in background
-                FloatplaneApi.ensureCompanionLogin()
+                // Success — persist tokens, prime sails.sid, companion login
+                FloatplaneApi.completeDeviceLogin(tokenResponse)
                 
                 _state.value = TvLoginState.Success
                 isDone = true
@@ -82,6 +78,7 @@ class TvLoginViewModel : ViewModel() {
                 if (e.code() == 400) {
                     val errorBody = e.response()?.errorBody()?.string()
                     android.util.Log.d("TvLoginViewModel", "pollForToken: 400 Error Body: $errorBody")
+                    e.response()?.headers()?.let { FloatplaneApi.dpopManager.captureNonce(it) }
                     
                     if (!errorBody.isNullOrEmpty()) {
                         try {
@@ -97,6 +94,12 @@ class TvLoginViewModel : ViewModel() {
                                 // For simplicity, we add 5s delay here before next loop logic handles standard delay
                                 android.util.Log.w("TvLoginViewModel", "pollForToken: Received slow_down, adding delay")
                                 delay(5000)
+                                continue
+                            } else if (error == "use_dpop_nonce") {
+                                // Auth server wants a proof that includes the nonce it just sent.
+                                // pollDeviceToken already retries, but if we still see this at the
+                                // ViewModel layer, immediately poll again with the captured nonce.
+                                android.util.Log.i("TvLoginViewModel", "pollForToken: use_dpop_nonce — retrying immediately")
                                 continue
                             } else if (errorDesc.contains("DPoP", ignoreCase = true)) {
                                 // Specific handling for DPoP time skew issues

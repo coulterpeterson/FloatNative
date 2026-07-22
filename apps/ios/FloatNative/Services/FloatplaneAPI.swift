@@ -570,7 +570,8 @@ class FloatplaneAPI: ObservableObject {
         endpoint: String,
         method: String = "POST",
         body: [String: String],
-        dpopProof: String? = nil
+        dpopProof: String? = nil,
+        nonceRetryCount: Int = 0
     ) async throws -> T {
         guard let url = URL(string: authBaseURL + endpoint) else {
             throw FloatplaneAPIError.invalidURL
@@ -643,6 +644,24 @@ class FloatplaneAPI: ObservableObject {
             // Parse error response
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let error = json["error"] as? String {
+                // Auth server may demand a nonce-bound proof (RFC 9449). Retry
+                // immediately with the nonce we just captured — same as floatcli.
+                let wwwAuth = headers["www-authenticate"] ?? ""
+                if (error == "use_dpop_nonce" || wwwAuth.contains("use_dpop_nonce")),
+                   nonceRetryCount < 3 {
+                    let retryProof = try DPoPManager.shared.generateProof(
+                        httpMethod: method,
+                        httpUrl: authBaseURL + endpoint,
+                        nonce: lastDPoPNonce
+                    )
+                    return try await requestAuth(
+                        endpoint: endpoint,
+                        method: method,
+                        body: body,
+                        dpopProof: retryProof,
+                        nonceRetryCount: nonceRetryCount + 1
+                    )
+                }
                 // Return descriptive error for polling (e.g., authorization_pending)
                 throw FloatplaneAPIError.httpError(statusCode: httpResponse.statusCode, message: error)
             }
@@ -704,6 +723,8 @@ class FloatplaneAPI: ObservableObject {
                 dpopProof: dpopProof
             )
             handleOAuthResponse(response)
+            // Prime sails.sid / currentUser the same way authorization-code login does.
+            _ = try? await getCurrentUser()
             return response
         } catch {
             throw error
