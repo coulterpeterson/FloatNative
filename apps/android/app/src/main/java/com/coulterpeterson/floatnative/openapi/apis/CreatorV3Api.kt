@@ -138,7 +138,7 @@ interface CreatorV3Api {
      * @return [kotlin.collections.List<CreatorModelV3>]
      */
     @GET("api/v3/creator/list")
-    suspend fun getCreators(@Query("search") search: kotlin.String): Response<kotlin.collections.List<CreatorModelV3>>
+    suspend fun getCreators(@Query("search") search: kotlin.String? = null): Response<kotlin.collections.List<CreatorModelV3>>
 
     /**
      * GET api/v3/creator/category/list

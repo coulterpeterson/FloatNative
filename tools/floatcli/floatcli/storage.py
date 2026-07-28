@@ -31,6 +31,7 @@ class Credentials:
     refresh_token: str | None
     expires_at: float  # epoch seconds
     companion_api_key: str | None = None
+    sails_sid: str | None = None
 
     @property
     def is_expired(self) -> bool:

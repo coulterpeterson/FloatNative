@@ -34,4 +34,10 @@ interface CompanionApi {
 
     @retrofit2.http.PATCH("/playlists/{id}/remove")
     suspend fun removeFromPlaylist(@retrofit2.http.Path("id") id: String, @Body request: PlaylistRemoveRequest): Response<Playlist>
+
+    @POST("/auth/qr/generate")
+    suspend fun generateQrSession(@Body request: QRCodeGenerateRequest = QRCodeGenerateRequest()): Response<QRCodeGenerateResponse>
+
+    @GET("/auth/qr/poll/{id}")
+    suspend fun pollQrSession(@retrofit2.http.Path("id") id: String): Response<QRCodePollResponse>
 }
