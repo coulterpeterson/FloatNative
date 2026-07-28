@@ -47,6 +47,8 @@ fun SettingsScreen(
     val uriHandler = LocalUriHandler.current
 
     var showDonateDialog by remember { mutableStateOf(false) }
+    var showCookieDialog by remember { mutableStateOf(false) }
+    var currentCookie by remember { mutableStateOf(com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.authCookie ?: "") }
     if (showDonateDialog) {
         com.coulterpeterson.floatnative.ui.components.DonateDialog(
             onDismiss = { showDonateDialog = false }
@@ -108,6 +110,21 @@ fun SettingsScreen(
                     )
                     HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
                 }
+            }
+
+            // --- Authentication & Session Section ---
+            item {
+                Text("Authentication & Session", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                val storedCookie = com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.authCookie
+                ListItem(
+                    headlineContent = { Text("Session Cookie (sails.sid)") },
+                    supportingContent = { Text(if (storedCookie.isNullOrEmpty()) "Not set (Tap to enter manually)" else "Present (Synced)") },
+                    modifier = Modifier.clickable {
+                        currentCookie = storedCookie ?: ""
+                        showCookieDialog = true
+                    }
+                )
             }
 
             // --- Appearance Section ---
@@ -348,6 +365,16 @@ fun SettingsScreen(
                         }
                     )
                 }
+
+                val storedCookie = com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.authCookie
+                ListItem(
+                    headlineContent = { Text("Session Cookie (sails.sid)") },
+                    supportingContent = { Text(if (storedCookie.isNullOrEmpty()) "Not set (Tap to enter manually)" else "Present (Synced)") },
+                    modifier = Modifier.clickable {
+                        currentCookie = storedCookie ?: ""
+                        showCookieDialog = true
+                    }
+                )
             }
 
             // --- Logout ---
@@ -363,6 +390,40 @@ fun SettingsScreen(
                     Text("Log Out")
                 }
             }
+        }
+
+        if (showCookieDialog) {
+            AlertDialog(
+                onDismissRequest = { showCookieDialog = false },
+                title = { Text("Session Cookie (sails.sid)") },
+                text = {
+                    Column {
+                        Text("Paste your Floatplane sails.sid cookie if automatic sync was missed:", style = MaterialTheme.typography.bodySmall)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = currentCookie,
+                            onValueChange = { currentCookie = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("s%3A...") }
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val clean = currentCookie.trim().removePrefix("sails.sid=").trim()
+                        com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.authCookie = clean.ifEmpty { null }
+                        showCookieDialog = false
+                    }) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showCookieDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }

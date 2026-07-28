@@ -19,7 +19,7 @@ from .dpop import DPoPKey, generate_proof
 from .storage import Credentials
 
 API_BASE = "https://www.floatplane.com"
-USER_AGENT = "floatcli/0.1.0 (+https://github.com/coulterpeterson/FloatNative)"
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
 
 @dataclass
@@ -80,6 +80,8 @@ class FloatplaneClient:
         url = f"{API_BASE}{path}"
         headers: dict[str, str] = {}
         if authenticated:
+            if self.credentials.sails_sid:
+                headers["Cookie"] = f"sails.sid={self.credentials.sails_sid}"
             if self.credentials.is_expired:
                 self._refresh()
             access = self.credentials.access_token
