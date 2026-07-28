@@ -33,16 +33,31 @@ class TvLoginViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 _state.value = TvLoginState.Loading
+
+                // 1. Try Companion QR auth session (transfers sails.sid directly over network)
+                try {
+                    val qrResponse = FloatplaneApi.companionApi.generateQrSession()
+                    if (qrResponse.isSuccessful && qrResponse.body() != null) {
+                        val body = qrResponse.body()!!
+                        _state.value = TvLoginState.Content(
+                            userCode = "SCAN QR",
+                            verificationUri = body.computedLoginUrl,
+                            verificationUriComplete = body.computedLoginUrl
+                        )
+                        pollForQrSession(body.sessionId, 600)
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("TvLoginViewModel", "Companion QR generation failed, falling back to Keycloak device auth", e)
+                }
+
+                // Fallback to Keycloak device auth
                 val response = FloatplaneApi.startDeviceAuth()
                 _state.value = TvLoginState.Content(
                     userCode = response.user_code,
                     verificationUri = response.verification_uri,
                     verificationUriComplete = response.verification_uri_complete ?: response.verification_uri
                 )
-                
-                android.util.Log.d("TvLoginViewModel", "startAuthFlow: Auth started, userCode=${response.user_code}, deviceCode=${response.device_code}")
-                
-                 // Start polling
                 pollForToken(response.device_code, response.interval)
             } catch (e: Exception) {
                 android.util.Log.e("TvLoginViewModel", "startAuthFlow: Failed to start auth", e)
@@ -51,6 +66,39 @@ class TvLoginViewModel : ViewModel() {
                 } else {
                     _state.value = TvLoginState.Error("Failed to start login: ${e.message}")
                 }
+            }
+        }
+    }
+
+    private suspend fun pollForQrSession(sessionId: String, expiresInSeconds: Int) {
+        var isDone = false
+        val startTime = System.currentTimeMillis()
+        val maxDurationMs = expiresInSeconds * 1000L
+
+        while (!isDone && (System.currentTimeMillis() - startTime < maxDurationMs)) {
+            delay(3000L)
+            try {
+                val pollResp = FloatplaneApi.companionApi.pollQrSession(sessionId)
+                if (pollResp.isSuccessful && pollResp.body() != null) {
+                    val body = pollResp.body()!!
+                    if (body.status == "completed" && !body.sailsSid.isNullOrEmpty()) {
+                        FloatplaneApi.tokenManager.authCookie = body.sailsSid
+                        FloatplaneApi.tokenManager.accessToken = "cookie_session"
+                        if (!body.apiKey.isNullOrEmpty()) {
+                            FloatplaneApi.tokenManager.companionApiKey = body.apiKey
+                        }
+                        _state.value = TvLoginState.Success
+                        isDone = true
+                        return
+                    } else if (body.status == "expired") {
+                        _state.value = TvLoginState.Error("QR Session Expired. Restarting...")
+                        delay(2000L)
+                        startAuthFlow()
+                        return
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("TvLoginViewModel", "Error polling QR session", e)
             }
         }
     }

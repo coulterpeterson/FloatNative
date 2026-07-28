@@ -78,3 +78,27 @@ data class LTTSearchResult(
     @Json(name = "thumbnail_url") val thumbnailUrl: String?, // Full URL or path? Usually path on backend, but response might differ.
     @Json(name = "channel_icon_url") val channelIconUrl: String?
 )
+
+@JsonClass(generateAdapter = true)
+data class QRCodeGenerateRequest(
+    @Json(name = "device_info") val deviceInfo: String? = "Android TV"
+)
+
+@JsonClass(generateAdapter = true)
+data class QRCodeGenerateResponse(
+    val id: String,
+    @Json(name = "expires_at") val expiresAt: String? = null,
+    @Json(name = "login_url") val loginUrl: String? = null
+) {
+    val sessionId: String get() = id
+    val computedLoginUrl: String
+        get() = loginUrl ?: "https://api.floatnative.coulterpeterson.com/public/qr-login.html?session=$id"
+}
+
+@JsonClass(generateAdapter = true)
+data class QRCodePollResponse(
+    val status: String,
+    @Json(name = "sails_sid") val sailsSid: String? = null,
+    @Json(name = "api_key") val apiKey: String? = null,
+    val message: String? = null
+)

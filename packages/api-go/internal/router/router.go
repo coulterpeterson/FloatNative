@@ -59,6 +59,8 @@ func New() *chi.Mux {
 	// Auth QR Routes (Public)
 	router.Post("/auth/qr/generate", handlers.GenerateQR)
 	router.Get("/auth/qr/poll/{id}", handlers.PollQR)
+	router.Post("/auth/qr/submit", handlers.SubmitQR)
+	router.Get("/public/qr-login.html", handlers.QRLoginHTML)
 	router.Post("/auth/login", handlers.Login)
 
 	return router
