@@ -398,7 +398,17 @@ struct VideoPlayerView: View {
         // Use the currently-selected attachment when set (multi-video posts,
         // GH #23). Fall back to the first attachment id from the feed model
         // so a fresh open before loadInteractionState completes still plays.
-        guard let videoId = selectedAttachmentId ?? post.videoAttachments?.first else {
+        // Floatplane's feed endpoints no longer include attachment ids; fall
+        // back to the full post when the feed model has none.
+        var resolvedVideoId = selectedAttachmentId ?? post.videoAttachments?.first
+        if resolvedVideoId == nil {
+            if let fetched = try? await api.getBlogPost(id: post.id) {
+                detailedPost = fetched
+                resolvedVideoId = fetched.post.orderedVideoAttachments.first?.id
+                if selectedAttachmentId == nil { selectedAttachmentId = resolvedVideoId }
+            }
+        }
+        guard let videoId = resolvedVideoId else {
             print("📱 [VideoPlayerView.loadVideo] No video attachment found!")
             errorMessage = "No video available for this post"
             isLoading = false
@@ -605,7 +615,11 @@ struct VideoPlayerView: View {
     }
 
     private func downloadVideo() async {
-        guard let videoId = post.videoAttachments?.first else {
+        var downloadVideoId = selectedAttachmentId ?? post.videoAttachments?.first
+        if downloadVideoId == nil {
+            downloadVideoId = try? await api.getBlogPost(id: post.id).post.orderedVideoAttachments.first?.id
+        }
+        guard let videoId = downloadVideoId else {
             await MainActor.run {
                 downloadToastMessage = "No video available for download"
                 downloadToastIcon = "exclamationmark.circle.fill"

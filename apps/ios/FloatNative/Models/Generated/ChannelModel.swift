@@ -13,7 +13,7 @@ import AnyCodable
 public struct ChannelModel: Codable, JSONEncodable, Hashable {
 
     public var id: String
-    public var creator: String
+    public var creator: String?
     public var title: String
     /** Shown in the browser URL. */
     public var urlname: String
@@ -24,7 +24,7 @@ public struct ChannelModel: Codable, JSONEncodable, Hashable {
     public var icon: ImageModel
     public var socialLinks: [String: String]?
 
-    public init(id: String, creator: String, title: String, urlname: String, about: String, order: Int? = nil, cover: ImageModel?, card: ImageModel?, icon: ImageModel, socialLinks: [String: String]? = nil) {
+    public init(id: String, creator: String? = nil, title: String, urlname: String, about: String, order: Int? = nil, cover: ImageModel? = nil, card: ImageModel? = nil, icon: ImageModel, socialLinks: [String: String]? = nil) {
         self.id = id
         self.creator = creator
         self.title = title
@@ -55,13 +55,13 @@ public struct ChannelModel: Codable, JSONEncodable, Hashable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
-        try container.encode(creator, forKey: .creator)
+        try container.encodeIfPresent(creator, forKey: .creator)
         try container.encode(title, forKey: .title)
         try container.encode(urlname, forKey: .urlname)
         try container.encode(about, forKey: .about)
         try container.encodeIfPresent(order, forKey: .order)
-        try container.encode(cover, forKey: .cover)
-        try container.encode(card, forKey: .card)
+        try container.encodeIfPresent(cover, forKey: .cover)
+        try container.encodeIfPresent(card, forKey: .card)
         try container.encode(icon, forKey: .icon)
         try container.encodeIfPresent(socialLinks, forKey: .socialLinks)
     }

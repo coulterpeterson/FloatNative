@@ -1045,7 +1045,17 @@ struct VideoPlayerTvosView: View {
 
         // Multi-video posts (GH #23): use the currently-selected attachment
         // when set, fall back to the first id from the feed model.
-        guard let videoId = selectedAttachmentId ?? post.videoAttachments?.first else {
+        // Floatplane's feed endpoints no longer include attachment ids; fall
+        // back to the full post when the feed model has none.
+        var resolvedVideoId = selectedAttachmentId ?? post.videoAttachments?.first
+        if resolvedVideoId == nil {
+            if let fetched = try? await api.getBlogPost(id: post.id) {
+                detailedPost = fetched
+                resolvedVideoId = fetched.post.orderedVideoAttachments.first?.id
+                if selectedAttachmentId == nil { selectedAttachmentId = resolvedVideoId }
+            }
+        }
+        guard let videoId = resolvedVideoId else {
             errorMessage = "No video available for this post"
             isLoading = false
             return

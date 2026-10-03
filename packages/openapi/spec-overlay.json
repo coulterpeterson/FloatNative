@@ -20,6 +20,53 @@
           }
         }
       },
+      "BlogPostModelV3": {
+        "_comment": "As of 2026-10-03 Floatplane's list/feed endpoints (/content/creator, /content/creator/list, /content/related) return a slimmed-down post: no attachmentOrder, wasReleasedSilently or *Attachments arrays (use /content/post?id= for those), a creator without owner/subscriptionPlans/discoverable/subscriberCountDisplay/incomeDisplay/liveStream/cover/card, and a channel without creator/cover/card. With the upstream-required lists every feed post failed to decode and the home screen went blank. Verified against 45 live posts. Clients must fetch /content/post for video attachment ids before playback.",
+        "required": [
+          "id",
+          "guid",
+          "title",
+          "text",
+          "type",
+          "channel",
+          "tags",
+          "metadata",
+          "releaseDate",
+          "likes",
+          "dislikes",
+          "score",
+          "comments",
+          "creator",
+          "isAccessible"
+        ],
+        "properties": {
+          "textMarkdown": {
+            "type": "string",
+            "description": "Markdown rendering of `text`. Present on live responses, absent from the upstream spec."
+          },
+          "creator": {
+            "required": [
+              "id",
+              "title",
+              "urlname",
+              "description",
+              "about",
+              "category",
+              "icon"
+            ]
+          }
+        }
+      },
+      "ChannelModel": {
+        "_comment": "The channel embedded in feed posts (BlogPostModelV3.channel) is now just {id, title, urlname, about, icon}: no creator, cover or card. See BlogPostModelV3 above.",
+        "required": [
+          "id",
+          "title",
+          "urlname",
+          "about",
+          "icon"
+        ]
+      },
       "SubscriptionPlanModel": {
         "_comment": "Real /api/v3/content/creator/list responses omit `interval` on every subscriptionPlan we've observed (e.g. LTT). The upstream spec marks it required, which would crash decode for any post whose creator has plans without it (= every post). Loosened here; see fixture get_api_v3_content_creator_list_ids_0_*.json captured 2026-05-08.",
         "required": [

@@ -1181,7 +1181,11 @@ struct VideoFeedView: View {
 
         do {
             // Update progress on server - use video attachment ID if available
-            if let videoAttachmentId = post.videoAttachments?.first {
+            var attachmentId = post.videoAttachments?.first
+            if attachmentId == nil {
+                attachmentId = try? await api.getBlogPost(id: post.id).post.orderedVideoAttachments.first?.id
+            }
+            if let videoAttachmentId = attachmentId {
                 _ = try await api.updateProgress(
                     videoId: videoAttachmentId,
                     contentType: "video",

@@ -23,7 +23,7 @@ public struct BlogPostModelV3: Codable, JSONEncodable, Hashable {
     public var type: ModelType
     public var channel: BlogPostModelV3Channel
     public var tags: [String]
-    public var attachmentOrder: [String]
+    public var attachmentOrder: [String]?
     public var metadata: PostMetadataModel
     public var releaseDate: Date
     public var likes: Int
@@ -31,7 +31,7 @@ public struct BlogPostModelV3: Codable, JSONEncodable, Hashable {
     public var score: Int
     public var comments: Int
     public var creator: BlogPostModelV3Creator
-    public var wasReleasedSilently: Bool
+    public var wasReleasedSilently: Bool?
     public var thumbnail: ImageModel?
     /** If false, the post should be marked as locked and not viewable by the user. */
     public var isAccessible: Bool
@@ -43,8 +43,10 @@ public struct BlogPostModelV3: Codable, JSONEncodable, Hashable {
     public var pictureAttachments: [String]?
     /** May be undefined, usually when `isAccessible` is `false`. */
     public var galleryAttachments: [String]?
+    /** Markdown rendering of `text`. Present on live responses, absent from the upstream spec. */
+    public var textMarkdown: String?
 
-    public init(id: String, guid: String, title: String, text: String, type: ModelType, channel: BlogPostModelV3Channel, tags: [String], attachmentOrder: [String], metadata: PostMetadataModel, releaseDate: Date, likes: Int, dislikes: Int, score: Int, comments: Int, creator: BlogPostModelV3Creator, wasReleasedSilently: Bool, thumbnail: ImageModel? = nil, isAccessible: Bool, videoAttachments: [String]? = nil, audioAttachments: [String]? = nil, pictureAttachments: [String]? = nil, galleryAttachments: [String]? = nil) {
+    public init(id: String, guid: String, title: String, text: String, type: ModelType, channel: BlogPostModelV3Channel, tags: [String], attachmentOrder: [String]? = nil, metadata: PostMetadataModel, releaseDate: Date, likes: Int, dislikes: Int, score: Int, comments: Int, creator: BlogPostModelV3Creator, wasReleasedSilently: Bool? = nil, thumbnail: ImageModel? = nil, isAccessible: Bool, videoAttachments: [String]? = nil, audioAttachments: [String]? = nil, pictureAttachments: [String]? = nil, galleryAttachments: [String]? = nil, textMarkdown: String? = nil) {
         self.id = id
         self.guid = guid
         self.title = title
@@ -67,6 +69,7 @@ public struct BlogPostModelV3: Codable, JSONEncodable, Hashable {
         self.audioAttachments = audioAttachments
         self.pictureAttachments = pictureAttachments
         self.galleryAttachments = galleryAttachments
+        self.textMarkdown = textMarkdown
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -92,6 +95,7 @@ public struct BlogPostModelV3: Codable, JSONEncodable, Hashable {
         case audioAttachments
         case pictureAttachments
         case galleryAttachments
+        case textMarkdown
     }
 
     // Encodable protocol methods
@@ -105,7 +109,7 @@ public struct BlogPostModelV3: Codable, JSONEncodable, Hashable {
         try container.encode(type, forKey: .type)
         try container.encode(channel, forKey: .channel)
         try container.encode(tags, forKey: .tags)
-        try container.encode(attachmentOrder, forKey: .attachmentOrder)
+        try container.encodeIfPresent(attachmentOrder, forKey: .attachmentOrder)
         try container.encode(metadata, forKey: .metadata)
         try container.encode(releaseDate, forKey: .releaseDate)
         try container.encode(likes, forKey: .likes)
@@ -113,13 +117,14 @@ public struct BlogPostModelV3: Codable, JSONEncodable, Hashable {
         try container.encode(score, forKey: .score)
         try container.encode(comments, forKey: .comments)
         try container.encode(creator, forKey: .creator)
-        try container.encode(wasReleasedSilently, forKey: .wasReleasedSilently)
+        try container.encodeIfPresent(wasReleasedSilently, forKey: .wasReleasedSilently)
         try container.encodeIfPresent(thumbnail, forKey: .thumbnail)
         try container.encode(isAccessible, forKey: .isAccessible)
         try container.encodeIfPresent(videoAttachments, forKey: .videoAttachments)
         try container.encodeIfPresent(audioAttachments, forKey: .audioAttachments)
         try container.encodeIfPresent(pictureAttachments, forKey: .pictureAttachments)
         try container.encodeIfPresent(galleryAttachments, forKey: .galleryAttachments)
+        try container.encodeIfPresent(textMarkdown, forKey: .textMarkdown)
     }
 }
 
