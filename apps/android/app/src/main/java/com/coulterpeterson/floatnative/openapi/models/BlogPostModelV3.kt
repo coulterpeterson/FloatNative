@@ -33,7 +33,6 @@ import com.squareup.moshi.JsonClass
  * @param type 
  * @param channel 
  * @param tags 
- * @param attachmentOrder 
  * @param metadata 
  * @param releaseDate 
  * @param likes 
@@ -41,13 +40,15 @@ import com.squareup.moshi.JsonClass
  * @param score 
  * @param comments 
  * @param creator 
- * @param wasReleasedSilently 
  * @param isAccessible If false, the post should be marked as locked and not viewable by the user.
+ * @param attachmentOrder 
+ * @param wasReleasedSilently 
  * @param thumbnail 
  * @param videoAttachments May be undefined, usually when `isAccessible` is `false`.
  * @param audioAttachments May be undefined, usually when `isAccessible` is `false`.
  * @param pictureAttachments May be undefined, usually when `isAccessible` is `false`.
  * @param galleryAttachments May be undefined, usually when `isAccessible` is `false`.
+ * @param textMarkdown Markdown rendering of `text`. Present on live responses, absent from the upstream spec.
  */
 
 
@@ -75,9 +76,6 @@ data class BlogPostModelV3 (
     @Json(name = "tags")
     val tags: kotlin.collections.List<kotlin.String>,
 
-    @Json(name = "attachmentOrder")
-    val attachmentOrder: kotlin.collections.List<kotlin.String>,
-
     @Json(name = "metadata")
     val metadata: PostMetadataModel,
 
@@ -99,12 +97,15 @@ data class BlogPostModelV3 (
     @Json(name = "creator")
     val creator: BlogPostModelV3Creator,
 
-    @Json(name = "wasReleasedSilently")
-    val wasReleasedSilently: kotlin.Boolean,
-
     /* If false, the post should be marked as locked and not viewable by the user. */
     @Json(name = "isAccessible")
     val isAccessible: kotlin.Boolean,
+
+    @Json(name = "attachmentOrder")
+    val attachmentOrder: kotlin.collections.List<kotlin.String>? = null,
+
+    @Json(name = "wasReleasedSilently")
+    val wasReleasedSilently: kotlin.Boolean? = null,
 
     @Json(name = "thumbnail")
     val thumbnail: ImageModel? = null,
@@ -123,7 +124,11 @@ data class BlogPostModelV3 (
 
     /* May be undefined, usually when `isAccessible` is `false`. */
     @Json(name = "galleryAttachments")
-    val galleryAttachments: kotlin.collections.List<kotlin.String>? = null
+    val galleryAttachments: kotlin.collections.List<kotlin.String>? = null,
+
+    /* Markdown rendering of `text`. Present on live responses, absent from the upstream spec. */
+    @Json(name = "textMarkdown")
+    val textMarkdown: kotlin.String? = null
 
 ) {
 

@@ -24,14 +24,14 @@ import com.squareup.moshi.JsonClass
  * 
  *
  * @param id 
- * @param creator 
  * @param title 
  * @param urlname Shown in the browser URL.
  * @param about 
+ * @param icon 
+ * @param creator 
+ * @param order 
  * @param cover 
  * @param card 
- * @param icon 
- * @param order 
  * @param socialLinks 
  */
 
@@ -40,9 +40,6 @@ data class ChannelModel (
 
     @Json(name = "id")
     val id: kotlin.String,
-
-    @Json(name = "creator")
-    val creator: kotlin.String,
 
     @Json(name = "title")
     val title: kotlin.String,
@@ -54,17 +51,20 @@ data class ChannelModel (
     @Json(name = "about")
     val about: kotlin.String,
 
-    @Json(name = "cover")
-    val cover: ImageModel?,
-
-    @Json(name = "card")
-    val card: ImageModel?,
-
     @Json(name = "icon")
     val icon: ImageModel,
 
+    @Json(name = "creator")
+    val creator: kotlin.String? = null,
+
     @Json(name = "order")
     val order: kotlin.Int? = null,
+
+    @Json(name = "cover")
+    val cover: ImageModel? = null,
+
+    @Json(name = "card")
+    val card: ImageModel? = null,
 
     @Json(name = "socialLinks")
     val socialLinks: kotlin.collections.Map<kotlin.String, java.net.URI>? = null

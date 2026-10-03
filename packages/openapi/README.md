@@ -69,7 +69,12 @@ While most models are auto-generated, the iOS app maintains custom wrappers and 
    - **Workaround**: `BlogPostDetailedWithInteraction` wrapper
    - **Status**: Could be contributed back to community spec
 
-2. **Generator bug**: Invalid `Identifiable` conformance on union types
+2. **Slim feed posts (2026-10-03)**: `/content/creator`, `/content/creator/list` and `/content/related` return posts without `attachmentOrder`, `wasReleasedSilently` or any `*Attachments` ids, with a `creator` missing `owner`/`subscriptionPlans`/etc., and a `channel` missing `creator`/`cover`/`card`
+   - **Impact**: With the upstream `required` lists every feed post failed to decode (blank home screen)
+   - **Fix**: Loosened in `spec-overlay.json` (`BlogPostModelV3`, `ChannelModel`); models regenerated for iOS and Android
+   - **Client rule**: video attachment ids only come from `/content/post?id=`, so players must fetch the full post before playback
+
+3. **Generator bug**: Invalid `Identifiable` conformance on union types
    - **Impact**: `BlogPostModelV3Channel` fails to compile
    - **Workaround**: Post-processing script removes invalid conformance
 
