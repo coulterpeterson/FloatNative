@@ -179,6 +179,59 @@ fun LoginScreen(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                var showCookieDialog by remember { mutableStateOf(false) }
+                var cookieInput by remember { mutableStateOf("") }
+                
+                OutlinedButton(
+                    onClick = { showCookieDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(28.dp),
+                ) {
+                    Text("Log in with sails.sid Cookie", fontSize = 15.sp)
+                }
+
+                if (showCookieDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showCookieDialog = false },
+                        title = { Text("Log in with Session Cookie") },
+                        text = {
+                            Column {
+                                Text("Paste your Floatplane sails.sid cookie from browser devtools:", fontSize = 13.sp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = cookieInput,
+                                    onValueChange = { cookieInput = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    placeholder = { Text("s%3A...") }
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                val clean = cookieInput.trim().removePrefix("sails.sid=").trim()
+                                if (clean.isNotEmpty()) {
+                                    com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.authCookie = clean
+                                    com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.accessToken = "cookie_session"
+                                    showCookieDialog = false
+                                    onLoginSuccess()
+                                }
+                            }) {
+                                Text("Sign In")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showCookieDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
                 
                 // Error message below button
                 if (state is LoginState.Error) {

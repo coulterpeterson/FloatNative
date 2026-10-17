@@ -126,6 +126,18 @@ def auth_refresh() -> None:
     console.print("[green]✓ Refreshed.[/green]")
 
 
+@auth_app.command("set-cookie")
+def auth_set_cookie(cookie: str = typer.Argument(..., help="sails.sid cookie string")) -> None:
+    """Save a sails.sid session cookie for requests."""
+    creds = _load_creds_or_die()
+    clean = cookie.strip()
+    if clean.startswith("sails.sid="):
+        clean = clean[len("sails.sid="):].strip()
+    creds.sails_sid = clean
+    creds.save()
+    console.print("[green]✓ sails.sid cookie saved.[/green]")
+
+
 @auth_app.command("logout")
 def auth_logout() -> None:
     """Delete saved credentials. Does NOT revoke server-side."""

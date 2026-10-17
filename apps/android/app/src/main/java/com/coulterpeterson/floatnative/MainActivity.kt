@@ -142,15 +142,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Defensive rollback for the pre-flip in onUserLeaveHint — if PiP
-        // never actually started (e.g. Android refused entry, or the user
-        // returned before the transition completed), we shouldn't be stuck
-        // rendering the fullscreen-PiP layout in a regular activity.
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             if (isInPipMode && !isInPictureInPictureMode) {
                 isInPipMode = false
             }
         }
+        syncCookiesFromBrowser()
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
@@ -166,6 +163,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleDeepLink(intent: android.content.Intent?) {
         val data = intent?.data
         if (data != null && data.scheme == "floatnative" && data.host == "auth") {
+             syncCookiesFromBrowser()
              val code = data.getQueryParameter("code")
              if (code != null) {
                  // Emit to global flow
@@ -173,6 +171,29 @@ class MainActivity : AppCompatActivity() {
                      com.coulterpeterson.floatnative.api.FloatplaneApi.authCodeFlow.emit(code)
                  }
              }
+        }
+    }
+
+    private fun syncCookiesFromBrowser() {
+        try {
+            val cookieManager = android.webkit.CookieManager.getInstance()
+            val rawCookies = cookieManager.getCookie("https://www.floatplane.com")
+                ?: cookieManager.getCookie("https://auth.floatplane.com")
+            if (!rawCookies.isNullOrEmpty()) {
+                val parts = rawCookies.split(";")
+                for (part in parts) {
+                    val pair = part.trim().split("=")
+                    if (pair.size == 2 && pair[0] == "sails.sid") {
+                        val cookieVal = pair[1]
+                        if (cookieVal.isNotEmpty()) {
+                            com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.authCookie = cookieVal
+                            android.util.Log.i("MainActivity", "Automagically synced sails.sid cookie from web session")
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to sync cookies from web session", e)
         }
     }
 }

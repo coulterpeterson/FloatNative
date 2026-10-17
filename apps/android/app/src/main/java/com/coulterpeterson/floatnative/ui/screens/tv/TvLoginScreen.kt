@@ -234,6 +234,69 @@ fun TvLoginScreen(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            var showTvCookieDialog by remember { mutableStateOf(false) }
+            var tvCookieInput by remember { mutableStateOf("") }
+
+            androidx.tv.material3.Button(
+                onClick = { showTvCookieDialog = true },
+                colors = androidx.tv.material3.ButtonDefaults.colors(
+                    containerColor = Color(0xFF333333),
+                    contentColor = Color.White,
+                    focusedContainerColor = Color.White,
+                    focusedContentColor = Color.Black
+                ),
+                modifier = Modifier.width(320.dp)
+            ) {
+                Text(
+                    text = "Log in with Session Cookie",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            if (showTvCookieDialog) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showTvCookieDialog = false },
+                    title = { androidx.compose.material3.Text("Log in with sails.sid Cookie") },
+                    text = {
+                        Column {
+                            androidx.compose.material3.Text(
+                                "Paste your Floatplane sails.sid cookie:",
+                                style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            androidx.compose.material3.OutlinedTextField(
+                                value = tvCookieInput,
+                                onValueChange = { tvCookieInput = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                placeholder = { androidx.compose.material3.Text("s%3A...") }
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(onClick = {
+                            val clean = tvCookieInput.trim().removePrefix("sails.sid=").trim()
+                            if (clean.isNotEmpty()) {
+                                com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.authCookie = clean
+                                com.coulterpeterson.floatnative.api.FloatplaneApi.tokenManager.accessToken = "cookie_session"
+                                showTvCookieDialog = false
+                                onLoginSuccess()
+                            }
+                        }) {
+                            androidx.compose.material3.Text("Sign In")
+                        }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { showTvCookieDialog = false }) {
+                            androidx.compose.material3.Text("Cancel")
+                        }
+                    }
+                )
+            }
         }
     }
 }

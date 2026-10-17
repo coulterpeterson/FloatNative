@@ -243,6 +243,25 @@ class FloatplaneAPI: ObservableObject {
                 saveAuthCookie(cookie.value)
             }
         }
+        syncCookiesFromStorage()
+    }
+
+    func syncCookiesFromStorage() {
+        if let url = URL(string: "https://www.floatplane.com"),
+           let cookies = HTTPCookieStorage.shared.cookies(for: url) {
+            for cookie in cookies where cookie.name == "sails.sid" {
+                if !cookie.value.isEmpty {
+                    saveAuthCookie(cookie.value)
+                }
+            }
+        }
+        if let cookies = cookieStorage.cookies {
+            for cookie in cookies where cookie.name == "sails.sid" {
+                if !cookie.value.isEmpty {
+                    saveAuthCookie(cookie.value)
+                }
+            }
+        }
     }
 
     // MARK: - Network Request Helpers
@@ -263,12 +282,19 @@ class FloatplaneAPI: ObservableObject {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = method
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("FloatNative/1.0 (iOS), CFNetwork", forHTTPHeaderField: "User-Agent")
+        urlRequest.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/605.1.15 FloatNative/1.0", forHTTPHeaderField: "User-Agent")
 
         // Add auth headers
         if requiresAuth {
+            // Check for automagically synced sails.sid cookie
+            if authCookie == nil {
+                syncCookiesFromStorage()
+            }
+            if let authCookie = authCookie {
+                urlRequest.setValue("sails.sid=\(authCookie)", forHTTPHeaderField: "Cookie")
+            }
+
             if let accessToken = accessToken {
-                
                 // Add DPoP Proof
                 if let dpopProof = try? DPoPManager.shared.generateProof(
                     httpMethod: method,
@@ -283,10 +309,7 @@ class FloatplaneAPI: ObservableObject {
                     // Fallback to Bearer if DPoP generation fails (shouldn't happen)
                     urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
                 }
-            } else if let authCookie = authCookie {
-                // Fallback to legacy cookie
-                urlRequest.setValue("sails.sid=\(authCookie)", forHTTPHeaderField: "Cookie")
-            } else {
+            } else if authCookie == nil {
                 throw FloatplaneAPIError.notAuthenticated
             }
         }

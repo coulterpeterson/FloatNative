@@ -49,7 +49,7 @@ class AuthInterceptor(
             builder.header("Cookie", "sails.sid=$authCookie")
         }
 
-        builder.header("User-Agent", "FloatNative/1.0 (Android)")
+        builder.header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36 FloatNative/1.0")
         
         val finalRequest = builder.build()
 
@@ -108,7 +108,12 @@ class AuthInterceptor(
             throw e
         }
 
-        // 2. Extract Cookie from Response (if logging in via legacy or hybrid)
+        // 2. Extract Cookie & DPoP Nonce from Response
+        val dpopNonceHeader = response.header("DPoP-Nonce") ?: response.header("dpop-nonce")
+        if (!dpopNonceHeader.isNullOrEmpty()) {
+            dpopManager.lastNonce = dpopNonceHeader
+        }
+
         val cookies = response.headers("Set-Cookie")
         for (cookie in cookies) {
             if (cookie.contains("sails.sid")) {
@@ -125,6 +130,25 @@ class AuthInterceptor(
 
         // 3. Handle 401 Unauthorized or 403 Forbidden
         if (response.code == 401 || response.code == 403) {
+            val wwwAuth = response.header("WWW-Authenticate") ?: response.header("www-authenticate")
+            if (wwwAuth != null && wwwAuth.contains("use_dpop_nonce", ignoreCase = true) && !dpopNonceHeader.isNullOrEmpty()) {
+                response.close()
+                val currentToken = tokenManager.accessToken
+                val method = originalRequest.method
+                val reqUrl = originalRequest.url.toString()
+                val proof = dpopManager.generateProof(method, reqUrl, currentToken, dpopNonceHeader)
+                return chain.proceed(
+                    originalRequest.newBuilder()
+                        .header("DPoP", proof)
+                        .apply {
+                            if (currentToken != null) {
+                                header("Authorization", "DPoP $currentToken")
+                            }
+                        }
+                        .build()
+                )
+            }
+
             val refreshToken = tokenManager.refreshToken
             if (refreshToken != null) {
                 synchronized(this) {
@@ -133,7 +157,6 @@ class AuthInterceptor(
                     if (currentAccessToken != null && currentAccessToken != accessToken) {
                         // Token was updated, retry with new token
                         response.close()
-                        // Generate new proof for the retried request with new token
                          try {
                             val method = originalRequest.method
                             val url = originalRequest.url.toString()
@@ -157,12 +180,9 @@ class AuthInterceptor(
                     // Try to refresh
                     try {
                         val authApi = authApiProvider()
-                        
-                        // Generate DPoP proof for Token Endpoint
                         val tokenEndpoint = "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/token"
                         val refreshProof = dpopManager.generateProof("POST", tokenEndpoint)
 
-                        // Run blocking because Interceptor is synchronous
                         val tokenResponse = runBlocking {
                             authApi.getToken(
                                 dpop = refreshProof,
@@ -172,15 +192,10 @@ class AuthInterceptor(
                             )
                         }
 
-                        // Save new tokens
                         tokenManager.accessToken = tokenResponse.access_token
                         tokenManager.refreshToken = tokenResponse.refresh_token
-                        // Update expiry if needed
 
-                        // Retry request
                         response.close()
-                        
-                        // Generate DPoP proof for the retried request with NEW token
                         val method = originalRequest.method
                         val url = originalRequest.url.toString()
                         val proof = dpopManager.generateProof(method, url, tokenResponse.access_token)
@@ -194,11 +209,10 @@ class AuthInterceptor(
 
                     } catch (e: Exception) {
                         // Handle DPoP Time Skew for Refresh Token
-                         if (e is HttpException && e.code() == 400) {
+                        if (e is HttpException && e.code() == 400) {
                             val errorBody = e.response()?.errorBody()?.string()
                             if (!errorBody.isNullOrEmpty() && errorBody.contains("DPoP", ignoreCase = true)) {
                                 try {
-                                    // 1. Auto-correct time
                                     val dateHeader = e.response()?.headers()?.get("date")
                                     if (dateHeader != null) {
                                         val sdf = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
@@ -211,7 +225,6 @@ class AuthInterceptor(
                                         }
                                     }
 
-                                    // 2. Retry Refresh
                                     val authApi = authApiProvider()
                                     val tokenEndpoint = "https://auth.floatplane.com/realms/floatplane/protocol/openid-connect/token"
                                     val retryProof = dpopManager.generateProof("POST", tokenEndpoint)
@@ -225,11 +238,9 @@ class AuthInterceptor(
                                         )
                                     }
 
-                                    // 3. Save new tokens
                                     tokenManager.accessToken = retryTokenResponse.access_token
                                     tokenManager.refreshToken = retryTokenResponse.refresh_token
 
-                                    // 4. Retry Original Request
                                     response.close()
                                     val method = originalRequest.method
                                     val url = originalRequest.url.toString()
@@ -244,29 +255,19 @@ class AuthInterceptor(
 
                                 } catch (retryEx: Exception) {
                                     android.util.Log.e("AuthInterceptor", "Retry refresh failed", retryEx)
-                                    com.coulterpeterson.floatnative.utils.DebugLogManager.auth(
-                                        "Token refresh retry failed; signing out",
-                                        "${retryEx.javaClass.simpleName}: ${retryEx.message}"
-                                    )
                                     tokenManager.clearAll()
                                 }
                             } else {
-                                com.coulterpeterson.floatnative.utils.DebugLogManager.auth(
-                                    "Token refresh failed (non-DPoP error); signing out",
-                                    "${e.javaClass.simpleName}: ${e.message}"
-                                )
                                 tokenManager.clearAll()
                             }
                         } else {
-                            // Refresh failed, clear tokens to force re-login
-                            com.coulterpeterson.floatnative.utils.DebugLogManager.auth(
-                                "Token refresh failed; signing out",
-                                "${e.javaClass.simpleName}: ${e.message}"
-                            )
                             tokenManager.clearAll()
                         }
                     }
                 }
+            } else {
+                // No refresh token present on 401/403, clear tokens so app routes to login
+                tokenManager.clearAll()
             }
         }
 

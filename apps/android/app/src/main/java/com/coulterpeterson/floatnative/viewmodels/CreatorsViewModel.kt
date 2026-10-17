@@ -29,7 +29,7 @@ class CreatorsViewModel : ViewModel() {
         viewModelScope.launch {
             _state.value = CreatorsState.Loading
             try {
-                val creatorsDeferred = async { FloatplaneApi.creatorV3.getCreators(search = "") }
+                val creatorsDeferred = async { FloatplaneApi.creatorV3.getCreators() }
                 val subscriptionsDeferred = async { FloatplaneApi.subscriptionsV3.listUserSubscriptionsV3() }
 
                 val creatorsResponse = creatorsDeferred.await()

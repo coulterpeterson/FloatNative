@@ -91,7 +91,14 @@ class DPoPManager(context: Context) {
         return map
     }
 
-    fun generateProof(httpMethod: String, httpUrl: String, accessToken: String? = null): String {
+    var lastNonce: String? = null
+
+    fun generateProof(
+        httpMethod: String,
+        httpUrl: String,
+        accessToken: String? = null,
+        nonce: String? = lastNonce
+    ): String {
         val keys = getOrGenerateKeyPair()
         val publicKey = keys.public as ECPublicKey
 
@@ -136,9 +143,18 @@ class DPoPManager(context: Context) {
            payload.put("ath", base64UrlEncode(hash))
         }
 
+        if (nonce != null) {
+            payload.put("nonce", nonce)
+        }
+
         // 3. Sign
-        val headerStr = base64UrlEncode(header.toString().toByteArray(Charsets.UTF_8))
-        val payloadStr = base64UrlEncode(payload.toString().toByteArray(Charsets.UTF_8))
+        // org.json.JSONObject.toString() escapes slashes ('/' -> '\/').
+        // RFC 9449 DPoP URIs require unescaped slashes ('https://...'), matching iOS output.
+        val headerJson = header.toString().replace("\\/", "/")
+        val payloadJson = payload.toString().replace("\\/", "/")
+
+        val headerStr = base64UrlEncode(headerJson.toByteArray(Charsets.UTF_8))
+        val payloadStr = base64UrlEncode(payloadJson.toByteArray(Charsets.UTF_8))
         val toSign = "$headerStr.$payloadStr"
 
         val signature = Signature.getInstance("SHA256withECDSA")
