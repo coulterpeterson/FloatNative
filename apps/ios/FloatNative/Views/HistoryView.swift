@@ -9,6 +9,7 @@ import SwiftUI
 
 struct HistoryView: View {
     @StateObject private var viewModel = HistoryViewModel()
+    @State private var playerPost: BlogPost?
 
     var body: some View {
         ZStack {
@@ -25,7 +26,7 @@ struct HistoryView: View {
                             Section {
                                 LazyVStack(spacing: 8) {
                                     ForEach(viewModel.groupedHistory[date] ?? []) { item in
-                                        NavigationLink(value: item.post) {
+                                        PostPlayerLink(post: item.post, presented: $playerPost) {
                                             CompactHistoryCard(
                                                 post: item.post,
                                                 progress: item.progress,
@@ -75,16 +76,13 @@ struct HistoryView: View {
         .task {
             await viewModel.loadHistory()
         }
+        #if os(tvOS)
+        .tvOSPlayerCover($playerPost)
+        #else
         .navigationDestination(for: BlogPost.self) { post in
-            let _ = print("🔍 HistoryView: Navigating to BlogPost: \(post.title)")
-            #if os(tvOS)
-            let _ = print("🔍 HistoryView: Using VideoPlayerTvosView")
-            return VideoPlayerTvosView(post: post)
-            #else
-            let _ = print("🔍 HistoryView: Using VideoPlayerView")
-            return VideoPlayerView(post: post)
-            #endif
+            VideoPlayerView(post: post)
         }
+        #endif
     }
 
     private var emptyState: some View {

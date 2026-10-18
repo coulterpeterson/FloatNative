@@ -144,6 +144,9 @@ struct LivePlayerTvosView: View {
             .onAppear {
                 #if os(tvOS)
                 customTransportBarItems = buildTransportBarItems()
+                TVLog.log(.player, "live player appeared creator=\(creator.title)", notable: true)
+                MainThreadWatchdog.shared.start()
+                playerManager.isTransportBarVisible = false
                 #endif
             }
             .task {
@@ -162,6 +165,11 @@ struct LivePlayerTvosView: View {
                 hasParsedDescription = true
             }
             .onDisappear {
+                #if os(tvOS)
+                TVLog.log(.player, "live player disappeared", notable: true)
+                MainThreadWatchdog.shared.stop()
+                playerManager.isTransportBarVisible = false
+                #endif
                 playerManager.pause()
                 playerManager.reset()
             }
@@ -177,21 +185,37 @@ struct LivePlayerTvosView: View {
                 }
             }
             #if os(tvOS)
-            .onExitCommand {
-                if showSidePanel {
-                    withAnimation {
-                        showSidePanel = false
-                    }
-                } else {
-                    dismiss()
-                }
-            }
+            // Menu (back) button — see `exitCommandAction`.
+            .onExitCommand(perform: exitCommandAction)
             .onChange(of: playerManager.availableQualities) { _, _ in
                 customTransportBarItems = buildTransportBarItems()
             }
             #endif
     }
     
+    // MARK: - Exit (Menu button) handling
+
+    #if os(tvOS)
+    /// Same three-way split as VideoPlayerTvosView.exitCommandAction —
+    /// `nil` hands the press to AVKit so the transport bar can collapse
+    /// instead of the whole player popping. See that property for why.
+    private var exitCommandAction: (() -> Void)? {
+        if showSidePanel {
+            return {
+                TVLog.log(.exitCmd, "live: menu -> closing side panel", notable: true)
+                withAnimation {
+                    showSidePanel = false
+                }
+            }
+        }
+        if playerManager.isTransportBarVisible { return nil }
+        return {
+            TVLog.log(.exitCmd, "live: menu -> dismissing player", notable: true)
+            dismiss()
+        }
+    }
+    #endif
+
     // MARK: - Components
 
     #if os(tvOS)

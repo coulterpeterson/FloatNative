@@ -18,6 +18,39 @@ class CustomAVPlayerViewController: AVPlayerViewController {
     private var likeHandler: (() async -> Void)?
     private var dislikeHandler: (() async -> Void)?
 
+    // MARK: - Remote diagnostics
+    //
+    // Every Siri Remote press that reaches the player lands here first.
+    // These overrides log and then defer to `super` — they never consume a
+    // press — so the trace shows exactly what the app received and when.
+    // A press logged with no matching focus/transport change afterwards
+    // means the event was delivered and ignored; a *missing* press log
+    // (with the user insisting they pressed the button) means the event
+    // never made it out of the system, which the MainThreadWatchdog hang
+    // reports will corroborate.
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        TVLog.press("Began", presses, source: "AVPlayerVC")
+        super.pressesBegan(presses, with: event)
+    }
+
+    override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        TVLog.press("Ended", presses, source: "AVPlayerVC")
+        super.pressesEnded(presses, with: event)
+    }
+
+    override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        TVLog.press("Cancelled", presses, source: "AVPlayerVC")
+        super.pressesCancelled(presses, with: event)
+    }
+
+    override func didUpdateFocus(in context: UIFocusUpdateContext, with coordinator: UIFocusAnimationCoordinator) {
+        super.didUpdateFocus(in: context, with: coordinator)
+        let from = context.previouslyFocusedItem.map { String(describing: type(of: $0)) } ?? "nil"
+        let to = context.nextFocusedItem.map { String(describing: type(of: $0)) } ?? "nil"
+        TVLog.log(.focus, "focus \(from) -> \(to) heading=\(context.focusHeading)")
+    }
+
     /// Update the like button title and state without recreating the entire transport bar
     func updateLikeButton(count: Int, isLiked: Bool) {
         guard let likeAction = likeAction else { return }
@@ -233,30 +266,35 @@ struct CustomVideoPlayer: UIViewControllerRepresentable {
         uiViewController.showsPlaybackControls = showsPlaybackControls
 
         #if os(tvOS)
-        // Always apply transport bar items when they change
-        // Trust SwiftUI's change detection - if this method is called, something changed
-        let newItemsCount = customMenuItems.count
-
-        // Only update if the items have actually changed to avoid resetting focus
-        if context.coordinator.lastCustomMenuItemsCount != newItemsCount ||
-           context.coordinator.lastCustomMenuItems.elementsEqual(customMenuItems, by: { $0.hashValue == $1.hashValue }) == false { // Using hashValue for comparison, might need a more robust solution for complex UIMenuElement types
-            
-            if newItemsCount > 0 {
-                uiViewController.transportBarCustomMenuItems = customMenuItems
-                context.coordinator.lastCustomMenuItems = customMenuItems
-                context.coordinator.lastCustomMenuItemsCount = newItemsCount
-                
-
-            } else {
-                // If items become empty, clear them
-                uiViewController.transportBarCustomMenuItems = []
-                context.coordinator.lastCustomMenuItems = []
-                context.coordinator.lastCustomMenuItemsCount = 0
-            }
+        // This runs on every body evaluation of the host view, and the host
+        // observes AVPlayerManager — whose `currentTime` republishes twice a
+        // second during playback. Count the calls so the log shows how much
+        // churn the player is actually under, but only touch AVKit when
+        // something genuinely changed: reassigning `transportBarCustomMenuItems`
+        // rebuilds the bar and resets focus.
+        context.coordinator.updateCount += 1
+        if context.coordinator.updateCount % 20 == 0 {
+            TVLog.log(.ui, "updateUIViewController called \(context.coordinator.updateCount)x, transportBar reassigned \(context.coordinator.transportBarAssignments)x")
         }
 
-        // Update contextual actions (these are time-based, not state-based)
-        uiViewController.contextualActions = contextualActions
+        // Compare by object identity. UIAction/UIMenu are NSObject subclasses
+        // whose `hashValue` is identity-based anyway, so `===` says the same
+        // thing without pretending the comparison is value-based.
+        let itemsChanged = !context.coordinator.lastCustomMenuItems.elementsEqual(customMenuItems, by: { $0 === $1 })
+
+        if itemsChanged {
+            uiViewController.transportBarCustomMenuItems = customMenuItems
+            context.coordinator.lastCustomMenuItems = customMenuItems
+            context.coordinator.transportBarAssignments += 1
+            TVLog.log(.transport, "transportBarCustomMenuItems reassigned (\(customMenuItems.count) items, assignment #\(context.coordinator.transportBarAssignments))")
+        }
+
+        // Contextual actions are time-based, not state-based. Assigning them
+        // unconditionally on every update poked AVKit twice a second for no
+        // reason, so skip when nothing moved.
+        if !uiViewController.contextualActions.elementsEqual(contextualActions, by: { $0 === $1 }) {
+            uiViewController.contextualActions = contextualActions
+        }
         #endif
     }
 
@@ -267,12 +305,32 @@ struct CustomVideoPlayer: UIViewControllerRepresentable {
     class Coordinator: NSObject, AVPlayerViewControllerDelegate {
         var parent: CustomVideoPlayer
         var lastCustomMenuItems: [UIMenuElement] = []
-        var lastCustomMenuItemsCount: Int = 0
+        var updateCount: Int = 0
+        var transportBarAssignments: Int = 0
 
         init(_ parent: CustomVideoPlayer) {
             self.parent = parent
 
         }
+
+        #if os(tvOS)
+        // MARK: - Transport bar visibility
+        //
+        // The only public signal for "are the playback controls on screen
+        // right now". We mirror it onto AVPlayerManager so the SwiftUI layer
+        // can reason about what a Menu press means, and log the transitions
+        // because they're the thing a Menu press is supposed to change.
+        func playerViewController(
+            _ playerViewController: AVPlayerViewController,
+            willTransitionToVisibilityOfTransportBar visible: Bool,
+            with coordinator: any AVPlayerViewControllerAnimationCoordinator
+        ) {
+            MainActor.assumeIsolated {
+                AVPlayerManager.shared.isTransportBarVisible = visible
+            }
+            TVLog.log(.transport, "transport bar -> \(visible ? "VISIBLE" : "hidden")")
+        }
+        #endif
 
         // Prevent the player view controller from being dismissed when PiP starts
         // This keeps the VideoPlayerView alive in the navigation stack so it can be restored later

@@ -318,8 +318,19 @@ struct VideoPlayerTvosView: View {
                 currentLikes = post.likes
                 currentDislikes = post.dislikes
 
-
-
+                #if os(tvOS)
+                TVLog.log(.player,
+                          "player appeared post=\(post.id) title=\(post.title) livestream=\(isLivestream) isVideoPost=\(isVideoPost)",
+                          notable: true)
+                // Watchdog runs only while the player is on screen — this is
+                // where the "remote did nothing for 10 seconds" reports come
+                // from, and we don't want a background timer for the app's
+                // whole lifetime.
+                MainThreadWatchdog.shared.start()
+                // Stale `true` from a previous video would make the first
+                // Menu press a no-op, so clear it on entry.
+                playerManager.isTransportBarVisible = false
+                #endif
 
 
                 #if os(tvOS)
@@ -368,6 +379,11 @@ struct VideoPlayerTvosView: View {
                 await loadComments(limit: 20)
             }
             .onDisappear {
+                #if os(tvOS)
+                TVLog.log(.player, "player disappeared post=\(post.id)", notable: true)
+                MainThreadWatchdog.shared.stop()
+                AVPlayerManager.shared.isTransportBarVisible = false
+                #endif
                 // Save progress (skip for livestreams)
                 if !isLivestream {
                     Task {
@@ -406,24 +422,17 @@ struct VideoPlayerTvosView: View {
             .toolbar(isVideoPost ? .hidden : .visible, for: .navigationBar)
             .toolbar(.hidden, for: .tabBar)
             .onChange(of: showSidePanel) { _, newValue in
+                #if os(tvOS)
+                TVLog.log(.ui, "side panel \(newValue ? "opened" : "closed") mode=\(sidePanelMode)")
+                #endif
                 if newValue {
                     // Auto-focus the list content when panel opens
                     sidePanelContentFocused = true
                 }
             }
             #if os(tvOS)
-            // Handle Menu button (back) press on tvOS
-            .onExitCommand {
-                if showSidePanel {
-                    // If side panel is visible, close it first
-                    withAnimation {
-                        showSidePanel = false
-                    }
-                } else {
-                    // If side panel is closed, dismiss the video player
-                    dismiss()
-                }
-            }
+            // Menu (back) button — see `exitCommandAction`.
+            .onExitCommand(perform: exitCommandAction)
             #endif
     }
 
@@ -453,6 +462,46 @@ struct VideoPlayerTvosView: View {
         return content
         #endif
     }
+
+    // MARK: - Exit (Menu button) handling
+
+    #if os(tvOS)
+    /// What the Menu button should do right now, or `nil` to let tvOS handle
+    /// the press natively.
+    ///
+    /// `onExitCommand` installs a menu-press gesture recognizer on the
+    /// SwiftUI host, and gesture recognizers are offered presses *before*
+    /// the responder chain. An unconditional handler therefore stole the
+    /// press that AVPlayerViewController uses to collapse its own transport
+    /// bar: pressing Menu with the playback controls on screen popped the
+    /// whole player back to the feed instead of just dismissing the
+    /// controls. Returning `nil` removes the recognizer, so the press
+    /// reaches AVKit.
+    ///
+    /// The three cases, in priority order:
+    ///  - side panel open  → close the panel (our UI, AVKit has no stake)
+    ///  - transport bar up → `nil`, AVKit collapses it (the bug above)
+    ///  - otherwise        → leave the player
+    private var exitCommandAction: (() -> Void)? {
+        if showSidePanel {
+            return {
+                TVLog.log(.exitCmd, "menu -> closing side panel (mode=\(sidePanelMode))", notable: true)
+                withAnimation {
+                    showSidePanel = false
+                }
+            }
+        }
+        // No log here — this property is re-evaluated on every body pass
+        // (twice a second during playback) and would drown the trace. The
+        // transport bar transitions themselves are logged from
+        // CustomVideoPlayer's delegate.
+        if playerManager.isTransportBarVisible { return nil }
+        return {
+            TVLog.log(.exitCmd, "menu -> dismissing player", notable: true)
+            dismiss()
+        }
+    }
+    #endif
 
     // MARK: - Video Player Area
 
@@ -846,65 +895,66 @@ struct VideoPlayerTvosView: View {
 
     /// Parse HTML into paragraphs with character-based grouping for better readability
     /// Groups consecutive <p> tags until reaching ~400 characters for natural reading chunks
+    /// Split a post's HTML description into ~400-character groups of
+    /// paragraphs for the sidebar list.
+    ///
+    /// This deliberately calls the HTML importer exactly ONCE. Foundation's
+    /// `NSAttributedString(data:options:[.documentType: .html])` is
+    /// WebKit-backed and always executes on the main thread — calling it from
+    /// a detached task just makes the background task block *while the main
+    /// thread does the work*. The previous version invoked it once per `<p>`
+    /// (only to test for emptiness) plus once per group, so a livestream VOD
+    /// description with dozens of paragraphs stalled the main thread for
+    /// seconds right as the player was starting up (the watchdog clocked
+    /// 2.5s). Now we import the whole document, then split the resulting
+    /// attributed string on its paragraph breaks, which is pure string work.
     nonisolated static func parseHTMLParagraphsStatic(_ html: String) -> [AttributedString] {
-        // Split by closing </p> tags to get individual <p> chunks
-        let paragraphChunks = html.components(separatedBy: "</p>")
-        var groupedParagraphs: [AttributedString] = []
-        var groupedAttributedStrings: [AttributedString] = [] // Unused but consistent? No, just copy logic.
-        var currentGroupHTML = ""
-        var currentGroupCharCount = 0
+        let whole = htmlToAttributedStringStatic(html)
         let targetCharsPerGroup = 400
 
-        for chunk in paragraphChunks {
-            // Skip empty chunks
-            let trimmed = chunk.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
-
-            // Find the opening <p> tag or use the whole chunk
-            var paragraphHTML = trimmed
-            if let pTagRange = trimmed.range(of: "<p[^>]*>", options: .regularExpression) {
-                paragraphHTML = String(trimmed[pTagRange.lowerBound...])
+        // The importer turns each <p> into a run of text followed by "\n".
+        // Slice on those breaks, dropping blank paragraphs (<p><br></p>).
+        var paragraphs: [AttributedString] = []
+        var sliceStart = whole.startIndex
+        func flush(upTo end: AttributedString.Index) {
+            let slice = AttributedString(whole[sliceStart..<end])
+            if !String(slice.characters).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                paragraphs.append(slice)
             }
+        }
+        for index in whole.characters.indices where whole.characters[index] == "\n" {
+            flush(upTo: index)
+            sliceStart = whole.characters.index(after: index)
+        }
+        flush(upTo: whole.endIndex)
 
-            // Add closing tag back
-            if !paragraphHTML.hasSuffix("</p>") {
-                paragraphHTML += "</p>"
+        // Group consecutive paragraphs until each group is roughly
+        // `targetCharsPerGroup` long, re-joining them with newlines.
+        var groups: [AttributedString] = []
+        var currentGroup = AttributedString()
+        var currentGroupCharCount = 0
+        for paragraph in paragraphs {
+            if currentGroupCharCount > 0 {
+                currentGroup.append(AttributedString("\n"))
             }
-
-            // Filter out empty paragraphs like <p><br /></p>
-            let tempAttributed = htmlToAttributedStringStatic(paragraphHTML)
-            let plainText = String(tempAttributed.characters).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !plainText.isEmpty else { continue }
-
-            // Add to current group
-            currentGroupHTML += paragraphHTML
-            currentGroupCharCount += plainText.count
-
-            // If we've reached target size, finalize this group
+            currentGroup.append(paragraph)
+            currentGroupCharCount += paragraph.characters.count
             if currentGroupCharCount >= targetCharsPerGroup {
-                let groupedAttributed = htmlToAttributedStringStatic(currentGroupHTML)
-                if !String(groupedAttributed.characters).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    groupedParagraphs.append(groupedAttributed)
-                }
-                currentGroupHTML = ""
+                groups.append(currentGroup)
+                currentGroup = AttributedString()
                 currentGroupCharCount = 0
             }
         }
-
-        // Add any remaining content as final paragraph
-        if !currentGroupHTML.isEmpty {
-            let groupedAttributed = htmlToAttributedStringStatic(currentGroupHTML)
-            if !String(groupedAttributed.characters).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                groupedParagraphs.append(groupedAttributed)
-            }
+        if currentGroupCharCount > 0 {
+            groups.append(currentGroup)
         }
 
-        // If no paragraphs found, treat entire HTML as one paragraph
-        if groupedParagraphs.isEmpty {
-            groupedParagraphs.append(htmlToAttributedStringStatic(html))
+        // Nothing paragraph-shaped at all — show whatever the importer gave us.
+        if groups.isEmpty {
+            groups.append(whole)
         }
 
-        return groupedParagraphs
+        return groups
     }
 
     nonisolated static func htmlToAttributedStringStatic(_ html: String) -> AttributedString {
@@ -1048,15 +1098,27 @@ struct VideoPlayerTvosView: View {
         // Floatplane's feed endpoints no longer include attachment ids; fall
         // back to the full post when the feed model has none.
         var resolvedVideoId = selectedAttachmentId ?? post.videoAttachments?.first
+        // Keep the failure: "no video" and "couldn't load the post" are
+        // different problems, and the second usually means Floatplane changed
+        // its response shape (details land in Settings → Debug Log).
+        var postLoadError: Error?
         if resolvedVideoId == nil {
-            if let fetched = try? await api.getBlogPost(id: post.id) {
+            do {
+                let fetched = try await api.getBlogPost(id: post.id)
                 detailedPost = fetched
                 resolvedVideoId = fetched.post.orderedVideoAttachments.first?.id
                 if selectedAttachmentId == nil { selectedAttachmentId = resolvedVideoId }
+            } catch {
+                postLoadError = error
             }
         }
         guard let videoId = resolvedVideoId else {
-            errorMessage = "No video available for this post"
+            if let postLoadError {
+                TVLog.log(.player, "couldn't load post \(post.id)", detail: postLoadError.localizedDescription, notable: true)
+                errorMessage = "Couldn't load this post: \(postLoadError.localizedDescription)"
+            } else {
+                errorMessage = "No video available for this post"
+            }
             isLoading = false
             return
         }

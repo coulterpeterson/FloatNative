@@ -401,16 +401,28 @@ struct VideoPlayerView: View {
         // Floatplane's feed endpoints no longer include attachment ids; fall
         // back to the full post when the feed model has none.
         var resolvedVideoId = selectedAttachmentId ?? post.videoAttachments?.first
+        // Keep the failure: "no video" and "couldn't load the post" are
+        // different problems, and the second usually means Floatplane changed
+        // its response shape (details land in Settings → Debug Log).
+        var postLoadError: Error?
         if resolvedVideoId == nil {
-            if let fetched = try? await api.getBlogPost(id: post.id) {
+            do {
+                let fetched = try await api.getBlogPost(id: post.id)
                 detailedPost = fetched
                 resolvedVideoId = fetched.post.orderedVideoAttachments.first?.id
                 if selectedAttachmentId == nil { selectedAttachmentId = resolvedVideoId }
+            } catch {
+                postLoadError = error
             }
         }
         guard let videoId = resolvedVideoId else {
-            print("📱 [VideoPlayerView.loadVideo] No video attachment found!")
-            errorMessage = "No video available for this post"
+            if let postLoadError {
+                print("📱 [VideoPlayerView.loadVideo] Couldn't load post: \(postLoadError)")
+                errorMessage = "Couldn't load this post: \(postLoadError.localizedDescription)"
+            } else {
+                print("📱 [VideoPlayerView.loadVideo] No video attachment found!")
+                errorMessage = "No video available for this post"
+            }
             isLoading = false
             return
         }

@@ -26,10 +26,11 @@ struct SearchView: View {
     @AppStorage("enhancedLttSearchEnabled") private var enhancedLttSearchEnabled = false
 
     // Bookmark indicators: Set of all video IDs that exist in any playlist (for O(1) lookup)
-    @State private var allPlaylistVideoIds: Set<String> = []
+    @ObservedObject private var membership = PlaylistMembershipStore.shared
 
     // iOS Menu state
     @State private var menuSelectedPost: BlogPost?
+    @State private var playerPost: BlogPost?
     @State private var showPlaylistSheet = false
     @State private var isAddingToWatchLaterMenu = false
     @State private var menuPlaylistsWithVideo: Set<String> = []
@@ -115,10 +116,10 @@ struct SearchView: View {
                     ScrollView {
                         LazyVGrid(columns: gridColumns, spacing: 20) {
                             ForEach(searchResults) { post in
-                                NavigationLink(value: post) {
+                                PostPlayerLink(post: post, presented: $playerPost) {
                                     VideoCard(
                                         post: post,
-                                        isBookmarked: allPlaylistVideoIds.contains(post.id),
+                                        isBookmarked: membership.contains(post.id),
                                         onMenuWatchLater: {
                                             Task { @MainActor in
                                                 await handleMenuWatchLater(post: post)
@@ -214,13 +215,13 @@ struct SearchView: View {
                     }
                 }
             }
+            #if os(tvOS)
+            .tvOSPlayerCover($playerPost)
+            #else
             .navigationDestination(for: BlogPost.self) { post in
-                #if os(tvOS)
-                VideoPlayerTvosView(post: post)
-                #else
                 VideoPlayerView(post: post)
-                #endif
             }
+            #endif
             #if !os(tvOS)
             .sheet(isPresented: $showPlaylistSheet, onDismiss: {
                 // Reset state when sheet is dismissed
@@ -239,17 +240,10 @@ struct SearchView: View {
     }
 
     private func loadPlaylistsForBookmarks() async {
-        do {
-            let loadedPlaylists = try await companionAPI.getPlaylists(includeWatchLater: true)
-
-            // Create efficient lookup set of all video IDs in any playlist
-            allPlaylistVideoIds = Set(loadedPlaylists.flatMap { $0.videoIds })
-
-            print("✅ SearchView: Loaded \(loadedPlaylists.count) playlists for bookmark indicators (\(allPlaylistVideoIds.count) unique videos)")
-        } catch {
-            print("⚠️ SearchView: Failed to load playlists for bookmarks: \(error)")
-            // Fail silently - bookmarks just won't show
-        }
+        // See VideoFeedView.loadPlaylistsForBookmarks — the shared store only
+        // needs one full fetch per launch.
+        guard !membership.hasLoadedFullListing else { return }
+        await membership.refresh()
     }
 
     private func performSearch(query: String) async {
@@ -429,8 +423,6 @@ struct SearchView: View {
 
         do {
             _ = try await companionAPI.addToWatchLater(videoId: post.id)
-            // Update bookmark indicator
-            allPlaylistVideoIds.insert(post.id)
             // Show success toast
             withAnimation {
                 showToast = true
@@ -469,17 +461,8 @@ struct SearchView: View {
                 playlists[index] = updatedPlaylist
             }
 
-            // Update bookmark indicator state
-            if isCurrentlyInPlaylist {
-                // Video was removed - check if it still exists in any other playlist
-                let stillInAnyPlaylist = playlists.contains { $0.videoIds.contains(post.id) }
-                if !stillInAnyPlaylist {
-                    allPlaylistVideoIds.remove(post.id)
-                }
-            } else {
-                // Video was added - add to bookmark indicators
-                allPlaylistVideoIds.insert(post.id)
-            }
+            // Bookmark badges update on their own: CompanionAPI feeds every
+            // playlist response into PlaylistMembershipStore.
         } catch {
             // Rollback optimistic update on failure
             if isCurrentlyInPlaylist {

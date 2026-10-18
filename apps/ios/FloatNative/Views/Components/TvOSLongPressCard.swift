@@ -99,7 +99,6 @@ struct TvOSLongPressCard<Content: View>: UIViewRepresentable {
         context.coordinator.widthConstraint = widthConstraint
         context.coordinator.heightConstraint = heightConstraint
         context.coordinator.lastWidth = width
-        context.coordinator.lastProgress = progress
 
         return button
     }
@@ -107,9 +106,31 @@ struct TvOSLongPressCard<Content: View>: UIViewRepresentable {
     func updateUIView(_ uiView: FocusableCardButton, context: Context) {
         let height = width / (16.0 / 9.0)
 
-        // Check if width or progress has changed
+        // Keep the coordinator's closures current. They capture values from
+        // the parent (e.g. `focusedVideoId` in the long-press handler), and
+        // the ones handed to `makeCoordinator` are frozen at creation.
+        context.coordinator.onTap = onTap
+        context.coordinator.onLongPress = onLongPress
+
+        // Push the latest SwiftUI content into the existing hosting view.
+        //
+        // `UIHostingConfiguration.makeContentView()` snapshots the view it is
+        // given; it does NOT track the parent's state afterwards. This used
+        // to rebuild only when `progress` changed, which meant everything
+        // else baked into `content` — notably the bookmark badge, computed
+        // from a set that finishes loading *after* the first cards are
+        // built — stayed at whatever it was when the card was created.
+        // Cards recycled by the LazyVGrid picked up fresh state while the
+        // ones that stayed on screen did not, hence the badges looking
+        // random. Assigning a new configuration to the content view updates
+        // the hosted root in place (same view identity, so @State and the
+        // cached thumbnail survive — no flash) and is the documented way to
+        // update a UIHostingConfiguration.
+        if var hosted = context.coordinator.contentView as? any UIContentView {
+            hosted.configuration = UIHostingConfiguration { content }.margins(.all, 0)
+        }
+
         let widthChanged = context.coordinator.lastWidth != width
-        let progressChanged = context.coordinator.lastProgress != progress
 
         if widthChanged {
             // Animate constraint changes instead of rebuilding the view
@@ -129,34 +150,6 @@ struct TvOSLongPressCard<Content: View>: UIViewRepresentable {
             // Update stored width for next comparison
             context.coordinator.lastWidth = width
         }
-        
-        if progressChanged {
-            // Rebuild content if progress changed
-            // This is necessary because UIHostingConfiguration doesn't automatically update
-            // when captured SwiftUI state changes unless we explicitly tell it to
-            let configuration = UIHostingConfiguration {
-                content
-            }
-            .margins(.all, 0)
-
-            if let oldContentView = context.coordinator.contentView {
-                let newContentView = configuration.makeContentView()
-                newContentView.translatesAutoresizingMaskIntoConstraints = false
-
-                oldContentView.removeFromSuperview()
-                uiView.addSubview(newContentView)
-
-                NSLayoutConstraint.activate([
-                    newContentView.topAnchor.constraint(equalTo: uiView.topAnchor),
-                    newContentView.leadingAnchor.constraint(equalTo: uiView.leadingAnchor),
-                    newContentView.trailingAnchor.constraint(equalTo: uiView.trailingAnchor),
-                    newContentView.bottomAnchor.constraint(equalTo: uiView.bottomAnchor)
-                ])
-
-                context.coordinator.contentView = newContentView
-            }
-            context.coordinator.lastProgress = progress
-        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -164,13 +157,12 @@ struct TvOSLongPressCard<Content: View>: UIViewRepresentable {
     }
 
     class Coordinator: NSObject {
-        let onTap: () -> Void
-        let onLongPress: () -> Void
+        var onTap: () -> Void
+        var onLongPress: () -> Void
         var contentView: UIView?
         var widthConstraint: NSLayoutConstraint?
         var heightConstraint: NSLayoutConstraint?
         var lastWidth: CGFloat?
-        var lastProgress: Double?
 
         init(onTap: @escaping () -> Void, onLongPress: @escaping () -> Void) {
             self.onTap = onTap
