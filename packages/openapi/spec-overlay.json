@@ -53,7 +53,13 @@
               "about",
               "category",
               "icon"
-            ]
+            ],
+            "properties": {
+              "visibility": {
+                "type": "string",
+                "description": "Replaces `discoverable` as of 2026-10-18. Observed value: \"public\". Not in the upstream spec."
+              }
+            }
           }
         }
       },
@@ -94,9 +100,55 @@
           }
         }
       },
-      "CreatorModelV3": {
-        "_comment": "The inline owner schema on CreatorModelV3 mirrors the badges-on-user pattern: `additionalProperties: false` plus no `badges` field. Real responses on /api/v3/creator/info, /creator/named, and /creator/list all carry badges on owner.",
+      "CreatorModelV2": {
+        "_comment": "As of 2026-10-18 Floatplane no longer returns `discoverable` on any creator object (/content/post, /creator/named, /creator/list, /creator/info); it returns `visibility: \"public\"` instead. With `discoverable` required, /content/post failed to decode, and since video attachment ids only come from that endpoint the iOS players showed \"No video available for this post\". Verified on 12 posts plus their /content/video and /delivery/info responses; nothing else required is missing.",
+        "required": [
+          "id",
+          "owner",
+          "title",
+          "urlname",
+          "description",
+          "about",
+          "category",
+          "cover",
+          "icon",
+          "liveStream",
+          "subscriptionPlans",
+          "subscriberCountDisplay",
+          "incomeDisplay"
+        ],
         "properties": {
+          "visibility": {
+            "type": "string",
+            "description": "Replaces `discoverable` as of 2026-10-18. Observed value: \"public\". Not in the upstream spec."
+          }
+        }
+      },
+      "CreatorModelV3": {
+        "_comment": "The inline owner schema on CreatorModelV3 mirrors the badges-on-user pattern: `additionalProperties: false` plus no `badges` field. Real responses on /api/v3/creator/info, /creator/named, and /creator/list all carry badges on owner. As of 2026-10-18 `discoverable` is gone from all three endpoints (replaced by `visibility`), so it's dropped from `required`; see CreatorModelV2.",
+        "required": [
+          "id",
+          "owner",
+          "title",
+          "urlname",
+          "description",
+          "about",
+          "category",
+          "cover",
+          "icon",
+          "liveStream",
+          "subscriptionPlans",
+          "subscriberCountDisplay",
+          "incomeDisplay",
+          "defaultChannel",
+          "socialLinks",
+          "channels"
+        ],
+        "properties": {
+          "visibility": {
+            "type": "string",
+            "description": "Replaces `discoverable` as of 2026-10-18. Observed value: \"public\". Not in the upstream spec."
+          },
           "owner": {
             "additionalProperties": null,
             "properties": {

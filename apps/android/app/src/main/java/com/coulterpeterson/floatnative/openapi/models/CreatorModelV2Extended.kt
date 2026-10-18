@@ -37,12 +37,13 @@ import com.squareup.moshi.JsonClass
  * @param icon 
  * @param liveStream 
  * @param subscriptionPlans 
- * @param discoverable 
  * @param subscriberCountDisplay 
  * @param incomeDisplay 
  * @param socialLinks 
  * @param discordServers 
+ * @param discoverable 
  * @param defaultChannel 
+ * @param visibility Replaces `discoverable` as of 2026-10-18. Observed value: \"public\". Not in the upstream spec.
  */
 
 
@@ -82,9 +83,6 @@ data class CreatorModelV2Extended (
     @Json(name = "subscriptionPlans")
     val subscriptionPlans: kotlin.collections.List<SubscriptionPlanModel>?,
 
-    @Json(name = "discoverable")
-    val discoverable: kotlin.Boolean,
-
     @Json(name = "subscriberCountDisplay")
     val subscriberCountDisplay: kotlin.String,
 
@@ -97,8 +95,15 @@ data class CreatorModelV2Extended (
     @Json(name = "discordServers")
     val discordServers: kotlin.collections.List<DiscordServerModel>,
 
+    @Json(name = "discoverable")
+    val discoverable: kotlin.Boolean? = null,
+
     @Json(name = "defaultChannel")
-    val defaultChannel: kotlin.String? = null
+    val defaultChannel: kotlin.String? = null,
+
+    /* Replaces `discoverable` as of 2026-10-18. Observed value: \"public\". Not in the upstream spec. */
+    @Json(name = "visibility")
+    val visibility: kotlin.String? = null
 
 ) {
 
