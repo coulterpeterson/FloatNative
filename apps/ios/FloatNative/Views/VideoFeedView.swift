@@ -60,8 +60,9 @@ struct VideoFeedView: View {
     @State private var isLoadingPlaylists = false
     @State private var watchLaterPlaylistId: String?
 
-    // Bookmark indicators: Set of all video IDs that exist in any playlist (for O(1) lookup)
-    @State private var allPlaylistVideoIds: Set<String> = []
+    // Bookmark indicators. Shared across every feed + Search so a change made
+    // in one place shows everywhere; CompanionAPI keeps it current.
+    @ObservedObject private var membership = PlaylistMembershipStore.shared
 
     // Watch progress tracking: Maps post IDs to progress values (0.0 to 1.0)
     @State private var progressData: [String: Double] = [:]
@@ -233,7 +234,7 @@ struct VideoFeedView: View {
                                         ) {
                                             VideoCard(
                                                 post: post,
-                                                isBookmarked: allPlaylistVideoIds.contains(post.id),
+                                                isBookmarked: membership.contains(post.id),
                                                 progress: progressData[post.id]
                                             )
                                         }
@@ -244,7 +245,7 @@ struct VideoFeedView: View {
                                         NavigationLink(value: post) {
                                             VideoCard(
                                                 post: post,
-                                                isBookmarked: allPlaylistVideoIds.contains(post.id),
+                                                isBookmarked: membership.contains(post.id),
                                                 progress: progressData[post.id]
                                             )
                                         }
@@ -333,10 +334,15 @@ struct VideoFeedView: View {
             }
             .navigationTitle("")
             .toolbarBackground(.hidden, for: .navigationBar)
-            .navigationDestination(item: $selectedPost) { post in
+            // Players are presented full screen rather than pushed. Pushed
+            // inside the TabView's NavigationStack, the (hidden) tab bar kept
+            // focus for several seconds after the player appeared, and a Menu
+            // press in that window went to the tab bar — whose Menu action is
+            // "suspend the app". A modal is outside the tab bar's focus scope.
+            .fullScreenCover(item: $selectedPost) { post in
                 VideoPlayerTvosView(post: post)
             }
-            .navigationDestination(item: $selectedLiveCreator) { creator in
+            .fullScreenCover(item: $selectedLiveCreator) { creator in
                 LivePlayerTvosView(creator: creator)
             }
             .onChange(of: showActionSidebar) { _, isShowing in
@@ -404,7 +410,7 @@ struct VideoFeedView: View {
                             NavigationLink(value: post) {
                                 VideoCard(
                                     post: post,
-                                    isBookmarked: allPlaylistVideoIds.contains(post.id),
+                                    isBookmarked: membership.contains(post.id),
                                     currentPlaylistId: currentPlaylistId,
                                     onMenuWatchLater: {
                                         Task { @MainActor in
@@ -1154,14 +1160,11 @@ struct VideoFeedView: View {
     // MARK: - Bookmark Indicator Helpers
 
     private func loadPlaylistsForBookmarks() async {
-        do {
-            let loadedPlaylists = try await companionAPI.getPlaylists(includeWatchLater: true)
-
-            // Create efficient lookup set of all video IDs in any playlist
-            allPlaylistVideoIds = Set(loadedPlaylists.flatMap { $0.videoIds })
-        } catch {
-            // Fail silently - bookmarks just won't show
-        }
+        // One full fetch is enough for the whole app; every later playlist
+        // response (from any view) keeps the store current. Errors are
+        // logged inside the store — bookmarks just won't show.
+        guard !membership.hasLoadedFullListing else { return }
+        await membership.refresh()
     }
 
     // MARK: - Watch Progress Helpers
@@ -1352,17 +1355,8 @@ struct VideoFeedView: View {
                 displayPosts = displayPosts.filter { updatedPlaylist.videoIds.contains($0.id) }
             }
 
-            // Update bookmark indicator state
-            if isCurrentlyInPlaylist {
-                // Video was removed - check if it still exists in any other playlist
-                let stillInAnyPlaylist = playlists.contains { $0.videoIds.contains(post.id) }
-                if !stillInAnyPlaylist {
-                    allPlaylistVideoIds.remove(post.id)
-                }
-            } else {
-                // Video was added - add to bookmark indicators
-                allPlaylistVideoIds.insert(post.id)
-            }
+            // Bookmark badges update on their own: CompanionAPI feeds every
+            // playlist response into PlaylistMembershipStore.
         } catch {
             // Rollback optimistic updates on failure
             if isCurrentlyInPlaylist {
@@ -1416,8 +1410,6 @@ struct VideoFeedView: View {
 
         do {
             _ = try await companionAPI.addToWatchLater(videoId: post.id)
-            // Update bookmark indicator
-            allPlaylistVideoIds.insert(post.id)
             // Show success toast
             withAnimation {
                 showToast = true
@@ -1478,17 +1470,8 @@ struct VideoFeedView: View {
                 playlists[index] = updatedPlaylist
             }
 
-            // Update bookmark indicator state
-            if isCurrentlyInPlaylist {
-                // Video was removed - check if it still exists in any other playlist
-                let stillInAnyPlaylist = playlists.contains { $0.videoIds.contains(post.id) }
-                if !stillInAnyPlaylist {
-                    allPlaylistVideoIds.remove(post.id)
-                }
-            } else {
-                // Video was added - add to bookmark indicators
-                allPlaylistVideoIds.insert(post.id)
-            }
+            // Bookmark badges update on their own: CompanionAPI feeds every
+            // playlist response into PlaylistMembershipStore.
         } catch {
             // Rollback optimistic update on failure
             if isCurrentlyInPlaylist {

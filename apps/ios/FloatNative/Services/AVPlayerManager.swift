@@ -97,6 +97,15 @@ class AVPlayerManager: NSObject, ObservableObject {
     /// screen.
     var isInFullScreenTransition: Bool = false
 
+    /// tvOS: whether AVPlayerViewController is currently showing its
+    /// transport bar / playback controls. Fed by the AVPlayerViewController
+    /// delegate in CustomVideoPlayer. Published because the tvOS player
+    /// views decide whether to claim the Menu press based on it — see
+    /// VideoPlayerTvosView.exitCommandAction. It only flips on user
+    /// interaction (a few times a minute at most), so the extra body
+    /// evaluations are cheap.
+    @Published var isTransportBarVisible: Bool = false
+
     // MARK: - Current Video Info
 
     private(set) var currentVideoId: String?
@@ -244,6 +253,13 @@ class AVPlayerManager: NSObject, ObservableObject {
     // MARK: - Now Playing Info
 
     private func updateNowPlayingInfo() {
+        #if os(tvOS)
+        // AVPlayerViewController owns Now Playing on tvOS: it overrides the
+        // duration/rate/elapsed fields, drops our title, and logs a warning
+        // burst on every write — and this runs on every time-observer tick.
+        // The title goes in via `externalMetadata` instead (see loadStream).
+        return
+        #else
         var nowPlayingInfo = [String: Any]()
 
         nowPlayingInfo[MPMediaItemPropertyTitle] = currentVideoTitle ?? "Floatplane Video"
@@ -257,7 +273,20 @@ class AVPlayerManager: NSObject, ObservableObject {
         // }
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+        #endif
     }
+
+    #if os(tvOS)
+    /// Title metadata for AVKit's Now Playing / info panel on tvOS.
+    private static func externalMetadata(title: String?) -> [AVMetadataItem] {
+        guard let title, !title.isEmpty else { return [] }
+        let item = AVMutableMetadataItem()
+        item.identifier = .commonIdentifierTitle
+        item.value = title as NSString
+        item.extendedLanguageTag = "und"
+        return [item]
+    }
+    #endif
 
     // MARK: - Load Video
 
@@ -316,7 +345,7 @@ class AVPlayerManager: NSObject, ObservableObject {
             guard let streamURL = URL(string: url) else {
                 throw FloatplaneAPIError.invalidURL
             }
-            print("📡 [AVPlayerManager] Loading LIVE stream directly: \(streamURL)")
+            print("📡 [AVPlayerManager] Loading LIVE stream directly: \(streamURL.redactingQuery)")
 
             // Create asset without custom resource loader
             asset = AVURLAsset(url: streamURL)
@@ -332,7 +361,7 @@ class AVPlayerManager: NSObject, ObservableObject {
             guard let streamURL = components.url else {
                 throw FloatplaneAPIError.invalidURL
             }
-            print("📼 [AVPlayerManager] Loading VOD stream with interception: \(streamURL)")
+            print("📼 [AVPlayerManager] Loading VOD stream with interception: \(streamURL.redactingQuery)")
 
             // Create new player with Interceptor
             // We do NOT pass headers here because the ResourceLoader will handle the request.
@@ -341,6 +370,9 @@ class AVPlayerManager: NSObject, ObservableObject {
         }
 
         let playerItem = AVPlayerItem(asset: asset)
+        #if os(tvOS)
+        playerItem.externalMetadata = Self.externalMetadata(title: currentVideoTitle)
+        #endif
 
         // Configure buffer limits for tvOS to prevent memory issues during long playback
         #if os(tvOS)
@@ -404,21 +436,29 @@ class AVPlayerManager: NSObject, ObservableObject {
         NotificationCenter.default.addObserver(forName: .AVPlayerItemNewErrorLogEntry, object: item, queue: .main) { notification in
             guard let playerItem = notification.object as? AVPlayerItem,
                   let errorLog = playerItem.errorLog()?.events.last else { return }
-            print("🚨 [AVPlayer] Error Log: \(errorLog.errorDomain) \(errorLog.errorStatusCode) — \(errorLog.errorComment ?? "(no comment)") @ \(errorLog.uri ?? "?")")
+            print("🚨 [AVPlayer] Error Log: \(errorLog.errorDomain) \(errorLog.errorStatusCode) — \(errorLog.errorComment ?? "(no comment)") @ \((errorLog.uri ?? "?").redactingURLQuery)")
         }
 
         NotificationCenter.default.addObserver(forName: .AVPlayerItemNewAccessLogEntry, object: item, queue: .main) { notification in
             guard let playerItem = notification.object as? AVPlayerItem,
                   let accessLog = playerItem.accessLog()?.events.last else { return }
-            print("ℹ️ [AVPlayer] Access Log: URI: \(accessLog.uri ?? "") | Bitrate: \(accessLog.indicatedBitrate)")
+            print("ℹ️ [AVPlayer] Access Log: URI: \((accessLog.uri ?? "").redactingURLQuery) | Bitrate: \(accessLog.indicatedBitrate)")
         }
 
         NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) { notification in
             if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
                 print("❌ [AVPlayer] Failed to play to end: \(error.localizedDescription)")
+                TVLog.log(.player, "failed to play to end", detail: error.localizedDescription, notable: true)
             }
         }
 
+        // A stall is one of the plausible explanations for "the remote did
+        // nothing for ten seconds" — the UI is alive but nothing visibly
+        // reacts. Timestamped here so it can be lined up against the press
+        // and hang traces.
+        NotificationCenter.default.addObserver(forName: AVPlayerItem.playbackStalledNotification, object: item, queue: .main) { _ in
+            TVLog.log(.player, "playback STALLED", notable: true)
+        }
     }
 
     // MARK: - Change Quality
@@ -485,6 +525,8 @@ class AVPlayerManager: NSObject, ObservableObject {
                             self?.playerState = .paused
                         }
                     case .waitingToPlayAtSpecifiedRate:
+                        let reason = player.reasonForWaitingToPlay?.rawValue ?? "unknown"
+                        TVLog.log(.player, "waitingToPlayAtSpecifiedRate reason=\(reason)", notable: true)
                         self?.playerState = .buffering
                     @unknown default:
                         break
@@ -501,6 +543,7 @@ class AVPlayerManager: NSObject, ObservableObject {
                     switch status {
                     case .failed:
                         if let error = player.currentItem?.error {
+                            TVLog.log(.player, "item status FAILED", detail: String(describing: error), notable: true)
                             self?.playerState = .failed(error)
                         }
                     case .readyToPlay:
@@ -519,7 +562,7 @@ class AVPlayerManager: NSObject, ObservableObject {
             .sink { [weak self] isEmpty in
                 Task { @MainActor in
                     if isEmpty {
-
+                        TVLog.log(.player, "playback buffer EMPTY — stalling", notable: true)
                         self?.isBuffering = true
                         self?.playerState = .buffering
                     }
@@ -532,7 +575,9 @@ class AVPlayerManager: NSObject, ObservableObject {
             .sink { [weak self] likelyToKeepUp in
                 Task { @MainActor in
                     if likelyToKeepUp {
-
+                        if self?.isBuffering == true {
+                            TVLog.log(.player, "playback likely to keep up — buffering cleared", notable: true)
+                        }
                         self?.isBuffering = false
                         if self?.isPlaying == true {
                             self?.playerState = .playing

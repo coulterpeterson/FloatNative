@@ -125,6 +125,7 @@ private struct EntryCard: View {
         case .api: return .orange
         case .decode: return .red
         case .auth: return .blue
+        case .player: return .green
         case .other: return .gray
         }
     }

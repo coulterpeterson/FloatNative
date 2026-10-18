@@ -240,8 +240,9 @@ class CompanionAPI: ObservableObject {
 
         let addRequest = WatchLaterAddRequest(videoId: videoId)
 
+        let response: WatchLaterResponse
         do {
-            return try await request(
+            response = try await request(
                 endpoint: "/watch-later/add",
                 method: "PATCH",
                 body: addRequest,
@@ -251,7 +252,7 @@ class CompanionAPI: ObservableObject {
             // If we get 401, try to re-register and retry once
             do {
                 _ = try await ensureLoggedIn()
-                return try await request(
+                response = try await request(
                     endpoint: "/watch-later/add",
                     method: "PATCH",
                     body: addRequest,
@@ -261,6 +262,8 @@ class CompanionAPI: ObservableObject {
                 throw CompanionAPIError.registrationFailed
             }
         }
+        PlaylistMembershipStore.shared.applyWatchLater(response)
+        return response
     }
 
     // MARK: - Playlists
@@ -277,28 +280,31 @@ class CompanionAPI: ObservableObject {
         }
 
         let includeParam = includeWatchLater ? "true" : "false"
-        
+
+        let response: PlaylistResponse
         do {
-            let response: PlaylistResponse = try await request(
+            response = try await request(
                 endpoint: "/playlists?include_watch_later=\(includeParam)",
                 method: "GET",
                 requiresAuth: true
             )
-            return response.playlists
         } catch CompanionAPIError.httpError(let statusCode, _) where statusCode == 401 {
             // If we get 401, try to re-login and retry once
             do {
                 _ = try await ensureLoggedIn()
-                let response: PlaylistResponse = try await request(
+                response = try await request(
                     endpoint: "/playlists?include_watch_later=\(includeParam)",
                     method: "GET",
                     requiresAuth: true
                 )
-                return response.playlists
             } catch {
                 throw CompanionAPIError.registrationFailed
             }
         }
+        // Every listing refreshes the shared bookmark state, so any view that
+        // loads playlists for its own purposes also brings the badges up to date.
+        PlaylistMembershipStore.shared.ingest(response.playlists, includesWatchLater: includeWatchLater)
+        return response.playlists
     }
 
     /// Create a new playlist
@@ -314,8 +320,9 @@ class CompanionAPI: ObservableObject {
 
         let createRequest = PlaylistCreateRequest(name: name)
 
+        let playlist: Playlist
         do {
-            return try await request(
+            playlist = try await request(
                 endpoint: "/playlists",
                 method: "POST",
                 body: createRequest,
@@ -325,7 +332,7 @@ class CompanionAPI: ObservableObject {
             // If we get 401, try to re-register and retry once
             do {
                 _ = try await ensureLoggedIn()
-                return try await request(
+                playlist = try await request(
                     endpoint: "/playlists",
                     method: "POST",
                     body: createRequest,
@@ -335,6 +342,8 @@ class CompanionAPI: ObservableObject {
                 throw CompanionAPIError.registrationFailed
             }
         }
+        PlaylistMembershipStore.shared.apply(playlist)
+        return playlist
     }
 
     /// Delete a playlist
@@ -367,6 +376,7 @@ class CompanionAPI: ObservableObject {
                 throw CompanionAPIError.registrationFailed
             }
         }
+        PlaylistMembershipStore.shared.remove(playlistId: playlistId)
     }
 
     /// Add a video to a playlist
@@ -382,8 +392,9 @@ class CompanionAPI: ObservableObject {
 
         let addRequest = PlaylistAddRequest(videoId: videoId)
 
+        let playlist: Playlist
         do {
-            return try await request(
+            playlist = try await request(
                 endpoint: "/playlists/\(playlistId)/add",
                 method: "PATCH",
                 body: addRequest,
@@ -393,7 +404,7 @@ class CompanionAPI: ObservableObject {
             // If we get 401, try to re-register and retry once
             do {
                 _ = try await ensureLoggedIn()
-                return try await request(
+                playlist = try await request(
                     endpoint: "/playlists/\(playlistId)/add",
                     method: "PATCH",
                     body: addRequest,
@@ -403,6 +414,8 @@ class CompanionAPI: ObservableObject {
                 throw CompanionAPIError.registrationFailed
             }
         }
+        PlaylistMembershipStore.shared.apply(playlist)
+        return playlist
     }
 
     /// Remove a video from a playlist
@@ -418,8 +431,9 @@ class CompanionAPI: ObservableObject {
 
         let removeRequest = PlaylistRemoveRequest(videoId: videoId)
 
+        let playlist: Playlist
         do {
-            return try await request(
+            playlist = try await request(
                 endpoint: "/playlists/\(playlistId)/remove",
                 method: "PATCH",
                 body: removeRequest,
@@ -429,7 +443,7 @@ class CompanionAPI: ObservableObject {
             // If we get 401, try to re-register and retry once
             do {
                 _ = try await ensureLoggedIn()
-                return try await request(
+                playlist = try await request(
                     endpoint: "/playlists/\(playlistId)/remove",
                     method: "PATCH",
                     body: removeRequest,
@@ -439,6 +453,8 @@ class CompanionAPI: ObservableObject {
                 throw CompanionAPIError.registrationFailed
             }
         }
+        PlaylistMembershipStore.shared.apply(playlist)
+        return playlist
     }
 
     // MARK: - LTT Search

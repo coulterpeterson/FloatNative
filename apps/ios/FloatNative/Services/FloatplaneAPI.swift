@@ -538,7 +538,7 @@ class FloatplaneAPI: ObservableObject {
             // users can copy/paste them into a bug report. Body is truncated
             // to keep the buffer reasonable.
             let summary = DecodingErrorFormatter.summary(error)
-            let body = String(data: data, encoding: .utf8) ?? "<non-utf8 \(data.count) bytes>"
+            let body = (String(data: data, encoding: .utf8) ?? "<non-utf8 \(data.count) bytes>").redactingTokens
             let snippet = body.count > 4096 ? String(body.prefix(4096)) + "\n…(truncated)" : body
             DebugLogManager.shared.append(.decode(
                 message: "decode failed on \(endpoint): \(summary)",

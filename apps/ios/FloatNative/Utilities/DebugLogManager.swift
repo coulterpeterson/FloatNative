@@ -21,6 +21,7 @@ final class DebugLogManager: ObservableObject {
         case api
         case decode
         case auth
+        case player
         case other
     }
 
@@ -111,4 +112,33 @@ extension DebugLogManager.Entry {
     static func auth(_ message: String, detail: String? = nil) -> Self {
         .init(category: .auth, message: message, detail: detail)
     }
+
+    static func player(_ message: String, detail: String? = nil) -> Self {
+        .init(category: .player, message: message, detail: detail)
+    }
+}
+
+// MARK: - Log redaction
+
+extension String {
+    /// The URL with its query string replaced by `?…`. Stream URLs carry a
+    /// signed `token=` in the query; use this anywhere one is printed so logs
+    /// people share don't hand out a working playback token.
+    var redactingURLQuery: String {
+        guard let q = firstIndex(of: "?") else { return self }
+        return String(self[..<q]) + "?…"
+    }
+}
+
+extension String {
+    /// Replaces every `token=<value>` with `token=…`. For response bodies
+    /// (e.g. /delivery/info) that embed signed stream URLs mid-JSON.
+    var redactingTokens: String {
+        replacingOccurrences(of: #"token=[^&"\s\\]+"#, with: "token=…", options: .regularExpression)
+    }
+}
+
+extension URL {
+    /// See `String.redactingURLQuery`.
+    var redactingQuery: String { absoluteString.redactingURLQuery }
 }

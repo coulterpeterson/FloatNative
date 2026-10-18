@@ -9,6 +9,12 @@ import SwiftUI
 
 @main
 struct FloatNativeApp: App {
+    #if os(tvOS)
+    init() {
+        TVLog.installGlobalObservers()
+    }
+    #endif
+
     var body: some Scene {
         WindowGroup {
             ContentView()
