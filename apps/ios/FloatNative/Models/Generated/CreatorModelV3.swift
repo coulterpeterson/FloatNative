@@ -24,7 +24,7 @@ public struct CreatorModelV3: Codable, JSONEncodable, Hashable {
     public var icon: ImageModel
     public var liveStream: LiveStreamModel?
     public var subscriptionPlans: [SubscriptionPlanModel]?
-    public var discoverable: Bool
+    public var discoverable: Bool?
     public var subscriberCountDisplay: String
     public var incomeDisplay: Bool
     public var defaultChannel: String
@@ -33,8 +33,10 @@ public struct CreatorModelV3: Codable, JSONEncodable, Hashable {
     /** Present in `/creator/named` queries */
     public var discordServers: [DiscordServerModel]?
     public var card: ImageModel?
+    /** Replaces `discoverable` as of 2026-10-18. Observed value: \"public\". Not in the upstream spec. */
+    public var visibility: String?
 
-    public init(id: String, owner: CreatorModelV3Owner, title: String, urlname: String, description: String, about: String, category: CreatorModelV3Category, cover: ImageModel?, icon: ImageModel, liveStream: LiveStreamModel?, subscriptionPlans: [SubscriptionPlanModel]?, discoverable: Bool, subscriberCountDisplay: String, incomeDisplay: Bool, defaultChannel: String, socialLinks: [String: String], channels: [ChannelModel], discordServers: [DiscordServerModel]? = nil, card: ImageModel? = nil) {
+    public init(id: String, owner: CreatorModelV3Owner, title: String, urlname: String, description: String, about: String, category: CreatorModelV3Category, cover: ImageModel?, icon: ImageModel, liveStream: LiveStreamModel?, subscriptionPlans: [SubscriptionPlanModel]?, discoverable: Bool? = nil, subscriberCountDisplay: String, incomeDisplay: Bool, defaultChannel: String, socialLinks: [String: String], channels: [ChannelModel], discordServers: [DiscordServerModel]? = nil, card: ImageModel? = nil, visibility: String? = nil) {
         self.id = id
         self.owner = owner
         self.title = title
@@ -54,6 +56,7 @@ public struct CreatorModelV3: Codable, JSONEncodable, Hashable {
         self.channels = channels
         self.discordServers = discordServers
         self.card = card
+        self.visibility = visibility
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -76,6 +79,7 @@ public struct CreatorModelV3: Codable, JSONEncodable, Hashable {
         case channels
         case discordServers
         case card
+        case visibility
     }
 
     // Encodable protocol methods
@@ -93,7 +97,7 @@ public struct CreatorModelV3: Codable, JSONEncodable, Hashable {
         try container.encode(icon, forKey: .icon)
         try container.encode(liveStream, forKey: .liveStream)
         try container.encode(subscriptionPlans, forKey: .subscriptionPlans)
-        try container.encode(discoverable, forKey: .discoverable)
+        try container.encodeIfPresent(discoverable, forKey: .discoverable)
         try container.encode(subscriberCountDisplay, forKey: .subscriberCountDisplay)
         try container.encode(incomeDisplay, forKey: .incomeDisplay)
         try container.encode(defaultChannel, forKey: .defaultChannel)
@@ -101,6 +105,7 @@ public struct CreatorModelV3: Codable, JSONEncodable, Hashable {
         try container.encode(channels, forKey: .channels)
         try container.encodeIfPresent(discordServers, forKey: .discordServers)
         try container.encodeIfPresent(card, forKey: .card)
+        try container.encodeIfPresent(visibility, forKey: .visibility)
     }
 }
 

@@ -44,6 +44,7 @@ import com.squareup.moshi.JsonClass
  * @param defaultChannel 
  * @param channels 
  * @param card 
+ * @param visibility Replaces `discoverable` as of 2026-10-18. Observed value: \"public\". Not in the upstream spec.
  */
 
 
@@ -99,7 +100,11 @@ data class BlogPostModelV3Creator (
     val channels: kotlin.collections.List<kotlin.String>? = null,
 
     @Json(name = "card")
-    val card: ImageModel? = null
+    val card: ImageModel? = null,
+
+    /* Replaces `discoverable` as of 2026-10-18. Observed value: \"public\". Not in the upstream spec. */
+    @Json(name = "visibility")
+    val visibility: kotlin.String? = null
 
 ) {
 

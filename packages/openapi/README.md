@@ -74,7 +74,11 @@ While most models are auto-generated, the iOS app maintains custom wrappers and 
    - **Fix**: Loosened in `spec-overlay.json` (`BlogPostModelV3`, `ChannelModel`); models regenerated for iOS and Android
    - **Client rule**: video attachment ids only come from `/content/post?id=`, so players must fetch the full post before playback
 
-3. **Generator bug**: Invalid `Identifiable` conformance on union types
+3. **`discoverable` → `visibility` (2026-10-18)**: every creator object (`/content/post`, `/creator/named`, `/creator/list`, `/creator/info`) dropped `discoverable` and gained `visibility` (observed: `"public"`)
+   - **Impact**: `/content/post` failed to decode, so the iOS players had no attachment id and showed "No video available for this post"
+   - **Fix**: `discoverable` dropped from `required` on `CreatorModelV2` and `CreatorModelV3`; `visibility` added to both and to the inline `BlogPostModelV3.creator`
+
+4. **Generator bug**: Invalid `Identifiable` conformance on union types
    - **Impact**: `BlogPostModelV3Channel` fails to compile
    - **Workaround**: Post-processing script removes invalid conformance
 

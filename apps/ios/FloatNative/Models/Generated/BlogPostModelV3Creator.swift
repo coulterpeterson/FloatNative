@@ -30,8 +30,10 @@ public struct BlogPostModelV3Creator: Codable, JSONEncodable, Hashable {
     public var defaultChannel: String?
     public var channels: [String]?
     public var card: ImageModel?
+    /** Replaces `discoverable` as of 2026-10-18. Observed value: \"public\". Not in the upstream spec. */
+    public var visibility: String?
 
-    public init(id: String, owner: BlogPostModelV3CreatorOwner? = nil, title: String, urlname: String, description: String, about: String, category: CreatorModelV3Category, cover: ImageModel? = nil, icon: ImageModel, liveStream: LiveStreamModel? = nil, subscriptionPlans: [SubscriptionPlanModel]? = nil, discoverable: Bool? = nil, subscriberCountDisplay: String? = nil, incomeDisplay: Bool? = nil, defaultChannel: String? = nil, channels: [String]? = nil, card: ImageModel? = nil) {
+    public init(id: String, owner: BlogPostModelV3CreatorOwner? = nil, title: String, urlname: String, description: String, about: String, category: CreatorModelV3Category, cover: ImageModel? = nil, icon: ImageModel, liveStream: LiveStreamModel? = nil, subscriptionPlans: [SubscriptionPlanModel]? = nil, discoverable: Bool? = nil, subscriberCountDisplay: String? = nil, incomeDisplay: Bool? = nil, defaultChannel: String? = nil, channels: [String]? = nil, card: ImageModel? = nil, visibility: String? = nil) {
         self.id = id
         self.owner = owner
         self.title = title
@@ -49,6 +51,7 @@ public struct BlogPostModelV3Creator: Codable, JSONEncodable, Hashable {
         self.defaultChannel = defaultChannel
         self.channels = channels
         self.card = card
+        self.visibility = visibility
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -69,6 +72,7 @@ public struct BlogPostModelV3Creator: Codable, JSONEncodable, Hashable {
         case defaultChannel
         case channels
         case card
+        case visibility
     }
 
     // Encodable protocol methods
@@ -92,6 +96,7 @@ public struct BlogPostModelV3Creator: Codable, JSONEncodable, Hashable {
         try container.encodeIfPresent(defaultChannel, forKey: .defaultChannel)
         try container.encodeIfPresent(channels, forKey: .channels)
         try container.encodeIfPresent(card, forKey: .card)
+        try container.encodeIfPresent(visibility, forKey: .visibility)
     }
 }
 
