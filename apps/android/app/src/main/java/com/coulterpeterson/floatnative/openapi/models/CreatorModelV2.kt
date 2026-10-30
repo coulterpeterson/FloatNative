@@ -26,19 +26,19 @@ import com.squareup.moshi.JsonClass
  * 
  *
  * @param id 
- * @param owner 
  * @param title 
  * @param urlname Shown in the browser URL, and used in `/creator/named` queries.
  * @param description 
  * @param about 
+ * @param icon 
+ * @param owner 
  * @param category 
  * @param cover 
- * @param icon 
  * @param liveStream 
  * @param subscriptionPlans 
+ * @param discoverable 
  * @param subscriberCountDisplay 
  * @param incomeDisplay 
- * @param discoverable 
  * @param defaultChannel 
  * @param visibility Replaces `discoverable` as of 2026-10-18. Observed value: \"public\". Not in the upstream spec.
  */
@@ -48,9 +48,6 @@ data class CreatorModelV2 (
 
     @Json(name = "id")
     val id: kotlin.String,
-
-    @Json(name = "owner")
-    val owner: kotlin.String,
 
     @Json(name = "title")
     val title: kotlin.String,
@@ -65,29 +62,32 @@ data class CreatorModelV2 (
     @Json(name = "about")
     val about: kotlin.String,
 
-    @Json(name = "category")
-    val category: kotlin.String,
-
-    @Json(name = "cover")
-    val cover: ImageModel?,
-
     @Json(name = "icon")
     val icon: ImageModel,
 
+    @Json(name = "owner")
+    val owner: kotlin.String? = null,
+
+    @Json(name = "category")
+    val category: kotlin.String? = null,
+
+    @Json(name = "cover")
+    val cover: ImageModel? = null,
+
     @Json(name = "liveStream")
-    val liveStream: LiveStreamModel?,
+    val liveStream: LiveStreamModel? = null,
 
     @Json(name = "subscriptionPlans")
-    val subscriptionPlans: kotlin.collections.List<SubscriptionPlanModel>?,
-
-    @Json(name = "subscriberCountDisplay")
-    val subscriberCountDisplay: kotlin.String,
-
-    @Json(name = "incomeDisplay")
-    val incomeDisplay: kotlin.Boolean,
+    val subscriptionPlans: kotlin.collections.List<SubscriptionPlanModel>? = null,
 
     @Json(name = "discoverable")
     val discoverable: kotlin.Boolean? = null,
+
+    @Json(name = "subscriberCountDisplay")
+    val subscriberCountDisplay: kotlin.String? = null,
+
+    @Json(name = "incomeDisplay")
+    val incomeDisplay: kotlin.Boolean? = null,
 
     @Json(name = "defaultChannel")
     val defaultChannel: kotlin.String? = null,

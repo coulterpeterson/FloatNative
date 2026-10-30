@@ -173,17 +173,17 @@ class HistoryViewModel: ObservableObject {
                     comments: historyResponse.blogPost.comments,
                     creator: BlogPostModelV3Creator(
                         id: historyResponse.blogPost.creator.id,
-                        owner: BlogPostModelV3CreatorOwner(
-                            id: historyResponse.blogPost.creator.owner,
-                            username: historyResponse.blogPost.creator.owner
-                        ),
+                        // owner/category are absent from Floatplane's slim post creator
+                        owner: historyResponse.blogPost.creator.owner.map {
+                            BlogPostModelV3CreatorOwner(id: $0, username: $0)
+                        },
                         title: historyResponse.blogPost.creator.title,
                         urlname: historyResponse.blogPost.creator.urlname,
                         description: historyResponse.blogPost.creator.description,
                         about: historyResponse.blogPost.creator.about,
                         category: CreatorModelV3Category(
-                            id: historyResponse.blogPost.creator.category,
-                            title: historyResponse.blogPost.creator.category
+                            id: historyResponse.blogPost.creator.category ?? "",
+                            title: historyResponse.blogPost.creator.category ?? ""
                         ),
                         cover: historyResponse.blogPost.creator.cover,
                         icon: historyResponse.blogPost.creator.icon,

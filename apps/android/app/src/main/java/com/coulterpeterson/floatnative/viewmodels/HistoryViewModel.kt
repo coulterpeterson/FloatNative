@@ -116,7 +116,7 @@ class HistoryViewModel : TvSidebarViewModel() {
         // Map Creator
         val creator = post.creator
         val blogCreatorOwner = com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3CreatorOwner(
-            id = creator.owner,
+            id = creator.owner ?: "", // absent from Floatplane's slim post creator
             username = "" 
         )
         

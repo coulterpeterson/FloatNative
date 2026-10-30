@@ -13,25 +13,25 @@ import AnyCodable
 public struct CreatorModelV2: Codable, JSONEncodable, Hashable {
 
     public var id: String
-    public var owner: String
+    public var owner: String?
     public var title: String
     /** Shown in the browser URL, and used in `/creator/named` queries. */
     public var urlname: String
     public var description: String
     public var about: String
-    public var category: String
+    public var category: String?
     public var cover: ImageModel?
     public var icon: ImageModel
     public var liveStream: LiveStreamModel?
     public var subscriptionPlans: [SubscriptionPlanModel]?
     public var discoverable: Bool?
-    public var subscriberCountDisplay: String
-    public var incomeDisplay: Bool
+    public var subscriberCountDisplay: String?
+    public var incomeDisplay: Bool?
     public var defaultChannel: String?
     /** Replaces `discoverable` as of 2026-10-18. Observed value: \"public\". Not in the upstream spec. */
     public var visibility: String?
 
-    public init(id: String, owner: String, title: String, urlname: String, description: String, about: String, category: String, cover: ImageModel?, icon: ImageModel, liveStream: LiveStreamModel?, subscriptionPlans: [SubscriptionPlanModel]?, discoverable: Bool? = nil, subscriberCountDisplay: String, incomeDisplay: Bool, defaultChannel: String? = nil, visibility: String? = nil) {
+    public init(id: String, owner: String? = nil, title: String, urlname: String, description: String, about: String, category: String? = nil, cover: ImageModel? = nil, icon: ImageModel, liveStream: LiveStreamModel? = nil, subscriptionPlans: [SubscriptionPlanModel]? = nil, discoverable: Bool? = nil, subscriberCountDisplay: String? = nil, incomeDisplay: Bool? = nil, defaultChannel: String? = nil, visibility: String? = nil) {
         self.id = id
         self.owner = owner
         self.title = title
@@ -74,19 +74,19 @@ public struct CreatorModelV2: Codable, JSONEncodable, Hashable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
-        try container.encode(owner, forKey: .owner)
+        try container.encodeIfPresent(owner, forKey: .owner)
         try container.encode(title, forKey: .title)
         try container.encode(urlname, forKey: .urlname)
         try container.encode(description, forKey: .description)
         try container.encode(about, forKey: .about)
-        try container.encode(category, forKey: .category)
-        try container.encode(cover, forKey: .cover)
+        try container.encodeIfPresent(category, forKey: .category)
+        try container.encodeIfPresent(cover, forKey: .cover)
         try container.encode(icon, forKey: .icon)
-        try container.encode(liveStream, forKey: .liveStream)
-        try container.encode(subscriptionPlans, forKey: .subscriptionPlans)
+        try container.encodeIfPresent(liveStream, forKey: .liveStream)
+        try container.encodeIfPresent(subscriptionPlans, forKey: .subscriptionPlans)
         try container.encodeIfPresent(discoverable, forKey: .discoverable)
-        try container.encode(subscriberCountDisplay, forKey: .subscriberCountDisplay)
-        try container.encode(incomeDisplay, forKey: .incomeDisplay)
+        try container.encodeIfPresent(subscriberCountDisplay, forKey: .subscriberCountDisplay)
+        try container.encodeIfPresent(incomeDisplay, forKey: .incomeDisplay)
         try container.encodeIfPresent(defaultChannel, forKey: .defaultChannel)
         try container.encodeIfPresent(visibility, forKey: .visibility)
     }

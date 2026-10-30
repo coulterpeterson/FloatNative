@@ -78,7 +78,11 @@ While most models are auto-generated, the iOS app maintains custom wrappers and 
    - **Impact**: `/content/post` failed to decode, so the iOS players had no attachment id and showed "No video available for this post"
    - **Fix**: `discoverable` dropped from `required` on `CreatorModelV2` and `CreatorModelV3`; `visibility` added to both and to the inline `BlogPostModelV3.creator`
 
-4. **Generator bug**: Invalid `Identifiable` conformance on union types
+4. **Slim post creator (2026-10-30)**: `/content/post`'s `creator` is now only `{id, title, urlname, description, about, icon}`
+   - **Impact**: `/content/post` failed to decode again, breaking video playback and playlist loading (both build cards from it)
+   - **Fix**: `CreatorModelV2` requires only those six fields; app code that mapped `owner`/`category` into feed-shaped creators now tolerates their absence
+
+5. **Generator bug**: Invalid `Identifiable` conformance on union types
    - **Impact**: `BlogPostModelV3Channel` fails to compile
    - **Workaround**: Post-processing script removes invalid conformance
 

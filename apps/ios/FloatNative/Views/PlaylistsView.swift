@@ -19,6 +19,9 @@ struct PlaylistsView: View {
     
     // Thumbnail cache: playlist ID -> BlogPost thumbnail
     @State private var thumbnailCache: [String: ImageModel?] = [:]
+    /// First video id each cached thumbnail came from, so a thumbnail is only
+    /// refetched when a playlist's first video changes.
+    @State private var thumbnailSourceIds: [String: String] = [:]
 
     // Create playlist sheet
     @State private var showCreatePlaylistSheet = false
@@ -273,12 +276,12 @@ struct PlaylistsView: View {
         do {
             let loadedPlaylists = try await companionAPI.getPlaylists(includeWatchLater: true)
 
-            // Load thumbnails for playlists with videos BEFORE updating state
-            // This ensures thumbnailCache is populated before view renders
-            await loadThumbnails(for: loadedPlaylists)
-
-            // Now update playlists state - view will render with thumbnails ready
+            // Show the grid right away; thumbnails fill in as they arrive.
+            // Waiting for them first meant one Floatplane post fetch per
+            // playlist before anything appeared.
             playlists = loadedPlaylists
+            isLoading = false
+            await loadThumbnails(for: loadedPlaylists)
         } catch {
             errorMessage = "Failed to load playlists: \(error.localizedDescription)"
             print("❌ Failed to load playlists: \(error)")
@@ -292,7 +295,8 @@ struct PlaylistsView: View {
     private func loadThumbnails(for playlists: [Playlist]) async {
         // Load thumbnails concurrently for playlists that have videos
         await withTaskGroup(of: (String, ImageModel?).self) { group in
-            for playlist in playlists where !playlist.videoIds.isEmpty {
+            for playlist in playlists where !playlist.videoIds.isEmpty
+                && thumbnailSourceIds[playlist.id] != playlist.videoIds[0] {
                 group.addTask {
                     // Fetch first video to get thumbnail
                     do {
@@ -307,6 +311,9 @@ struct PlaylistsView: View {
 
             for await (playlistId, thumbnail) in group {
                 thumbnailCache[playlistId] = thumbnail
+                if let firstVideoId = playlists.first(where: { $0.id == playlistId })?.videoIds.first {
+                    thumbnailSourceIds[playlistId] = firstVideoId
+                }
             }
         }
     }
@@ -342,8 +349,8 @@ struct PlaylistsView: View {
                 // Update selectedPlaylist to the fresh version
                 selectedPlaylist = freshPlaylist
 
-                // Also reload thumbnails for the fresh playlists
-                await loadThumbnails(for: freshPlaylists)
+                // Refresh thumbnails alongside, not ahead of, the post load
+                Task { await loadThumbnails(for: freshPlaylists) }
 
                 // Now load posts from the fresh playlist
                 await playlistVideoViewModel.loadPostsFromPlaylist(playlist: freshPlaylist)
