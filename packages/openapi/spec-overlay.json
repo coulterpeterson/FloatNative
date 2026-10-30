@@ -101,21 +101,14 @@
         }
       },
       "CreatorModelV2": {
-        "_comment": "As of 2026-10-18 Floatplane no longer returns `discoverable` on any creator object (/content/post, /creator/named, /creator/list, /creator/info); it returns `visibility: \"public\"` instead. With `discoverable` required, /content/post failed to decode, and since video attachment ids only come from that endpoint the iOS players showed \"No video available for this post\". Verified on 12 posts plus their /content/video and /delivery/info responses; nothing else required is missing.",
+        "_comment": "As of 2026-10-18 Floatplane no longer returns `discoverable` on any creator object (/content/post, /creator/named, /creator/list, /creator/info); it returns `visibility: \"public\"` instead. With `discoverable` required, /content/post failed to decode, and since video attachment ids only come from that endpoint the iOS players showed \"No video available for this post\". Verified on 12 posts plus their /content/video and /delivery/info responses; nothing else required is missing. As of 2026-10-30 the /content/post creator is slim too: only {id, title, urlname, description, about, icon}; owner, category, cover, liveStream, subscriptionPlans, subscriberCountDisplay and incomeDisplay are gone (verified on 8 posts), which again broke /content/post decoding and with it video playback.",
         "required": [
           "id",
-          "owner",
           "title",
           "urlname",
           "description",
           "about",
-          "category",
-          "cover",
-          "icon",
-          "liveStream",
-          "subscriptionPlans",
-          "subscriberCountDisplay",
-          "incomeDisplay"
+          "icon"
         ],
         "properties": {
           "visibility": {

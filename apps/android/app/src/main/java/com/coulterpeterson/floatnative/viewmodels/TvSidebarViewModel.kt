@@ -88,7 +88,7 @@ abstract class TvSidebarViewModel : ViewModel() {
         // Map Creator
         val creator = post.creator
         val blogCreatorOwner = com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3CreatorOwner(
-            id = creator.owner, // V2 owner is String ID
+            id = creator.owner ?: "", // V2 owner is String ID; absent from the slim post creator
             username = "" // Not available in V2
         )
         
@@ -96,7 +96,7 @@ abstract class TvSidebarViewModel : ViewModel() {
         val categoryEnum = try {
             com.coulterpeterson.floatnative.openapi.models.CreatorModelV3Category(
                  id = "legacy_v2", 
-                 title = creator.category
+                 title = creator.category ?: "Unknown"
             )
         } catch (e: Exception) {
              com.coulterpeterson.floatnative.openapi.models.CreatorModelV3Category(id="unknown", title="Unknown")

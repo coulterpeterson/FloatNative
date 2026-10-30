@@ -35,29 +35,25 @@ class PlaylistVideoViewModel: ObservableObject {
         // Note: This requires individual API calls as there's no batch endpoint
         var loadedPosts: [BlogPost] = []
 
-        // Fetch posts with limited concurrency to avoid overwhelming the API
-        // Process in chunks of 5 at a time
-        let chunkSize = 5
-        let chunks = playlist.videoIds.chunked(into: chunkSize)
+        // Keep up to `maxConcurrent` requests in flight, starting the next as
+        // soon as any one finishes. The old fixed chunks of 5 waited for the
+        // slowest request in each chunk, so a 66-video Watch Later took 14
+        // back-to-back rounds.
+        let maxConcurrent = 8
+        var remaining = playlist.videoIds.makeIterator()
 
-        for chunk in chunks {
-            await withTaskGroup(of: BlogPost?.self) { group in
-                for videoId in chunk {
-                    group.addTask {
-                        do {
-                            let detailedPost = try await self.api.getBlogPost(id: videoId)
-                            // Convert BlogPostDetailedWithInteraction to BlogPost
-                            return try? await self.convertToBlogPost(detailedPost)
-                        } catch {
-                            return nil
-                        }
-                    }
+        await withTaskGroup(of: BlogPost?.self) { group in
+            for _ in 0..<maxConcurrent {
+                guard let videoId = remaining.next() else { break }
+                group.addTask { await self.fetchPost(videoId) }
+            }
+
+            for await post in group {
+                if let post = post {
+                    loadedPosts.append(post)
                 }
-
-                for await post in group {
-                    if let post = post {
-                        loadedPosts.append(post)
-                    }
+                if let videoId = remaining.next() {
+                    group.addTask { await self.fetchPost(videoId) }
                 }
             }
         }
@@ -68,6 +64,16 @@ class PlaylistVideoViewModel: ObservableObject {
         isLoading = false
     }
     
+    private func fetchPost(_ videoId: String) async -> BlogPost? {
+        do {
+            let detailedPost = try await api.getBlogPost(id: videoId)
+            // Convert BlogPostDetailedWithInteraction to BlogPost
+            return try? await convertToBlogPost(detailedPost)
+        } catch {
+            return nil
+        }
+    }
+
     /// Convert BlogPostDetailedWithInteraction to BlogPost (BlogPostModelV3)
     private func convertToBlogPost(_ detailedPost: BlogPostDetailedWithInteraction) async throws -> BlogPost {
         let post = detailedPost.post
@@ -82,15 +88,15 @@ class PlaylistVideoViewModel: ObservableObject {
         
         // Get creator - convert CreatorModelV2 to BlogPostModelV3Creator
         // Note: Some fields need conversion since the models differ
-        let owner = BlogPostModelV3CreatorOwner(
-            id: post.creator.owner, // Use owner string as ID (best we can do)
-            username: post.creator.owner // Use owner string as username too
-        )
+        // owner/category are absent from Floatplane's slim post creator.
+        let owner = post.creator.owner.map {
+            BlogPostModelV3CreatorOwner(id: $0, username: $0) // owner string is all we have
+        }
         
         // Convert category string to CreatorModelV3Category
         let category = CreatorModelV3Category(
-            id: post.creator.category, // Use category string as ID
-            title: post.creator.category // Use category string as title
+            id: post.creator.category ?? "",
+            title: post.creator.category ?? ""
         )
         
         let creator = BlogPostModelV3Creator(
@@ -144,16 +150,6 @@ class PlaylistVideoViewModel: ObservableObject {
             pictureAttachments: pictureAttachmentIds,
             galleryAttachments: nil // Gallery attachments complex to convert
         )
-    }
-}
-
-// MARK: - Array Extension for Chunking
-
-extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
-        }
     }
 }
 
