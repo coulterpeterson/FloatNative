@@ -50,6 +50,7 @@ floatnative/
 ├── packages/
 │   ├── api/               # Companion API — original Cloudflare Workers (TS, Hono, D1)
 │   ├── api-go/            # Companion API — Go reimplementation for self-hosting (chi, Postgres)
+│   ├── api-php/           # Companion API — PHP 8.4 port of api-go for CloudPanel (MySQL/MariaDB)
 │   └── openapi/           # Community-maintained OpenAPI spec + Swift/Kotlin model generation
 │
 └── tools/
@@ -78,7 +79,7 @@ pnpm api:dev           # Cloudflare Workers local dev
 pnpm api:deploy        # ship to Cloudflare
 ```
 
-For the Go variant (self-hosting on a Linux box with Postgres), see [`packages/api-go/README.md`](packages/api-go/README.md).
+For the Go variant (self-hosting on a Linux box with Postgres), see [`packages/api-go/README.md`](packages/api-go/README.md). For the PHP port of it (plain PHP 8.4 + MySQL/MariaDB, e.g. on CloudPanel), see [`packages/api-php/README.md`](packages/api-php/README.md).
 
 ### Regenerate API models
 
