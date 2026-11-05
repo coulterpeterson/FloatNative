@@ -71,6 +71,15 @@ struct GlobalMenuModifier: ViewModifier {
                     }
 
                     Menu {
+                        // iPad has a Downloads tab instead.
+                        if UIDevice.current.userInterfaceIdiom != .pad {
+                            Button {
+                                tabCoordinator.showDownloads()
+                            } label: {
+                                Label("Downloads", systemImage: "arrow.down.circle.fill")
+                            }
+                        }
+
                         Button {
                             tabCoordinator.path.append(NavigationDestination.history)
                         } label: {

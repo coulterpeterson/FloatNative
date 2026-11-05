@@ -90,6 +90,15 @@ func fetchCaptionCues(
     from tracks: [ContentVideoV3ResponseTextTracksInner],
     session: URLSession = .shared
 ) async -> [VTTCue] {
+    guard let file = await fetchCaptionFile(from: tracks, session: session) else { return [] }
+    return VTTCueParser.parse(file)
+}
+
+/// The raw WebVTT of the first track that has any cues.
+func fetchCaptionFile(
+    from tracks: [ContentVideoV3ResponseTextTracksInner],
+    session: URLSession = .shared
+) async -> Data? {
     for track in tracks {
         guard let url = URL(string: track.src) else { continue }
         do {
@@ -97,11 +106,10 @@ func fetchCaptionCues(
             if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
                 continue
             }
-            let cues = VTTCueParser.parse(data)
-            if !cues.isEmpty { return cues }
+            if !VTTCueParser.parse(data).isEmpty { return data }
         } catch {
             continue
         }
     }
-    return []
+    return nil
 }

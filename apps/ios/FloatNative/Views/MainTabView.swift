@@ -12,6 +12,26 @@ import SwiftUI
 enum NavigationDestination: Hashable {
     case history
     case settings
+    #if !os(tvOS)
+    case downloads
+    case downloadPlayer(LocalVideo)
+    #endif
+
+    @MainActor @ViewBuilder
+    var view: some View {
+        switch self {
+        case .history:
+            HistoryView()
+        case .settings:
+            SettingsView()
+        #if !os(tvOS)
+        case .downloads:
+            DownloadsView()
+        case .downloadPlayer(let video):
+            DownloadPlayerView(video: video)
+        #endif
+        }
+    }
 }
 
 struct MainTabView: View {
@@ -64,12 +84,7 @@ struct MainTabView: View {
                             #endif
                         }
                         .navigationDestination(for: NavigationDestination.self) { destination in
-                            switch destination {
-                            case .history:
-                                HistoryView()
-                            case .settings:
-                                SettingsView()
-                            }
+                            destination.view
                         }
                 }
             }
@@ -88,12 +103,7 @@ struct MainTabView: View {
                             #endif
                         }
                         .navigationDestination(for: NavigationDestination.self) { destination in
-                            switch destination {
-                            case .history:
-                                HistoryView()
-                            case .settings:
-                                SettingsView()
-                            }
+                            destination.view
                         }
                 }
             }
@@ -109,12 +119,7 @@ struct MainTabView: View {
                             #endif
                         }
                         .navigationDestination(for: NavigationDestination.self) { destination in
-                            switch destination {
-                            case .history:
-                                HistoryView()
-                            case .settings:
-                                SettingsView()
-                            }
+                            destination.view
                         }
                 }
             }
@@ -125,6 +130,20 @@ struct MainTabView: View {
                     SearchView()
                 }
             }
+
+            #if !os(tvOS)
+            // iPad gets Downloads as a tab; iPhone has it in the 3-dot menu
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                Tab("Downloads", systemImage: "arrow.down.circle.fill", value: TabCoordinator.iPadDownloadsTab) {
+                    NavigationStack(path: $tabCoordinator.path) {
+                        DownloadsView()
+                            .navigationDestination(for: NavigationDestination.self) { destination in
+                                destination.view
+                            }
+                    }
+                }
+            }
+            #endif
         }
         .tint(Color.floatplaneBlue)
         .applyLiquidGlassTabBar()
@@ -145,12 +164,7 @@ struct MainTabView: View {
                         VideoPlayerTvosView(post: post)
                     }
                     .navigationDestination(for: NavigationDestination.self) { destination in
-                        switch destination {
-                        case .history:
-                            HistoryView()
-                        case .settings:
-                            SettingsView()
-                        }
+                        destination.view
                     }
             }
             .tabItem {
@@ -167,12 +181,7 @@ struct MainTabView: View {
                         VideoPlayerTvosView(post: post)
                     }
                     .navigationDestination(for: NavigationDestination.self) { destination in
-                        switch destination {
-                        case .history:
-                            HistoryView()
-                        case .settings:
-                            SettingsView()
-                        }
+                        destination.view
                     }
             }
             .tabItem {
@@ -186,12 +195,7 @@ struct MainTabView: View {
                         VideoPlayerTvosView(post: post)
                     }
                     .navigationDestination(for: NavigationDestination.self) { destination in
-                        switch destination {
-                        case .history:
-                            HistoryView()
-                        case .settings:
-                            SettingsView()
-                        }
+                        destination.view
                     }
             }
             .tabItem {
@@ -209,6 +213,22 @@ struct MainTabView: View {
                 }
                 .tag(3)
             }
+
+            #if !os(tvOS)
+            // iPad gets Downloads as a tab; iPhone has it in the 3-dot menu
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                NavigationStack(path: $tabCoordinator.path) {
+                    DownloadsView()
+                        .navigationDestination(for: NavigationDestination.self) { destination in
+                            destination.view
+                        }
+                }
+                .tabItem {
+                    Label("Downloads", systemImage: "arrow.down.circle.fill")
+                }
+                .tag(TabCoordinator.iPadDownloadsTab)
+            }
+            #endif
         }
         .tint(Color.floatplaneBlue)
         .environmentObject(tabCoordinator)
@@ -229,12 +249,7 @@ struct MainTabView: View {
                         VideoPlayerTvosView(post: post)
                     }
                     .navigationDestination(for: NavigationDestination.self) { destination in
-                        switch destination {
-                        case .history:
-                            HistoryView()
-                        case .settings:
-                            SettingsView()
-                        }
+                        destination.view
                     }
             }
             .tabItem {
@@ -251,12 +266,7 @@ struct MainTabView: View {
                         VideoPlayerTvosView(post: post)
                     }
                     .navigationDestination(for: NavigationDestination.self) { destination in
-                        switch destination {
-                        case .history:
-                            HistoryView()
-                        case .settings:
-                            SettingsView()
-                        }
+                        destination.view
                     }
             }
             .tabItem {
@@ -270,12 +280,7 @@ struct MainTabView: View {
                         VideoPlayerTvosView(post: post)
                     }
                     .navigationDestination(for: NavigationDestination.self) { destination in
-                        switch destination {
-                        case .history:
-                            HistoryView()
-                        case .settings:
-                            SettingsView()
-                        }
+                        destination.view
                     }
             }
             .tabItem {
@@ -294,12 +299,7 @@ struct MainTabView: View {
             NavigationStack(path: $tabCoordinator.path) {
                 HistoryView()
                     .navigationDestination(for: NavigationDestination.self) { destination in
-                        switch destination {
-                        case .history:
-                            HistoryView()
-                        case .settings:
-                            SettingsView()
-                        }
+                        destination.view
                     }
             }
             .tabItem {
@@ -310,12 +310,7 @@ struct MainTabView: View {
             NavigationStack(path: $tabCoordinator.path) {
                 SettingsView()
                     .navigationDestination(for: NavigationDestination.self) { destination in
-                        switch destination {
-                        case .history:
-                            HistoryView()
-                        case .settings:
-                            SettingsView()
-                        }
+                        destination.view
                     }
             }
             .tabItem {
