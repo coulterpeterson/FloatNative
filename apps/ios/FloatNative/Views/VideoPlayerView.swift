@@ -198,6 +198,11 @@ struct VideoPlayerView: View {
             let inPip = playerManager.hasPIPSession
             let inFullscreen = playerManager.isInFullScreenTransition
             if !inPip && !inFullscreen {
+                #if !os(tvOS)
+                if !isLivestream {
+                    ReviewPrompt.shared.recordVideoFinished(watchedTo: playerManager.currentTime)
+                }
+                #endif
                 playerManager.pause()
                 playerManager.reset()
                 playerManager.playerViewController = nil
