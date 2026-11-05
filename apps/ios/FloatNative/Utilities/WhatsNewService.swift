@@ -12,6 +12,9 @@
 //  - Skipped versions don't accumulate — we always show only the latest.
 //  - Settings → "What's New in this version" re-opens the sheet on demand
 //    without mutating lastSeen.
+//  - iOS/iPadOS and tvOS have separate content files, so a release can skip
+//    the popup on a platform it didn't change: leave that platform's file
+//    (and its version) alone.
 //
 
 import Foundation
@@ -96,16 +99,22 @@ final class WhatsNewService: ObservableObject {
 
     // MARK: - Bundle loading
 
+    #if os(tvOS)
+    private static let contentFile = "whats-new"
+    #else
+    private static let contentFile = "whats-new-ios"
+    #endif
+
     private static func loadBundledContent() -> WhatsNewContent? {
-        guard let url = Bundle.main.url(forResource: "whats-new", withExtension: "json") else {
-            print("⚠️ [WhatsNew] whats-new.json not found in bundle")
+        guard let url = Bundle.main.url(forResource: contentFile, withExtension: "json") else {
+            print("⚠️ [WhatsNew] \(contentFile).json not found in bundle")
             return nil
         }
         do {
             let data = try Data(contentsOf: url)
             return try JSONDecoder().decode(WhatsNewContent.self, from: data)
         } catch {
-            print("⚠️ [WhatsNew] failed to decode whats-new.json: \(error)")
+            print("⚠️ [WhatsNew] failed to decode \(contentFile).json: \(error)")
             return nil
         }
     }
