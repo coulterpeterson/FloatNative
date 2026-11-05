@@ -17,6 +17,7 @@ struct ContentView: View {
         Group {
             if api.isAuthenticated {
                 MainTabView()
+                    .reviewPromptWhenDue()
             } else {
                 LoginView()
             }

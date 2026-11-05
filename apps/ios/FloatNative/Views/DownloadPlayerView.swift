@@ -92,6 +92,7 @@ struct DownloadPlayerView: View {
                 await DownloadProgressStore.shared.syncPending()
             }
             if !playerManager.isPIPActive && !playerManager.isInFullScreenTransition {
+                ReviewPrompt.shared.recordVideoFinished(watchedTo: playerManager.currentTime)
                 playerManager.pause()
                 playerManager.reset()
             }
