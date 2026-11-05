@@ -1,0 +1,31 @@
+{
+  "version": "1.9",
+  "title": "What's New in 1.9",
+  "items": [
+    {
+      "icon": "arrow.down.circle",
+      "title": "Offline Downloads",
+      "body": "Downloads now save straight to the app and keep going in the background. Watch them anytime, even with no connection, from Downloads in the ••• menu on iPhone or the Downloads tab on iPad."
+    },
+    {
+      "icon": "arrow.triangle.2.circlepath",
+      "title": "Progress That Syncs",
+      "body": "Watch a download offline and your place is sent to Floatplane once you're back online with the app open."
+    },
+    {
+      "icon": "folder",
+      "title": "A FloatNative Folder in Files",
+      "body": "Find your downloads under On My iPhone or On My iPad in the Files app. Add your own MP4, MOV or M4V videos to that folder and they'll show up in the app too."
+    },
+    {
+      "icon": "bookmark",
+      "title": "Save to Playlist from the Player",
+      "body": "A new bookmark button next to the download button lets you add a video to a playlist right from its page."
+    },
+    {
+      "icon": "bolt",
+      "title": "Reliability Fixes",
+      "body": "The Home feed no longer waits on your playlists before loading, and a dropped connection won't sign you out."
+    }
+  ]
+}
