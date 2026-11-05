@@ -19,7 +19,6 @@ struct VideoPlayerView: View {
 
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var isDescriptionExpanded = false
     @State private var parsedDescription: AttributedString = AttributedString("")
     @State private var isStreamOffline = false
 
@@ -52,7 +51,6 @@ struct VideoPlayerView: View {
     @State private var selectedAttachmentId: String? = nil
 
     // Download state
-    @State private var isDownloading = false
     @State private var showDownloadToast = false
     @State private var downloadToastMessage = ""
     @State private var downloadToastIcon = "checkmark.circle.fill"
@@ -626,162 +624,36 @@ struct VideoPlayerView: View {
         }
     }
 
-    private func downloadVideo() async {
-        var downloadVideoId = selectedAttachmentId ?? post.videoAttachments?.first
-        if downloadVideoId == nil {
-            downloadVideoId = try? await api.getBlogPost(id: post.id).post.orderedVideoAttachments.first?.id
+    #if !os(tvOS)
+    /// Queues the current video for the Downloads page. Floatplane's feed models
+    /// don't always carry attachment ids, so this may need the full post first.
+    private func startDownload(videoId knownVideoId: String?) async {
+        var videoId = knownVideoId
+        if videoId == nil {
+            videoId = try? await api.getBlogPost(id: post.id).post.orderedVideoAttachments.first?.id
         }
-        guard let videoId = downloadVideoId else {
-            await MainActor.run {
-                downloadToastMessage = "No video available for download"
-                downloadToastIcon = "exclamationmark.circle.fill"
-                showDownloadToast = true
-            }
+        guard let videoId else {
+            showDownloadMessage("No video available for download", icon: "exclamationmark.circle.fill")
             return
         }
 
-        // Set loading state
-        await MainActor.run {
-            isDownloading = true
-        }
-
-        var tempURL: URL?
-        var localURL: URL?
-
-        do {
-            let deliveryInfo = try await api.getDeliveryInfo(
-                scenario: .download,
-                entityId: videoId,
-                outputKind: .flat
-            )
-
-            let qualities = deliveryInfo.availableVariants()
-
-            // Try to match the currently selected quality by resolution
-            var selectedQuality: QualityVariant?
-            if let currentQuality = playerManager.currentQuality {
-                // Match by resolution (width x height)
-                selectedQuality = qualities.first { quality in
-                    quality.width == currentQuality.width &&
-                    quality.height == currentQuality.height
-                }
-            }
-
-            // Fall back to best quality if no match found or no current quality selected
-            guard let downloadQuality = selectedQuality ?? qualities.first else {
-                await MainActor.run {
-                    downloadToastMessage = "No download variants available"
-                    downloadToastIcon = "exclamationmark.circle.fill"
-                    showDownloadToast = true
-                    isDownloading = false
-                }
-                return
-            }
-
-            guard let url = URL(string: downloadQuality.url) else {
-                await MainActor.run {
-                    downloadToastMessage = "Invalid download URL"
-                    downloadToastIcon = "exclamationmark.circle.fill"
-                    showDownloadToast = true
-                    isDownloading = false
-                }
-                return
-            }
-
-            // Download the file
-            let downloadResult = try await URLSession.shared.download(from: url)
-            localURL = downloadResult.0
-
-            // Move to temporary location with proper filename
-            tempURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("\(post.title).mp4")
-            try? FileManager.default.removeItem(at: tempURL!)
-            try FileManager.default.moveItem(at: localURL!, to: tempURL!)
-
-            // Present share sheet on main thread
-            await MainActor.run {
-                isDownloading = false
-                #if !os(tvOS)
-                presentShareSheet(url: tempURL!)
-                #else
-                // On tvOS, just clean up the temp file since there's no share sheet
-                try? FileManager.default.removeItem(at: tempURL!)
-                downloadToastMessage = "Download complete"
-                downloadToastIcon = "checkmark.circle.fill"
-                showDownloadToast = true
-                #endif
-            }
-        } catch {
-            // Clean up any partial downloads immediately
-            if let localURL = localURL {
-                try? FileManager.default.removeItem(at: localURL)
-            }
-            if let tempURL = tempURL {
-                try? FileManager.default.removeItem(at: tempURL)
-            }
-
-            await MainActor.run {
-                isDownloading = false
-
-                // Determine error message based on error type
-                let message: String
-                if let urlError = error as? URLError {
-                    switch urlError.code {
-                    case .notConnectedToInternet, .networkConnectionLost:
-                        message = "Network error. Check your connection."
-                    case .timedOut:
-                        message = "Download timed out"
-                    case .cannotWriteToFile:
-                        message = "Storage error. Check available space."
-                    default:
-                        message = "Download failed: \(urlError.localizedDescription)"
-                    }
-                } else {
-                    message = "Download failed: \(error.localizedDescription)"
-                }
-
-                downloadToastMessage = message
-                downloadToastIcon = "exclamationmark.circle.fill"
-                showDownloadToast = true
-
-                #if DEBUG
-                print("❌ Download failed: \(error)")
-                #endif
-            }
-        }
+        let attachments = detailedPost?.post.orderedVideoAttachments ?? []
+        let attachment = attachments.first { $0.id == videoId }
+        DownloadManager.shared.start(
+            post: post,
+            videoId: videoId,
+            // Multi-video posts need something to tell their downloads apart.
+            attachmentTitle: attachments.count > 1 ? attachment?.title : nil,
+            duration: attachment?.duration ?? post.metadata.videoDuration,
+            preferredHeight: playerManager.currentQuality?.height
+        )
+        showDownloadMessage("Downloading. Find it in Downloads.", icon: "arrow.down.circle.fill")
     }
 
-    #if !os(tvOS)
-    @MainActor
-    private func presentShareSheet(url: URL) {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootViewController = windowScene.windows.first?.rootViewController else {
-            return
-        }
-
-        let activityVC = UIActivityViewController(
-            activityItems: [url],
-            applicationActivities: nil
-        )
-
-        // Cleanup temp file after share sheet is dismissed
-        activityVC.completionWithItemsHandler = { _, _, _, _ in
-            // Delete temporary file regardless of whether user saved/shared/cancelled
-            try? FileManager.default.removeItem(at: url)
-        }
-
-        // For iPad popover
-        if let popover = activityVC.popoverPresentationController {
-            popover.sourceView = rootViewController.view
-            popover.sourceRect = CGRect(
-                x: rootViewController.view.bounds.midX,
-                y: rootViewController.view.bounds.midY,
-                width: 0,
-                height: 0
-            )
-        }
-
-        rootViewController.present(activityVC, animated: true)
+    private func showDownloadMessage(_ message: String, icon: String) {
+        downloadToastMessage = message
+        downloadToastIcon = icon
+        showDownloadToast = true
     }
     #endif
 
@@ -1151,24 +1023,23 @@ struct VideoPlayerView: View {
 
             Spacer()
 
-            // Download button (only for video posts)
+            // Save to playlist, then download (video posts only)
+            #if !os(tvOS)
+            SaveToPlaylistButton(post: post)
+
             if post.metadata.hasVideo {
-                Button {
+                let videoId = selectedAttachmentId ?? post.videoAttachments?.first
+                DownloadStatusButton(videoId: videoId) {
                     Task {
-                        await downloadVideo()
+                        await startDownload(videoId: videoId)
                     }
-                } label: {
-                    if isDownloading {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Image(systemName: "arrow.down.circle")
-                            .font(.title2)
-                            .foregroundColor(Color.adaptiveText)
-                    }
+                } onAlreadyDownloaded: {
+                    showDownloadMessage("Already in Downloads", icon: "checkmark.circle.fill")
+                } onInProgress: {
+                    showDownloadMessage("Downloading. Find it in Downloads.", icon: "arrow.down.circle.fill")
                 }
-                .disabled(isDownloading)
             }
+            #endif
 
             // Quality selector button (only for video posts)
             if post.metadata.hasVideo {
@@ -1717,68 +1588,7 @@ struct VideoPlayerView: View {
     // MARK: - Description Section
 
     private var descriptionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Make description text tappable when collapsed
-            Group {
-                if !isDescriptionExpanded && post.text.count > 150 {
-                    Button {
-                        withAnimation {
-                            isDescriptionExpanded = true
-                        }
-                    } label: {
-                        Text(parsedDescription)
-                            .font(.subheadline)
-                            .foregroundColor(Color.adaptiveText)
-                            .lineLimit(3)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .environment(\.openURL, OpenURLAction { url in
-                        // Handle timestamp seeking
-                        if url.scheme == "floatplane", url.host == "seek",
-                           let secondsString = url.pathComponents.last,
-                           let seconds = Int(secondsString) {
-                            // Seek video to timestamp
-                            playerManager.seek(to: TimeInterval(seconds))
-                            return .handled
-                        }
-                        // Let system handle other URLs
-                        return .systemAction
-                    })
-                } else {
-                    Text(parsedDescription)
-                        .font(.subheadline)
-                        .foregroundColor(Color.adaptiveText)
-                        .lineLimit(isDescriptionExpanded ? nil : 3)
-                        .environment(\.openURL, OpenURLAction { url in
-                            // Handle timestamp seeking
-                            if url.scheme == "floatplane", url.host == "seek",
-                               let secondsString = url.pathComponents.last,
-                               let seconds = Int(secondsString) {
-                                // Seek video to timestamp
-                                playerManager.seek(to: TimeInterval(seconds))
-                                return .handled
-                            }
-                            // Let system handle other URLs
-                            return .systemAction
-                        })
-                }
-            }
-
-            if post.text.count > 150 {
-                Button {
-                    withAnimation {
-                        isDescriptionExpanded.toggle()
-                    }
-                } label: {
-                    Text(isDescriptionExpanded ? "Show less" : "Show more")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.floatplaneBlue)
-                }
-            }
-        }
+        PostDescriptionView(description: parsedDescription, rawLength: post.text.count)
     }
 
     // MARK: - HTML Parsing Helper

@@ -777,6 +777,12 @@ class FloatplaneAPI: ObservableObject {
                 throw error
             }
 
+            // A connection problem says nothing about the token. Signing out here
+            // would strand the user mid-reconnect, with progress still queued.
+            if error is URLError {
+                throw error
+            }
+
             // If refresh fails (and not cancelled), clear tokens
             print("❌ Token refresh failed: \(error.localizedDescription)")
             clearOAuthState()
@@ -831,6 +837,10 @@ class FloatplaneAPI: ObservableObject {
             // We'll clear local state anyway
             print("⚠️ Logout API call failed (likely endpoint deprecated): \(error.localizedDescription)")
         }
+
+        #if !os(tvOS)
+        DownloadProgressStore.shared.discardPendingSync()
+        #endif
 
         // Always clear local state, regardless of API call success
         clearAuthCookie()

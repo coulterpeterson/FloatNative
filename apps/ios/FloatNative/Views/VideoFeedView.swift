@@ -499,6 +499,12 @@ struct VideoFeedView: View {
                         }
                     }
                     .buttonStyle(LiquidGlassButtonStyle(tint: .floatplaneBlue))
+
+                    // The usual reason for landing here is having no connection.
+                    Button("View Downloads") {
+                        tabCoordinator.showDownloads()
+                    }
+                    .foregroundStyle(Color.floatplaneBlue)
                 }
                 .padding()
             }
@@ -526,8 +532,11 @@ struct VideoFeedView: View {
             // Use syncDisplayPosts to handle cases where preloadedPosts might be empty initially
             syncDisplayPosts()
 
-            // Load playlists for bookmark indicators
-            await loadPlaylistsForBookmarks()
+            // Load playlists for bookmark indicators. Not awaited: the badges fill
+            // in on their own, and a slow companion API mustn't hold up the feed.
+            Task {
+                await loadPlaylistsForBookmarks()
+            }
 
             // Only load from API if we don't have preloaded posts AND we're not returning from navigation
             if preloadedPosts == nil && !isReturningFromNavigation {

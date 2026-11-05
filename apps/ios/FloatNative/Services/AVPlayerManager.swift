@@ -113,6 +113,9 @@ class AVPlayerManager: NSObject, ObservableObject {
     @Published var currentPost: BlogPost?
     @Published var shouldRestoreVideoPlayer: Bool = false
     private(set) var isLiveStream: Bool = false
+    /// Set while playing a downloaded file. Its progress goes to
+    /// DownloadProgressStore, which works offline, rather than straight to the API.
+    private(set) var localProgressKey: String?
 
     // MARK: - Observers
 
@@ -308,6 +311,7 @@ class AVPlayerManager: NSObject, ObservableObject {
         self.availableQualities = qualities
         self.playerState = .loading
         self.isLiveStream = isLive
+        self.localProgressKey = nil
         self.captionCues = captionCues
         // Auto-enable when the user has system captions on AND the post
         // ships a caption track. Otherwise leave the in-app toggle off.
@@ -324,10 +328,34 @@ class AVPlayerManager: NSObject, ObservableObject {
         try await loadStream(url: quality.url, startTime: startTime, isLive: isLive)
     }
 
+    #if !os(tvOS)
+    /// Loads a downloaded file. `videoId` is nil for files the user added
+    /// through the Files app, which have no Floatplane video behind them.
+    func loadLocalFile(_ fileURL: URL, title: String, videoId: String?, progressKey: String, startTime: Double, captionCues: [VTTCue]) async throws {
+        // Don't carry a PiP session over from whatever played before.
+        playerViewController = nil
+        playerViewControllerDelegate = nil
+        hasPIPSession = false
+
+        self.currentVideoId = videoId
+        self.currentVideoTitle = title
+        self.currentPost = nil
+        self.availableQualities = []
+        self.currentQuality = nil
+        self.playerState = .loading
+        self.isLiveStream = false
+        self.localProgressKey = progressKey
+        self.captionCues = captionCues
+        self.captionsEnabled = !captionCues.isEmpty && Self.systemCaptionsEnabled
+
+        try await loadStream(url: fileURL.absoluteString, startTime: startTime, isLive: false, localFile: fileURL)
+    }
+    #endif
+
     private let resourceLoader = VideoResourceLoader()
 
     /// Load stream from URL
-    private func loadStream(url: String, startTime: Double = 0, isLive: Bool) async throws {
+    private func loadStream(url: String, startTime: Double = 0, isLive: Bool, localFile: URL? = nil) async throws {
         // Clean up old player
         cleanupPlayer()
 
@@ -339,7 +367,9 @@ class AVPlayerManager: NSObject, ObservableObject {
 
         let asset: AVURLAsset
 
-        if isLive {
+        if let localFile {
+            asset = AVURLAsset(url: localFile)
+        } else if isLive {
             // Bypass VideoResourceLoader for Live Streams
             // Use the original URL directly so AVPlayer handles HLS natively
             guard let streamURL = URL(string: url) else {
@@ -682,13 +712,15 @@ class AVPlayerManager: NSObject, ObservableObject {
 
     // MARK: - Progress Tracking
 
-    /// Start periodic progress saving (every 2 minutes)
+    /// Start periodic progress saving (every 2 minutes, or every 30 seconds for
+    /// downloads, since those positions are the only copy until the next sync)
     private func startProgressTimer() {
         stopProgressTimer()
 
         // Use DispatchSourceTimer on background queue to avoid blocking main thread
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
-        timer.schedule(deadline: .now() + 120, repeating: 120)
+        let interval: DispatchTimeInterval = localProgressKey != nil ? .seconds(30) : .seconds(120)
+        timer.schedule(deadline: .now() + interval, repeating: interval)
         timer.setEventHandler { [weak self] in
             Task { @MainActor in
                 await self?.saveProgressWithTimeout()
@@ -725,6 +757,14 @@ class AVPlayerManager: NSObject, ObservableObject {
 
     /// Save progress to Floatplane API
     func saveProgress() async {
+        #if !os(tvOS)
+        if localProgressKey != nil {
+            recordLocalProgress()
+            await DownloadProgressStore.shared.syncPending()
+            return
+        }
+        #endif
+
         guard let videoId = currentVideoId else { return }
 
         let progressInSeconds = Int(currentTime)
@@ -740,6 +780,15 @@ class AVPlayerManager: NSObject, ObservableObject {
         }
     }
 
+    #if !os(tvOS)
+    /// Saves a downloaded video's position. Synchronous so it can run just
+    /// before reset() clears the state it reads.
+    func recordLocalProgress() {
+        guard let key = localProgressKey else { return }
+        DownloadProgressStore.shared.record(key: key, videoId: currentVideoId, seconds: Int(currentTime))
+    }
+    #endif
+
     // MARK: - Cleanup
 
     private func cleanupPlayer() {
@@ -754,12 +803,6 @@ class AVPlayerManager: NSObject, ObservableObject {
         if let timeObserver = timeObserver {
             player?.removeTimeObserver(timeObserver)
             self.timeObserver = nil
-        }
-
-        // Remove background observer
-        if let backgroundObserver = backgroundObserver {
-            NotificationCenter.default.removeObserver(backgroundObserver)
-            self.backgroundObserver = nil
         }
 
         // Remove video end observer
@@ -842,6 +885,7 @@ class AVPlayerManager: NSObject, ObservableObject {
         currentVideoId = nil
         currentVideoTitle = nil
         currentPost = nil
+        localProgressKey = nil
         shouldRestoreVideoPlayer = false
         availableQualities = []
         currentQuality = nil
