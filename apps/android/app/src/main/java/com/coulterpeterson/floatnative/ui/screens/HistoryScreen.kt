@@ -115,12 +115,12 @@ fun HistoryItemCard(item: WatchHistoryResponse, onClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = item.blogPost?.channel?.title ?: "",
+                text = item.blogPost?.let { it.channel.title ?: it.creator.title } ?: "",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray
             )
             Text(
-                text = DateUtils.getRelativeTime(item.blogPost?.releaseDate ?: ""),
+                text = DateUtils.getRelativeTime(item.blogPost?.releaseDate?.toString() ?: ""),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray
             )

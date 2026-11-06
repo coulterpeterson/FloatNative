@@ -2,9 +2,6 @@ package com.coulterpeterson.floatnative.utils
 
 import android.text.format.DateUtils
 import com.coulterpeterson.floatnative.openapi.models.PostMetadataModel
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
 
 /**
  * On a multi-video post (e.g. `C3GeAE0LmM`, videoCount=3) `videoDuration` is
@@ -46,14 +43,13 @@ fun com.coulterpeterson.floatnative.openapi.models.ContentPostV3Response.ordered
 object DateUtils {
     fun getRelativeTime(isoString: String): String {
         try {
-            // ISO 8601 format: 2023-10-27T10:00:00.000Z
-            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
-            parser.timeZone = TimeZone.getTimeZone("UTC")
-            val date = parser.parse(isoString) ?: return ""
+            // Any ISO 8601 form. A parsed date prints without its seconds or
+            // milliseconds when they're zero, as in 2023-10-27T10:00Z.
+            val date = java.time.OffsetDateTime.parse(isoString)
             val now = System.currentTimeMillis()
-            
+
             return DateUtils.getRelativeTimeSpanString(
-                date.time,
+                date.toInstant().toEpochMilli(),
                 now,
                 DateUtils.MINUTE_IN_MILLIS,
                 DateUtils.FORMAT_ABBREV_RELATIVE

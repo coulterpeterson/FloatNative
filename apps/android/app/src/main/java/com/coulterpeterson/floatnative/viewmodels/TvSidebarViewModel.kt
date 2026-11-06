@@ -372,7 +372,11 @@ abstract class TvSidebarViewModel : ViewModel() {
             try {
                  _watchProgress.value = _watchProgress.value + (post.id to 1.0f)
                  
-                 val videoId = post.videoAttachments?.firstOrNull() ?: return@launch
+                 // Posts from the feed and history no longer list their attachments.
+                 val videoId = post.videoAttachments?.firstOrNull()
+                     ?: FloatplaneApi.contentV3.getBlogPost(post.id).body()
+                         ?.videoAttachments?.firstOrNull()?.id
+                     ?: return@launch
                  // displayDuration matches the primary video we're reporting
                  // progress for; videoDuration is the sum on multi-video posts
                  // and would overshoot the real clip's length.

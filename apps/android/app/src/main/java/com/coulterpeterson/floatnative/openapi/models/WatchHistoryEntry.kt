@@ -15,7 +15,7 @@
 
 package com.coulterpeterson.floatnative.openapi.models
 
-import com.coulterpeterson.floatnative.openapi.models.WatchHistoryBlogPost
+import com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
@@ -26,7 +26,7 @@ import com.squareup.moshi.JsonClass
  * @param userId 
  * @param contentId 
  * @param contentType 
- * @param progress Last-known playback progress in seconds.
+ * @param progress Last-known playback progress as a percentage, 0 to 100.
  * @param updatedAt 
  * @param blogPost 
  */
@@ -43,7 +43,7 @@ data class WatchHistoryEntry (
     @Json(name = "contentType")
     val contentType: kotlin.String,
 
-    /* Last-known playback progress in seconds. */
+    /* Last-known playback progress as a percentage, 0 to 100. */
     @Json(name = "progress")
     val progress: kotlin.Int,
 
@@ -51,7 +51,7 @@ data class WatchHistoryEntry (
     val updatedAt: java.time.OffsetDateTime,
 
     @Json(name = "blogPost")
-    val blogPost: WatchHistoryBlogPost
+    val blogPost: BlogPostModelV3
 
 ) {
 

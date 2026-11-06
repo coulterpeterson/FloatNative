@@ -1,9 +1,17 @@
 package com.coulterpeterson.floatnative
 
+import com.coulterpeterson.floatnative.api.ManualApi
 import com.coulterpeterson.floatnative.openapi.models.BlogPostModelV3Channel
 import com.coulterpeterson.floatnative.openapi.models.ContentCreatorListV3Response
 import com.coulterpeterson.floatnative.utils.buildAppMoshi
 import com.squareup.moshi.adapter
+import kotlinx.coroutines.runBlocking
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.ResponseBody.Companion.toResponseBody
+import retrofit2.Retrofit
+import retrofit2.converter.moshi.MoshiConverterFactory
 import org.junit.Test
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -37,6 +45,44 @@ class FixtureDecodeTest {
             val decoded = decodeForFixture(text, file.name)
             assertNotNull("Fixture ${file.name} produced null", decoded)
         }
+    }
+
+    /**
+     * Goes through ManualApi itself, as the skipping depends on the Retrofit
+     * converter passing along the method's @Lossy.
+     */
+    @OptIn(ExperimentalStdlibApi::class)
+    @Test
+    fun history_skips_an_entry_it_cannot_read() {
+        val fixture = File(fixturesDir, "get_api_v3_content_history_offset_0.json").readText()
+        val root = moshi.adapter<Map<String, Any?>>().fromJson(fixture)!!
+        val response = root["response"] as Map<*, *>
+        val readable = (response["body"] as List<*>).first()
+        val body = moshi.adapter<Any>().toJson(listOf(readable, mapOf("userId" to "unreadable")))
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                okhttp3.Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .body(body.toResponseBody("application/json".toMediaType()))
+                    .build()
+            }
+            .build()
+        val api = Retrofit.Builder()
+            .baseUrl("https://example.test/")
+            .client(client)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(ManualApi::class.java)
+
+        val history = runBlocking { api.getWatchHistory(offset = 0) }.body()!!
+
+        assertEquals(1, history.size)
+        // The TV screen goes by this now that the attachment lists are gone.
+        assertTrue(history[0].blogPost!!.metadata.hasVideo)
     }
 
     /**

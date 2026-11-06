@@ -27,9 +27,12 @@ import java.lang.reflect.Type
  * ```kotlin
  * @Lossy val blogPosts: List<BlogPostModelV3>
  * ```
+ *
+ * Or annotate a Retrofit method that returns a list, as its Moshi converter
+ * passes the method's qualifiers along.
  */
 @Retention(AnnotationRetention.RUNTIME)
-@Target(AnnotationTarget.FIELD, AnnotationTarget.VALUE_PARAMETER)
+@Target(AnnotationTarget.FIELD, AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.FUNCTION)
 @com.squareup.moshi.JsonQualifier
 annotation class Lossy
 

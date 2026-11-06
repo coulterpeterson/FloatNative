@@ -208,44 +208,11 @@
           "userId": { "type": "string" },
           "contentId": { "type": "string" },
           "contentType": { "type": "string" },
-          "progress": { "type": "integer", "description": "Last-known playback progress in seconds." },
+          "progress": { "type": "integer", "description": "Last-known playback progress as a percentage, 0 to 100." },
           "updatedAt": { "type": "string", "format": "date-time" },
-          "blogPost": { "$ref": "#/components/schemas/WatchHistoryBlogPost" }
+          "blogPost": { "$ref": "#/components/schemas/BlogPostModelV3" }
         },
         "required": ["userId", "contentId", "contentType", "progress", "updatedAt", "blogPost"]
-      },
-      "WatchHistoryBlogPost": {
-        "type": "object",
-        "description": "Variant of BlogPostModelV3 returned inside watch-history entries. Differs from the home-feed shape in that videoAttachments / audioAttachments / pictureAttachments / galleryAttachments are arrays of string IDs rather than full attachment objects.",
-        "properties": {
-          "id": { "type": "string" },
-          "guid": { "type": "string" },
-          "title": { "type": "string" },
-          "text": { "type": "string" },
-          "type": { "type": "string" },
-          "channel": { "$ref": "#/components/schemas/ChannelModel" },
-          "tags": { "type": "array", "items": { "type": "string" } },
-          "attachmentOrder": { "type": "array", "items": { "type": "string" } },
-          "metadata": { "$ref": "#/components/schemas/PostMetadataModel" },
-          "releaseDate": { "type": "string", "format": "date-time" },
-          "likes": { "type": "integer" },
-          "dislikes": { "type": "integer" },
-          "score": { "type": "integer" },
-          "comments": { "type": "integer" },
-          "creator": { "$ref": "#/components/schemas/CreatorModelV2" },
-          "wasReleasedSilently": { "type": "boolean" },
-          "thumbnail": { "allOf": [{ "$ref": "#/components/schemas/ImageModel" }], "nullable": true },
-          "isAccessible": { "type": "boolean" },
-          "videoAttachments": { "type": "array", "items": { "type": "string" } },
-          "audioAttachments": { "type": "array", "items": { "type": "string" } },
-          "pictureAttachments": { "type": "array", "items": { "type": "string" } },
-          "galleryAttachments": { "type": "array", "items": { "type": "string" } }
-        },
-        "required": [
-          "id", "guid", "title", "text", "type", "channel", "tags", "attachmentOrder",
-          "metadata", "releaseDate", "likes", "dislikes", "score", "comments",
-          "creator", "wasReleasedSilently", "isAccessible"
-        ]
       }
     }
   },
@@ -290,7 +257,7 @@
       }
     },
     "/api/v3/content/history": {
-      "_comment": "Endpoint exists in production but is missing from the upstream spec. Returns the most recently-watched posts (paged via offset). The blogPost embedded in each entry has a different shape from BlogPostModelV3: video/audio/picture/galleryAttachments are arrays of string IDs rather than full objects. iOS hand-models this as WatchHistoryBlogPost.",
+      "_comment": "Endpoint exists in production but is missing from the upstream spec. Returns the most recently-watched posts (paged via offset). The blogPost embedded in each entry is the same slim post as the home feed: since November 2026 it has no attachmentOrder, wasReleasedSilently or attachment arrays, so go by metadata.hasVideo and fetch the post for its attachments. Both apps decode it with their feed post model.",
       "get": {
         "operationId": "getContentHistory",
         "summary": "Get watch history",
