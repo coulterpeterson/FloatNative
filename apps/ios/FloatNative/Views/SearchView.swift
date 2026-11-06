@@ -16,6 +16,7 @@ struct SearchView: View {
 
     @State private var searchText = ""
     @State private var searchResults: [BlogPost] = []
+    @State private var topVisiblePostId: String?
     @State private var isSearching = false
     @State private var errorMessage: String?
     @State private var hasSearched = false
@@ -27,6 +28,9 @@ struct SearchView: View {
 
     // Bookmark indicators: Set of all video IDs that exist in any playlist (for O(1) lookup)
     @ObservedObject private var membership = PlaylistMembershipStore.shared
+    #if !os(tvOS)
+    @ObservedObject private var downloads = DownloadLibrary.shared
+    #endif
 
     // iOS Menu state
     @State private var menuSelectedPost: BlogPost?
@@ -36,6 +40,8 @@ struct SearchView: View {
     @State private var menuPlaylistsWithVideo: Set<String> = []
     @State private var showCreatePlaylistFromMenu = false
     @State private var showToast = false
+    @State private var showDownloadToast = false
+    @State private var downloadToast: (message: String, icon: String) = ("", "")
     @State private var playlists: [Playlist] = []
     @State private var isLoadingPlaylists = false
 
@@ -50,16 +56,7 @@ struct SearchView: View {
         // Match Wasserflug layout: 30pt between columns for better space utilization
         return Array(repeating: GridItem(.flexible(), spacing: 30), count: 4)
         #else
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            // iPad: Adaptive grid that fits optimal number of columns
-            // With 16:9 thumbnails + metadata, ~320-380pt is optimal width per card
-            // Portrait (~768pt - padding): 2 columns
-            // Landscape (~1024pt - padding): 3 columns
-            return [GridItem(.adaptive(minimum: 320, maximum: 400), spacing: 16)]
-        } else {
-            // iPhone: Single flexible column
-            return [GridItem(.flexible())]
-        }
+        return AdaptiveGrid.columns
         #endif
     }
 
@@ -84,6 +81,7 @@ struct SearchView: View {
                             .multilineTextAlignment(.center)
                     }
                     .padding()
+                    .messageAvoidingFold()
                 } else if searchResults.isEmpty && hasSearched {
                     VStack(spacing: 16) {
                         Image(systemName: "magnifyingglass")
@@ -98,6 +96,7 @@ struct SearchView: View {
                             .font(.subheadline)
                             .foregroundColor(Color.adaptiveSecondaryText)
                     }
+                    .messageAvoidingFold()
                 } else if searchResults.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "magnifyingglass")
@@ -112,6 +111,7 @@ struct SearchView: View {
                             .font(.subheadline)
                             .foregroundColor(Color.adaptiveSecondaryText)
                     }
+                    .messageAvoidingFold()
                 } else {
                     ScrollView {
                         LazyVGrid(columns: gridColumns, spacing: 20) {
@@ -120,6 +120,7 @@ struct SearchView: View {
                                     VideoCard(
                                         post: post,
                                         isBookmarked: membership.contains(post.id),
+                                        isDownloaded: isDownloaded(post),
                                         onMenuWatchLater: {
                                             Task { @MainActor in
                                                 await handleMenuWatchLater(post: post)
@@ -128,7 +129,8 @@ struct SearchView: View {
                                         onMenuSaveToPlaylist: {
                                             menuSelectedPost = post
                                             showPlaylistSheet = true
-                                        }
+                                        },
+                                        onMenuDownload: downloadAction(for: post)
                                     )
                                 }
                                 #if os(tvOS)
@@ -143,11 +145,21 @@ struct SearchView: View {
                         .padding(.bottom, 40)      // Reduced bottom spacing for tighter layout
                         .focusSection()
                         #else
+                        .scrollTargetLayout()
                         .padding(.horizontal, 16)
                         .padding(.vertical)
                         #endif
                     }
+                    #if !os(tvOS)
+                    // Holds your place when the grid reflows, as when unfolding an iPhone Duo.
+                    .scrollPosition(id: $topVisiblePostId)
+                    #endif
+                    .columnsAvoidingFold()
                 }
+            }
+            .offlineFallback(hasContent: !searchResults.isEmpty) {
+                guard hasSearched, !searchText.isEmpty else { return }
+                await performSearch(query: searchText)
             }
             .navigationTitle("Search")
             #if !os(tvOS)
@@ -231,12 +243,20 @@ struct SearchView: View {
                 playlistPickerSheet
             }
             .toast(
+                isPresented: $showDownloadToast,
+                message: downloadToast.message,
+                icon: downloadToast.icon
+            )
+            .toast(
                 isPresented: $showToast,
                 message: "Saved to Watch Later",
                 icon: "clock.fill"
             )
             #endif
         }
+        #if !os(tvOS)
+        .environment(\.leaveSearch) { dismiss() }
+        #endif
     }
 
     private func loadPlaylistsForBookmarks() async {
@@ -281,7 +301,9 @@ struct SearchView: View {
             }
         } catch {
             await MainActor.run {
-                errorMessage = "Search failed: \(error.localizedDescription)"
+                if !error.isOffline {
+                    errorMessage = "Search failed: \(error.localizedDescription)"
+                }
                 isSearching = false
             }
         }
@@ -378,7 +400,7 @@ struct SearchView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button("Done", systemImage: "checkmark") {
                         showPlaylistSheet = false
                     }
                 }
@@ -396,6 +418,27 @@ struct SearchView: View {
         }
     }
     #endif
+
+    private func isDownloaded(_ post: BlogPost) -> Bool {
+        #if os(tvOS)
+        return false
+        #else
+        return downloads.downloadedPostIds.contains(post.id)
+        #endif
+    }
+
+    private func downloadAction(for post: BlogPost) -> (() -> Void)? {
+        #if os(tvOS)
+        return nil
+        #else
+        return {
+            Task {
+                downloadToast = await DownloadManager.shared.requestDownload(of: post, preferredHeight: DownloadQueue.menuDownloadHeight)
+                showDownloadToast = true
+            }
+        }
+        #endif
+    }
 
     private func loadPlaylistsForMenu() async {
         guard let post = menuSelectedPost else { return }

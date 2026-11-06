@@ -28,7 +28,7 @@ struct CreatePlaylistView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button("Cancel", systemImage: "xmark") {
                         dismiss()
                     }
                     .disabled(isCreating)
@@ -46,7 +46,7 @@ struct CreatePlaylistView: View {
                             ProgressView()
                                 .tint(.floatplaneBlue)
                         } else {
-                            Text("Create")
+                            Label("Create", systemImage: "checkmark")
                         }
                     }
                     .disabled(playlistName.isEmpty || isCreating)

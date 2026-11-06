@@ -21,13 +21,9 @@
           "type": "blogPost",
           "channel": {
             "id": "63fe42c309e691e4e36de93d",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "Linus Tech Tips",
             "urlname": "main",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "order": 0,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 600,
               "height": 600,
@@ -47,9 +43,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "Rm9k9zAHsf"
-          ],
           "releaseDate": "2026-05-02T00:56:00.029Z",
           "likes": 303,
           "dislikes": 1,
@@ -57,28 +50,23 @@
           "comments": 120,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "63fe42c309e691e4e36de93d"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -93,7 +81,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -117,12 +104,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "Rm9k9zAHsf"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -140,13 +122,9 @@
           "type": "blogPost",
           "channel": {
             "id": "6413534d88c13c181c3e2809",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "TechLinked",
             "urlname": "techlinked",
             "about": "News about tech + gaming culture, delivered thrice weekly.\n\nWe're also doing long-form video essays now, apparently. \n\nThe TalkLinked talk show/podcast will probably come back at some point, too!\n\nWriters: Riley Murdock, Jon Martin, James Strieb",
-            "order": 4,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 88,
               "height": 88,
@@ -155,9 +133,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "stPLcGCrrv"
-          ],
           "releaseDate": "2026-05-07T01:13:00.048Z",
           "likes": 238,
           "dislikes": 1,
@@ -165,28 +140,23 @@
           "comments": 20,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "6413534d88c13c181c3e2809"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -201,7 +171,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -225,12 +194,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "stPLcGCrrv"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -248,13 +212,9 @@
           "type": "blogPost",
           "channel": {
             "id": "6413534d88c13c181c3e2809",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "TechLinked",
             "urlname": "techlinked",
             "about": "News about tech + gaming culture, delivered thrice weekly.\n\nWe're also doing long-form video essays now, apparently. \n\nThe TalkLinked talk show/podcast will probably come back at some point, too!\n\nWriters: Riley Murdock, Jon Martin, James Strieb",
-            "order": 4,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 88,
               "height": 88,
@@ -263,9 +223,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "QhASczuflb"
-          ],
           "releaseDate": "2026-05-05T01:07:00.025Z",
           "likes": 233,
           "dislikes": 0,
@@ -273,28 +230,23 @@
           "comments": 24,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "6413534d88c13c181c3e2809"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -309,7 +261,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -333,12 +284,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "QhASczuflb"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -356,13 +302,9 @@
           "type": "blogPost",
           "channel": {
             "id": "63fe42c309e691e4e36de93d",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "Linus Tech Tips",
             "urlname": "main",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "order": 0,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 600,
               "height": 600,
@@ -382,9 +324,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "9fIRW98CeA"
-          ],
           "releaseDate": "2026-05-02T16:34:00.025Z",
           "likes": 435,
           "dislikes": 1,
@@ -392,28 +331,23 @@
           "comments": 78,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "63fe42c309e691e4e36de93d"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -428,7 +362,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -452,12 +385,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "9fIRW98CeA"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -475,13 +403,9 @@
           "type": "blogPost",
           "channel": {
             "id": "6413534d88c13c181c3e2809",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "TechLinked",
             "urlname": "techlinked",
             "about": "News about tech + gaming culture, delivered thrice weekly.\n\nWe're also doing long-form video essays now, apparently. \n\nThe TalkLinked talk show/podcast will probably come back at some point, too!\n\nWriters: Riley Murdock, Jon Martin, James Strieb",
-            "order": 4,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 88,
               "height": 88,
@@ -490,9 +414,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "UGVVRFOQuE"
-          ],
           "releaseDate": "2026-05-02T00:59:00.022Z",
           "likes": 201,
           "dislikes": 2,
@@ -500,28 +421,23 @@
           "comments": 12,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "6413534d88c13c181c3e2809"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -536,7 +452,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -560,12 +475,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "UGVVRFOQuE"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -583,13 +493,9 @@
           "type": "blogPost",
           "channel": {
             "id": "6413623f5b12cca228a28e78",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "FP Exclusives",
             "urlname": "fpexclusive",
             "about": "Floatplane Exclusive videos!",
-            "order": 1,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 720,
               "height": 720,
@@ -609,9 +515,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "dWrM2KG2n2"
-          ],
           "releaseDate": "2026-04-27T21:14:00.020Z",
           "likes": 1593,
           "dislikes": 27,
@@ -619,28 +522,23 @@
           "comments": 94,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "6413623f5b12cca228a28e78"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -655,7 +553,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -679,12 +576,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "dWrM2KG2n2"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -702,13 +594,9 @@
           "type": "blogPost",
           "channel": {
             "id": "649dbade3540dbc3945eeda7",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "GameLinked",
             "urlname": "gamelinked",
             "about": "Gaming news, delivered twice weekly. More to come! ",
-            "order": 5,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 720,
               "height": 720,
@@ -728,9 +616,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "LqBMPMF5HR"
-          ],
           "releaseDate": "2026-05-01T01:38:00.029Z",
           "likes": 301,
           "dislikes": 0,
@@ -738,28 +623,23 @@
           "comments": 30,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "649dbade3540dbc3945eeda7"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -774,7 +654,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -798,12 +677,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "LqBMPMF5HR"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -821,13 +695,9 @@
           "type": "blogPost",
           "channel": {
             "id": "6413534d88c13c181c3e2809",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "TechLinked",
             "urlname": "techlinked",
             "about": "News about tech + gaming culture, delivered thrice weekly.\n\nWe're also doing long-form video essays now, apparently. \n\nThe TalkLinked talk show/podcast will probably come back at some point, too!\n\nWriters: Riley Murdock, Jon Martin, James Strieb",
-            "order": 4,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 88,
               "height": 88,
@@ -836,9 +706,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "BeG3zidsfA"
-          ],
           "releaseDate": "2026-04-30T01:23:00.030Z",
           "likes": 234,
           "dislikes": 0,
@@ -846,28 +713,23 @@
           "comments": 28,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "6413534d88c13c181c3e2809"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -882,7 +744,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -906,12 +767,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "BeG3zidsfA"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -929,13 +785,9 @@
           "type": "blogPost",
           "channel": {
             "id": "63fe42c309e691e4e36de93d",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "Linus Tech Tips",
             "urlname": "main",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "order": 0,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 600,
               "height": 600,
@@ -955,9 +807,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "gdJY4JpuME"
-          ],
           "releaseDate": "2026-04-25T05:03:00.023Z",
           "likes": 323,
           "dislikes": 5,
@@ -965,28 +814,23 @@
           "comments": 117,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "63fe42c309e691e4e36de93d"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -1001,7 +845,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -1025,12 +868,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "gdJY4JpuME"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -1048,13 +886,9 @@
           "type": "blogPost",
           "channel": {
             "id": "6413534d88c13c181c3e2809",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "TechLinked",
             "urlname": "techlinked",
             "about": "News about tech + gaming culture, delivered thrice weekly.\n\nWe're also doing long-form video essays now, apparently. \n\nThe TalkLinked talk show/podcast will probably come back at some point, too!\n\nWriters: Riley Murdock, Jon Martin, James Strieb",
-            "order": 4,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 88,
               "height": 88,
@@ -1063,9 +897,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "gSSdPkKCYe"
-          ],
           "releaseDate": "2026-04-28T00:38:00.028Z",
           "likes": 230,
           "dislikes": 1,
@@ -1073,28 +904,23 @@
           "comments": 20,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "6413534d88c13c181c3e2809"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -1109,7 +935,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -1133,12 +958,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "gSSdPkKCYe"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -1156,13 +976,9 @@
           "type": "blogPost",
           "channel": {
             "id": "6413623f5b12cca228a28e78",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "FP Exclusives",
             "urlname": "fpexclusive",
             "about": "Floatplane Exclusive videos!",
-            "order": 1,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 720,
               "height": 720,
@@ -1182,9 +998,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "n3tn6P2USH"
-          ],
           "releaseDate": "2026-04-21T16:32:00.019Z",
           "likes": 783,
           "dislikes": 5,
@@ -1192,28 +1005,23 @@
           "comments": 188,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "6413623f5b12cca228a28e78"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -1228,7 +1036,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -1252,12 +1059,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "n3tn6P2USH"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -1275,13 +1077,9 @@
           "type": "blogPost",
           "channel": {
             "id": "63fe42c309e691e4e36de93d",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "Linus Tech Tips",
             "urlname": "main",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "order": 0,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 600,
               "height": 600,
@@ -1301,9 +1099,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "aNrmjpIiBr"
-          ],
           "releaseDate": "2026-04-18T01:29:00.043Z",
           "likes": 307,
           "dislikes": 5,
@@ -1311,28 +1106,23 @@
           "comments": 58,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "63fe42c309e691e4e36de93d"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -1347,7 +1137,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -1371,12 +1160,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "aNrmjpIiBr"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -1394,13 +1178,9 @@
           "type": "blogPost",
           "channel": {
             "id": "6413534d88c13c181c3e2809",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "TechLinked",
             "urlname": "techlinked",
             "about": "News about tech + gaming culture, delivered thrice weekly.\n\nWe're also doing long-form video essays now, apparently. \n\nThe TalkLinked talk show/podcast will probably come back at some point, too!\n\nWriters: Riley Murdock, Jon Martin, James Strieb",
-            "order": 4,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 88,
               "height": 88,
@@ -1409,9 +1189,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "fpJgLnrehp"
-          ],
           "releaseDate": "2026-04-25T02:09:00.030Z",
           "likes": 209,
           "dislikes": 2,
@@ -1419,28 +1196,23 @@
           "comments": 16,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "6413534d88c13c181c3e2809"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -1455,7 +1227,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -1479,12 +1250,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "fpJgLnrehp"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -1502,13 +1268,9 @@
           "type": "blogPost",
           "channel": {
             "id": "649dbade3540dbc3945eeda7",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "GameLinked",
             "urlname": "gamelinked",
             "about": "Gaming news, delivered twice weekly. More to come! ",
-            "order": 5,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 720,
               "height": 720,
@@ -1528,9 +1290,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "Xr1tkDAZZY"
-          ],
           "releaseDate": "2026-04-24T02:49:00.028Z",
           "likes": 217,
           "dislikes": 0,
@@ -1538,28 +1297,23 @@
           "comments": 8,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "649dbade3540dbc3945eeda7"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -1574,7 +1328,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -1598,12 +1351,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "Xr1tkDAZZY"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -1621,13 +1369,9 @@
           "type": "blogPost",
           "channel": {
             "id": "6413534d88c13c181c3e2809",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "TechLinked",
             "urlname": "techlinked",
             "about": "News about tech + gaming culture, delivered thrice weekly.\n\nWe're also doing long-form video essays now, apparently. \n\nThe TalkLinked talk show/podcast will probably come back at some point, too!\n\nWriters: Riley Murdock, Jon Martin, James Strieb",
-            "order": 4,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 88,
               "height": 88,
@@ -1636,9 +1380,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "NQjiumUgGQ"
-          ],
           "releaseDate": "2026-04-23T02:15:00.056Z",
           "likes": 231,
           "dislikes": 1,
@@ -1646,28 +1387,23 @@
           "comments": 18,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "6413534d88c13c181c3e2809"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -1682,7 +1418,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -1706,12 +1441,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "NQjiumUgGQ"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -1729,13 +1459,9 @@
           "type": "blogPost",
           "channel": {
             "id": "63fe42c309e691e4e36de93d",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "Linus Tech Tips",
             "urlname": "main",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "order": 0,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 600,
               "height": 600,
@@ -1755,9 +1481,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "1yRAUQ66hX"
-          ],
           "releaseDate": "2026-04-17T23:07:00.588Z",
           "likes": 781,
           "dislikes": 51,
@@ -1765,28 +1488,23 @@
           "comments": 141,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "63fe42c309e691e4e36de93d"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -1801,7 +1519,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -1825,12 +1542,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "1yRAUQ66hX"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -1848,13 +1560,9 @@
           "type": "blogPost",
           "channel": {
             "id": "6413534d88c13c181c3e2809",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "TechLinked",
             "urlname": "techlinked",
             "about": "News about tech + gaming culture, delivered thrice weekly.\n\nWe're also doing long-form video essays now, apparently. \n\nThe TalkLinked talk show/podcast will probably come back at some point, too!\n\nWriters: Riley Murdock, Jon Martin, James Strieb",
-            "order": 4,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 88,
               "height": 88,
@@ -1863,9 +1571,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "FYzl9LWol9"
-          ],
           "releaseDate": "2026-04-21T01:37:00.038Z",
           "likes": 315,
           "dislikes": 2,
@@ -1873,28 +1578,23 @@
           "comments": 28,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "6413534d88c13c181c3e2809"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -1909,7 +1609,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -1933,12 +1632,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "FYzl9LWol9"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -1956,13 +1650,9 @@
           "type": "blogPost",
           "channel": {
             "id": "63fe42c309e691e4e36de93d",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "Linus Tech Tips",
             "urlname": "main",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "order": 0,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 600,
               "height": 600,
@@ -1982,9 +1672,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "r58A6VDMx1"
-          ],
           "releaseDate": "2026-04-19T17:15:00.049Z",
           "likes": 365,
           "dislikes": 27,
@@ -1992,28 +1679,23 @@
           "comments": 64,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "63fe42c309e691e4e36de93d"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -2028,7 +1710,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -2052,12 +1733,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "r58A6VDMx1"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -2075,13 +1751,9 @@
           "type": "blogPost",
           "channel": {
             "id": "6413534d88c13c181c3e2809",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "TechLinked",
             "urlname": "techlinked",
             "about": "News about tech + gaming culture, delivered thrice weekly.\n\nWe're also doing long-form video essays now, apparently. \n\nThe TalkLinked talk show/podcast will probably come back at some point, too!\n\nWriters: Riley Murdock, Jon Martin, James Strieb",
-            "order": 4,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 88,
               "height": 88,
@@ -2090,9 +1762,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "Mqd8DiO7dX"
-          ],
           "releaseDate": "2026-04-18T00:29:00.041Z",
           "likes": 213,
           "dislikes": 1,
@@ -2100,28 +1769,23 @@
           "comments": 19,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "6413534d88c13c181c3e2809"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -2136,7 +1800,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -2160,12 +1823,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "Mqd8DiO7dX"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       },
       {
@@ -2183,13 +1841,9 @@
           "type": "blogPost",
           "channel": {
             "id": "649dbade3540dbc3945eeda7",
-            "creator": "59f94c0bdd241b70349eb72b",
             "title": "GameLinked",
             "urlname": "gamelinked",
             "about": "Gaming news, delivered twice weekly. More to come! ",
-            "order": 5,
-            "cover": null,
-            "card": null,
             "icon": {
               "width": 720,
               "height": 720,
@@ -2209,9 +1863,6 @@
             }
           },
           "tags": [],
-          "attachmentOrder": [
-            "mEldrRA8j9"
-          ],
           "releaseDate": "2026-04-17T01:20:00.053Z",
           "likes": 183,
           "dislikes": 2,
@@ -2219,28 +1870,23 @@
           "comments": 7,
           "creator": {
             "id": "59f94c0bdd241b70349eb72b",
-            "owner": "59f94c0bdd241b70349eb723",
             "title": "LinusTechTips",
             "urlname": "linustechtips",
             "description": "We make entertaining videos about technology, including tech reviews, showcases, and other content.",
             "about": "# We're LinusTechTips\nWe make videos and stuff, cool eh?",
-            "category": "59f94c0bdd241b70349eb727",
-            "cover": null,
+            "category": {
+              "id": "59f94c0bdd241b70349eb727",
+              "title": "Technology"
+            },
             "icon": {
               "width": 16,
               "height": 16,
               "path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA1BMVEUfLTy/Rf//AAAAC0lEQVQI12MgEQAAADAAAWV61nwAAAAASUVORK5CYII="
             },
-            "card": null,
-            "liveStream": null,
-            "subscriptionPlans": null,
-            "discoverable": true,
-            "visibility": "public",
-            "subscriberCountDisplay": "total",
-            "incomeDisplay": false,
-            "defaultChannel": "6413623f5b12cca228a28e78"
+            "channels": [
+              "649dbade3540dbc3945eeda7"
+            ]
           },
-          "wasReleasedSilently": false,
           "metadata": {
             "hasVideo": true,
             "videoCount": 1,
@@ -2255,7 +1901,6 @@
             "hasGallery": false,
             "galleryCount": 0
           },
-          "galleryAttachments": [],
           "selfUserInteraction": null,
           "thumbnail": {
             "width": 1920,
@@ -2279,12 +1924,7 @@
               }
             ]
           },
-          "isAccessible": true,
-          "videoAttachments": [
-            "mEldrRA8j9"
-          ],
-          "audioAttachments": [],
-          "pictureAttachments": []
+          "isAccessible": true
         }
       }
     ]

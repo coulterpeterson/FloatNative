@@ -13,6 +13,7 @@ struct PlaylistsView: View {
     @State private var playlists: [Playlist] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var showOfflineToast = false
     @State private var selectedPlaylist: Playlist?
     @State private var playlistPosts: [BlogPost] = []
     @State private var isLoadingPlaylistPosts = false
@@ -42,16 +43,13 @@ struct PlaylistsView: View {
                 )
                     #if !os(tvOS)
                     .toolbar {
-                        ToolbarItem(placement: .principal) {
+                        ToolbarItem(placement: .cancellationAction) {
                             Button {
                                 // Return to playlist grid
                                 self.selectedPlaylist = nil
                                 self.playlistPosts = []
                             } label: {
-                                HStack {
-                                    Image(systemName: "chevron.left")
-                                    Text("Back to Playlists")
-                                }
+                                Label("Back to Playlists", systemImage: "chevron.left")
                             }
                         }
                     }
@@ -193,6 +191,7 @@ struct PlaylistsView: View {
                             await loadPlaylists()
                         }.value
                     }
+                    .columnsAvoidingFold()
                 }
 
                 // Initial loading
@@ -223,6 +222,9 @@ struct PlaylistsView: View {
                     .padding()
                     }
             }
+            .offlineFallback(hasContent: !playlists.isEmpty) {
+                await loadPlaylists()
+            }
             .navigationTitle("Playlists")
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
@@ -230,10 +232,16 @@ struct PlaylistsView: View {
                     Button {
                         showCreatePlaylistSheet = true
                     } label: {
-                        Image(systemName: "plus")
+                        Label("New Playlist", systemImage: "plus")
                     }
                 }
             }
+            .globalMenu()
+            .toast(
+                isPresented: $showOfflineToast,
+                message: "You're offline. Try again when you're connected.",
+                icon: "wifi.slash"
+            )
             .sheet(isPresented: $showCreatePlaylistSheet) {
                 CreatePlaylistView { name in
                     await handleCreatePlaylist(name: name)
@@ -249,16 +257,12 @@ struct PlaylistsView: View {
         }
     }
 
-    // Grid columns: tvOS uses 4 columns, iPad uses adaptive, iPhone uses single
+    // Grid columns: tvOS uses 4 columns, everything else fits the space it has
     private var gridColumns: [GridItem] {
         #if os(tvOS)
         return Array(repeating: GridItem(.flexible(), spacing: 20), count: 4)
         #else
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            return [GridItem(.adaptive(minimum: 320, maximum: 400), spacing: 16)]
-        } else {
-            return [GridItem(.flexible())]
-        }
+        return AdaptiveGrid.columns
         #endif
     }
 
@@ -283,7 +287,9 @@ struct PlaylistsView: View {
             isLoading = false
             await loadThumbnails(for: loadedPlaylists)
         } catch {
-            errorMessage = "Failed to load playlists: \(error.localizedDescription)"
+            if !error.isOffline {
+                errorMessage = "Failed to load playlists: \(error.localizedDescription)"
+            }
             print("❌ Failed to load playlists: \(error)")
         }
 
@@ -379,7 +385,11 @@ struct PlaylistsView: View {
                 await loadThumbnails(for: [newPlaylist])
             }
         } catch {
-            errorMessage = "Failed to create playlist: \(error.localizedDescription)"
+            if error.isOffline {
+                showOfflineToast = true
+            } else {
+                errorMessage = "Failed to create playlist: \(error.localizedDescription)"
+            }
             print("❌ Failed to create playlist: \(error)")
         }
     }
@@ -401,7 +411,11 @@ struct PlaylistsView: View {
             } else {
                 playlists.insert(playlist, at: 0)
             }
-            errorMessage = "Failed to delete playlist: \(error.localizedDescription)"
+            if error.isOffline {
+                showOfflineToast = true
+            } else {
+                errorMessage = "Failed to delete playlist: \(error.localizedDescription)"
+            }
             print("❌ Failed to delete playlist: \(error)")
         }
     }

@@ -63,6 +63,9 @@ struct VideoFeedView: View {
     // Bookmark indicators. Shared across every feed + Search so a change made
     // in one place shows everywhere; CompanionAPI keeps it current.
     @ObservedObject private var membership = PlaylistMembershipStore.shared
+    #if !os(tvOS)
+    @ObservedObject private var downloads = DownloadLibrary.shared
+    #endif
 
     // Watch progress tracking: Maps post IDs to progress values (0.0 to 1.0)
     @State private var progressData: [String: Double] = [:]
@@ -70,10 +73,13 @@ struct VideoFeedView: View {
     // iOS Menu state
     @State private var menuSelectedPost: BlogPost?
     @State private var showPlaylistSheet = false
+    @State private var topVisiblePostId: String?
     @State private var isAddingToWatchLaterMenu = false
     @State private var menuPlaylistsWithVideo: Set<String> = []
     @State private var showCreatePlaylistFromMenu = false
     @State private var showToast = false
+    @State private var showDownloadToast = false
+    @State private var downloadToast: (message: String, icon: String) = ("", "")
 
     init(filter: FeedFilter? = nil) {
         self.initialFilter = filter
@@ -127,17 +133,7 @@ struct VideoFeedView: View {
         let columnCount = showActionSidebar ? 3 : 4
         return Array(repeating: GridItem(.flexible(), spacing: 20), count: columnCount)
         #else
-        // iOS: Standard adaptive grid (no custom wrappers, just NavigationLink)
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            // iPad: Adaptive grid that fits optimal number of columns
-            // With 16:9 thumbnails + metadata, ~320-380pt is optimal width per card
-            // Portrait (~768pt - padding): 2 columns
-            // Landscape (~1024pt - padding): 3 columns
-            return [GridItem(.adaptive(minimum: 320, maximum: 400), spacing: 16)]
-        } else {
-            // iPhone: Single flexible column
-            return [GridItem(.flexible())]
-        }
+        return AdaptiveGrid.columns
         #endif
     }
 
@@ -411,6 +407,7 @@ struct VideoFeedView: View {
                                 VideoCard(
                                     post: post,
                                     isBookmarked: membership.contains(post.id),
+                                    isDownloaded: downloads.downloadedPostIds.contains(post.id),
                                     currentPlaylistId: currentPlaylistId,
                                     onMenuWatchLater: {
                                         Task { @MainActor in
@@ -429,6 +426,12 @@ struct VideoFeedView: View {
                                     onMenuMarkAsWatched: {
                                         Task { @MainActor in
                                             await markAsWatched(post: post)
+                                        }
+                                    },
+                                    onMenuDownload: {
+                                        Task {
+                                            downloadToast = await DownloadManager.shared.requestDownload(of: post, preferredHeight: DownloadQueue.menuDownloadHeight)
+                                            showDownloadToast = true
                                         }
                                     },
                                     progress: progressData[post.id]
@@ -461,9 +464,12 @@ struct VideoFeedView: View {
                                 }
                         }
                     }
+                    .scrollTargetLayout()
                     .padding(.horizontal, 16)
                     .padding(.vertical)
                 }
+                // Holds your place when the grid reflows, as when unfolding an iPhone Duo.
+                .scrollPosition(id: $topVisiblePostId)
                 .refreshable {
                     await Task.detached {
                         await viewModel.refresh()
@@ -473,6 +479,7 @@ struct VideoFeedView: View {
                         await fetchWatchProgress(for: viewModel.posts)
                     }
                 }
+                .columnsAvoidingFold()
             }
 
             // Initial loading (only if not using preloaded posts)
@@ -500,11 +507,6 @@ struct VideoFeedView: View {
                     }
                     .buttonStyle(LiquidGlassButtonStyle(tint: .floatplaneBlue))
 
-                    // The usual reason for landing here is having no connection.
-                    Button("View Downloads") {
-                        tabCoordinator.showDownloads()
-                    }
-                    .foregroundStyle(Color.floatplaneBlue)
                 }
                 .padding()
             }
@@ -526,6 +528,14 @@ struct VideoFeedView: View {
             #endif
         }
 
+        .offlineFallback(hasContent: !postsToDisplay.isEmpty) {
+            guard preloadedPosts == nil else { return }
+            if let filter = initialFilter {
+                await viewModel.loadFeed(filter: filter)
+            } else {
+                await viewModel.loadFeed()
+            }
+        }
         .globalMenu()
         .task {
             // Sync displayPosts from preloadedPosts if viewing a playlist
@@ -627,6 +637,11 @@ struct VideoFeedView: View {
             #endif
         }
         #if !os(tvOS)
+        .toast(
+            isPresented: $showDownloadToast,
+            message: downloadToast.message,
+            icon: downloadToast.icon
+        )
         .toast(
             isPresented: $showToast,
             message: "Saved to Watch Later",
@@ -953,7 +968,7 @@ struct VideoFeedView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button("Done", systemImage: "checkmark") {
                         showPlaylistSheet = false
                     }
                 }
@@ -1519,11 +1534,13 @@ struct VideoFeedView: View {
 struct VideoCard: View {
     let post: BlogPost
     let isBookmarked: Bool
+    var isDownloaded: Bool = false
     var currentPlaylistId: String? = nil
     var onMenuWatchLater: (() -> Void)? = nil
     var onMenuSaveToPlaylist: (() -> Void)? = nil
     var onMenuRemoveFromPlaylist: (() -> Void)? = nil
     var onMenuMarkAsWatched: (() -> Void)? = nil
+    var onMenuDownload: (() -> Void)? = nil
     var progress: Double? = nil  // Watch progress (0.0 to 1.0)
 
     // Livestream detection
@@ -1554,6 +1571,8 @@ struct VideoCard: View {
                                         .fill(Color.floatplaneGray.opacity(0.3))
                                 }
                             }
+                        } else {
+                            MissingThumbnail()
                         }
 
                         // Duration badge (only for non-livestream videos)
@@ -1571,22 +1590,18 @@ struct VideoCard: View {
                     }
                 )
                 .overlay(
-                    // Bookmark indicator (top-right corner)
+                    // Downloaded and bookmark indicators (top-right corner)
                     VStack {
-                        HStack {
+                        HStack(spacing: 6) {
                             Spacer()
+                            if isDownloaded {
+                                thumbnailBadge("arrow.down.circle.fill")
+                            }
                             if isBookmarked {
-                                Image(systemName: "bookmark.fill")
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.white)
-                                    .shadow(color: .black, radius: 0, x: -1, y: -1)
-                                    .shadow(color: .black, radius: 0, x: 1, y: -1)
-                                    .shadow(color: .black, radius: 0, x: -1, y: 1)
-                                    .shadow(color: .black, radius: 0, x: 1, y: 1)
-                                    .padding(8)
+                                thumbnailBadge("bookmark.fill")
                             }
                         }
+                        .padding(8)
                         Spacer()
                     }
                 )
@@ -1737,6 +1752,14 @@ struct VideoCard: View {
                         Label("Mark as Watched", systemImage: "checkmark.circle")
                     }
 
+                    if let onMenuDownload, post.metadata.hasVideo, !isLivestream {
+                        Button {
+                            onMenuDownload()
+                        } label: {
+                            Label("Download", systemImage: "arrow.down.circle")
+                        }
+                    }
+
                     // Only show when viewing a playlist
                     if currentPlaylistId != nil {
                         Button {
@@ -1768,6 +1791,17 @@ struct VideoCard: View {
             #endif
         }
         .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private func thumbnailBadge(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.caption2)
+            .fontWeight(.bold)
+            .foregroundStyle(.white)
+            .shadow(color: .black, radius: 0, x: -1, y: -1)
+            .shadow(color: .black, radius: 0, x: 1, y: -1)
+            .shadow(color: .black, radius: 0, x: -1, y: 1)
+            .shadow(color: .black, radius: 0, x: 1, y: 1)
     }
 
     private func formatDuration(_ seconds: Double) -> String {

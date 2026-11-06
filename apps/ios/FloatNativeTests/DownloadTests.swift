@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import SwiftUI
 @testable import FloatNative
 
 private func makeTempFolder() throws -> URL {
@@ -232,6 +233,7 @@ struct DownloadProgressStoreTests {
         FloatplaneAPIError.httpError(statusCode: 401, message: nil),
         FloatplaneAPIError.httpError(statusCode: 429, message: nil),
         FloatplaneAPIError.notAuthenticated,
+        FloatplaneAPIError.rateLimited(retryAfter: 300),
     ])
     func temporaryFailuresStayQueued(error: FloatplaneAPIError) async throws {
         let server = FakeServer()
@@ -328,3 +330,260 @@ struct DownloadProgressStoreTests {
         #expect(await store.resumeSeconds(key: "file:a.mp4", videoId: nil) == 42)
     }
 }
+
+struct DownloadQueueTests {
+    private func download(_ id: String, _ state: ActiveDownload.State) -> ActiveDownload {
+        ActiveDownload(metadata: metadata(videoId: id), state: state, taskIdentifier: nil)
+    }
+
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test func startsTheOldestQueuedFirst() {
+        let active = [download("a", .queued), download("b", .queued)]
+        #expect(DownloadQueue.next(in: active, waitingUntil: nil, now: now)?.id == "a")
+    }
+
+    @Test(arguments: [ActiveDownload.State.preparing, .downloading(fraction: 0.5)])
+    func runsOneAtATime(running: ActiveDownload.State) {
+        let active = [download("a", running), download("b", .queued)]
+        #expect(DownloadQueue.next(in: active, waitingUntil: nil, now: now) == nil)
+    }
+
+    @Test func aFailedDownloadDoesNotHoldUpTheQueue() {
+        let active = [download("a", .failed("Nope")), download("b", .queued)]
+        #expect(DownloadQueue.next(in: active, waitingUntil: nil, now: now)?.id == "b")
+    }
+
+    @Test func waitsOutTheLimit() {
+        let active = [download("a", .queued)]
+        #expect(DownloadQueue.next(in: active, waitingUntil: now.addingTimeInterval(1), now: now) == nil)
+        #expect(DownloadQueue.next(in: active, waitingUntil: now.addingTimeInterval(-1), now: now)?.id == "a")
+    }
+
+    @Test func waitEndUsesFloatplanesDelayOrTheDefault() {
+        #expect(DownloadQueue.waitEnd(retryAfter: 120, now: now) == now.addingTimeInterval(122))
+        #expect(DownloadQueue.waitEnd(retryAfter: nil, now: now) == now.addingTimeInterval(302))
+    }
+
+    @Test func spacesOutRequests() {
+        // First ever request goes straight away.
+        #expect(DownloadQueue.earliestStart(lastRequestAt: nil, waitingUntil: nil, now: now) == nil)
+
+        let justNow = now.addingTimeInterval(-5)
+        #expect(DownloadQueue.earliestStart(lastRequestAt: justNow, waitingUntil: nil, now: now) == justNow.addingTimeInterval(65))
+
+        let longAgo = now.addingTimeInterval(-66)
+        #expect(DownloadQueue.earliestStart(lastRequestAt: longAgo, waitingUntil: nil, now: now) == nil)
+    }
+
+    @Test func aRateLimitOutranksSpacing() {
+        let block = now.addingTimeInterval(280)
+        #expect(DownloadQueue.earliestStart(lastRequestAt: now, waitingUntil: block, now: now) == block)
+    }
+
+    private func variants(_ heights: Int...) -> [QualityVariant] {
+        heights.map { QualityVariant(name: "\($0)", label: "\($0)p", url: "u", resolution: "", width: 0, height: $0, order: 0) }
+    }
+
+    @Test func choosesRequestedQualityWhenOffered() {
+        let picked = DownloadQueue.quality(from: variants(2160, 1080, 720, 360), preferredHeight: 1080)
+        #expect(picked?.height == 1080)
+    }
+
+    @Test func neverGoesAboveTheRequestedQuality() {
+        // No 1080p on offer, and 4K isn't what was asked for.
+        #expect(DownloadQueue.quality(from: variants(2160, 720, 360), preferredHeight: 1080)?.height == 720)
+        // A smaller source just gets its best.
+        #expect(DownloadQueue.quality(from: variants(720, 480), preferredHeight: 1080)?.height == 720)
+        // Wide videos have shorter heights at the same width.
+        #expect(DownloadQueue.quality(from: variants(1600, 800, 536), preferredHeight: 1080)?.height == 800)
+    }
+
+    @Test func fallsBackWhenNothingFitsOrNothingWasRequested() {
+        #expect(DownloadQueue.quality(from: variants(2160, 1440), preferredHeight: 1080)?.height == 1440)
+        #expect(DownloadQueue.quality(from: variants(2160, 1080), preferredHeight: nil)?.height == 2160)
+        #expect(DownloadQueue.quality(from: [], preferredHeight: 1080) == nil)
+    }
+
+    @Test func emptyQueueStartsNothing() {
+        #expect(DownloadQueue.next(in: [download("a", .failed("Nope"))], waitingUntil: nil, now: now) == nil)
+    }
+
+    @Test func savedQueueSurvivesARoundTrip() throws {
+        let url = try makeTempFolder().appendingPathComponent("queue.json")
+        let saved = SavedDownloadQueue(
+            items: [.init(metadata: metadata(videoId: "a"), preferredHeight: 1080)],
+            waitingUntil: now,
+            lastRequestAt: now
+        )
+        saved.save(to: url)
+        #expect(SavedDownloadQueue.load(from: url) == saved)
+    }
+}
+
+struct OfflineErrorTests {
+    @Test func noConnectionCountsAsOffline() {
+        #expect(URLError(.notConnectedToInternet).isOffline)
+        #expect(URLError(.dataNotAllowed).isOffline)
+        #expect(FloatplaneAPIError.networkError(URLError(.notConnectedToInternet)).isOffline)
+        #expect(CompanionAPIError.networkError(URLError(.notConnectedToInternet)).isOffline)
+    }
+
+    @Test func realFailuresStillShowAsErrors() {
+        #expect(!URLError(.timedOut).isOffline)
+        #expect(!URLError(.badServerResponse).isOffline)
+        #expect(!FloatplaneAPIError.httpError(statusCode: 500, message: nil).isOffline)
+        #expect(!FloatplaneAPIError.networkError(URLError(.timedOut)).isOffline)
+    }
+}
+
+struct TokenRefreshDecisionTests {
+    private func body(_ names: String...) -> Data {
+        let errors = names.map { "{\"id\":\"x\",\"name\":\"\($0)\",\"message\":\"m\"}" }.joined(separator: ",")
+        return Data("{\"errors\":[\(errors)],\"message\":\"m\"}".utf8)
+    }
+
+    @Test func expiredTokenOn403Refreshes() {
+        #expect(FloatplaneAPI.shouldRefreshToken(statusCode: 403, body: body("notLoggedInError"), allowRefreshOn403: false))
+        // Floatplane sends both when it can't tell who's asking.
+        #expect(FloatplaneAPI.shouldRefreshToken(statusCode: 403, body: body("notLoggedInError", "notSubscribedError"), allowRefreshOn403: false))
+    }
+
+    @Test func paywalled403DoesNotRefresh() {
+        #expect(!FloatplaneAPI.shouldRefreshToken(statusCode: 403, body: body("notSubscribedError"), allowRefreshOn403: false))
+    }
+
+    @Test func htmlOrEmpty403DoesNotRefresh() {
+        #expect(!FloatplaneAPI.shouldRefreshToken(statusCode: 403, body: Data("<html>Forbidden</html>".utf8), allowRefreshOn403: false))
+        #expect(!FloatplaneAPI.shouldRefreshToken(statusCode: 403, body: Data(), allowRefreshOn403: false))
+    }
+
+    @Test func callsThatAlwaysRefreshOn403StillDo() {
+        #expect(FloatplaneAPI.shouldRefreshToken(statusCode: 403, body: Data(), allowRefreshOn403: true))
+    }
+
+    @Test func otherStatuses() {
+        #expect(FloatplaneAPI.shouldRefreshToken(statusCode: 401, body: Data(), allowRefreshOn403: false))
+        #expect(!FloatplaneAPI.shouldRefreshToken(statusCode: 500, body: body("notLoggedInError"), allowRefreshOn403: false))
+        #expect(!FloatplaneAPI.shouldRefreshToken(statusCode: 429, body: Data(), allowRefreshOn403: true))
+    }
+}
+
+@MainActor
+struct TabCoordinatorPlayTests {
+    private let video = LocalVideo(
+        url: URL(fileURLWithPath: "/tmp/video.mp4"),
+        relativePath: "video.mp4",
+        metadata: nil,
+        fileSize: 1,
+        addedAt: Date()
+    )
+
+    @Test func replacesTheCurrentScreen() {
+        let coordinator = TabCoordinator()
+        coordinator.path.append(NavigationDestination.history)
+        coordinator.path.append(NavigationDestination.settings)
+
+        coordinator.play(video, replacingCurrent: true)
+
+        #expect(coordinator.path.count == 2)
+    }
+
+    @Test func pushesByDefault() {
+        let coordinator = TabCoordinator()
+        coordinator.path.append(NavigationDestination.history)
+
+        coordinator.play(video)
+
+        #expect(coordinator.path.count == 2)
+    }
+
+    @Test func replacingWithNothingOnThePathStillPlays() {
+        let coordinator = TabCoordinator()
+
+        coordinator.play(video, replacingCurrent: true)
+
+        #expect(coordinator.path.count == 1)
+    }
+}
+
+#if !os(tvOS)
+struct AdaptiveLayoutTests {
+    /// Apple says an open iPhone Duo is regular in both directions and a closed one acts
+    /// like any other iPhone. Its point sizes come from third-party measurements.
+    @Test(arguments: [
+        (CGSize(width: 951, height: 669), UserInterfaceSizeClass.regular, UserInterfaceSizeClass.regular, true),   // Duo open, wide
+        (CGSize(width: 669, height: 951), .regular, .regular, false),  // Duo open, upright
+        (CGSize(width: 466, height: 678), .compact, .regular, false),  // Duo closed
+        (CGSize(width: 678, height: 466), .compact, .compact, false),  // Duo closed, like a tent
+        (CGSize(width: 402, height: 874), .compact, .regular, false),  // iPhone
+        (CGSize(width: 956, height: 440), .regular, .compact, false),  // Large iPhone on its side
+        (CGSize(width: 1194, height: 834), .regular, .regular, true),  // iPad landscape
+        (CGSize(width: 834, height: 1194), .regular, .regular, false)  // iPad portrait
+    ])
+    func playerGoesBesideDetailsOnlyWithRoom(
+        size: CGSize,
+        horizontal: UserInterfaceSizeClass,
+        vertical: UserInterfaceSizeClass,
+        expected: Bool
+    ) {
+        #expect(PlayerPageArrangement.isSideBySide(size: size, horizontal: horizontal, vertical: vertical) == expected)
+    }
+
+    @Test func playerColumnEndsAtTheFold() {
+        typealias Arrangement = PlayerPageArrangement
+        #expect(Arrangement.playerColumnWidth(totalWidth: 1000, foldX: nil) == 620)
+        #expect(Arrangement.playerColumnWidth(totalWidth: 1000, foldX: 500) == 500)
+        #expect(Arrangement.playerColumnWidth(totalWidth: 951, foldX: 475.5) == 476)
+        // Not a fold worth lining up with: it would leave no room for one column.
+        #expect(Arrangement.playerColumnWidth(totalWidth: 1000, foldX: 100) == 620)
+        #expect(Arrangement.playerColumnWidth(totalWidth: 1000, foldX: 900) == 620)
+    }
+
+    @Test func rotationLeavesFullscreenAloneOnAnOpenDuoOnly() {
+        typealias Manager = AVPlayerManager
+        #expect(!Manager.rotationControlsFullScreen(idiom: .phone, horizontal: .regular, vertical: .regular))
+        #expect(Manager.rotationControlsFullScreen(idiom: .phone, horizontal: .compact, vertical: .regular))
+        #expect(Manager.rotationControlsFullScreen(idiom: .phone, horizontal: .compact, vertical: .compact))
+        // A large iPhone on its side, after the rotation has happened.
+        #expect(Manager.rotationControlsFullScreen(idiom: .phone, horizontal: .regular, vertical: .compact))
+        #expect(Manager.rotationControlsFullScreen(idiom: .pad, horizontal: .regular, vertical: .regular))
+    }
+
+    /// SwiftUI's rule for how many columns an adaptive grid fits.
+    private func columnCount(contentWidth: CGFloat) -> Int {
+        Int((contentWidth + 16) / (AdaptiveGrid.minimumColumnWidth + 16))
+    }
+
+    @Test func columnsCentreOnTheFold() {
+        // The bars on an iPhone Duo's inner screen leave the fold right of centre.
+        #expect(Fold.columnsInset(totalWidth: 868, foldX: 475.5) == 83)
+        #expect(Fold.columnsInset(totalWidth: 868, foldX: 392.5) == -83)
+        // Not folded, or a division too far to one side to use.
+        #expect(Fold.columnsInset(totalWidth: 868, foldX: nil) == 0)
+        #expect(Fold.columnsInset(totalWidth: 868, foldX: 100) == 0)
+        // A fold from the closed screen on its side, applied to the open screen's width.
+        #expect(Fold.columnsInset(totalWidth: 867, foldX: 297) == 0)
+        // Columns already indented from the leading edge need less to reach the fold.
+        #expect(Fold.columnsInset(totalWidth: 868, foldX: 475.5, leadingIndent: 40) == 43)
+    }
+
+    @Test func twoColumnsSurviveCentringOnTheFold() {
+        let width: CGFloat = 868
+        let inset = Fold.columnsInset(totalWidth: width, foldX: 475.5)
+        let padding: CGFloat = 32
+        #expect(columnCount(contentWidth: width - padding) == 2)
+        #expect(columnCount(contentWidth: width - padding - inset) == 2)
+    }
+
+    @Test func gridFitsEachScreen() {
+        let padding: CGFloat = 32
+        #expect(columnCount(contentWidth: 320 - padding) == 1)  // Smallest iPhone
+        #expect(columnCount(contentWidth: 466 - padding) == 1)  // Duo closed
+        #expect(columnCount(contentWidth: 669 - padding) == 2)  // Duo open, upright
+        #expect(columnCount(contentWidth: 834 - padding) == 2)  // iPad portrait, same as before
+        #expect(columnCount(contentWidth: 1194 - padding) == 3) // iPad landscape, same as before
+        #expect(columnCount(contentWidth: 1366 - padding) == 4) // Large iPad landscape, same as before
+    }
+}
+#endif

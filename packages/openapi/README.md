@@ -52,7 +52,6 @@ While most models are auto-generated, the iOS app maintains custom wrappers and 
 
 ### 1. **API Spec Gaps**
 - **`BlogPostDetailedWithInteraction`**: Adds missing `selfUserInteraction` field not in OpenAPI spec
-- **`WatchHistoryBlogPost`**: Different response format for watch history endpoint
 
 ### 2. **Convenience Wrappers**
 - **Type aliases**: `BlogPost`, `Creator`, `DeliveryInfo`, etc. (shorthand for verbose generated names)

@@ -24,43 +24,34 @@ struct DownloadPlayerView: View {
             Color.adaptiveBackground
                 .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 0) {
+            PlayerPageLayout(hasSide: video.metadata != nil) {
                 playerArea
                     .frame(maxWidth: .infinity)
                     .aspectRatio(16 / 9, contentMode: .fit)
+            } details: {
+                Text(video.title)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.adaptiveText)
+                    .multilineTextAlignment(.leading)
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text(video.title)
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundColor(Color.adaptiveText)
-                            .multilineTextAlignment(.leading)
+                if let releaseDate = video.metadata?.releaseDate {
+                    Text(RelativeDateTimeFormatter().localizedString(for: releaseDate, relativeTo: Date()))
+                        .font(.subheadline)
+                        .foregroundColor(Color.adaptiveSecondaryText)
+                }
 
-                        if let releaseDate = video.metadata?.releaseDate {
-                            Text(RelativeDateTimeFormatter().localizedString(for: releaseDate, relativeTo: Date()))
-                                .font(.subheadline)
-                                .foregroundColor(Color.adaptiveSecondaryText)
-                        }
+                playerButtons
+            } side: {
+                if let metadata = video.metadata {
+                    channelRow(metadata)
 
-                        playerButtons
+                    if let html = metadata.descriptionHTML, !html.isEmpty {
+                        Divider()
+                            .background(Color.floatplaneGray.opacity(0.3))
 
-                        if let metadata = video.metadata {
-                            Divider()
-                                .background(Color.floatplaneGray.opacity(0.3))
-
-                            channelRow(metadata)
-
-                            if let html = metadata.descriptionHTML, !html.isEmpty {
-                                Divider()
-                                    .background(Color.floatplaneGray.opacity(0.3))
-
-                                PostDescriptionView(description: parsedDescription, rawLength: html.count)
-                            }
-                        }
+                        PostDescriptionView(description: parsedDescription, rawLength: html.count)
                     }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
@@ -77,12 +68,7 @@ struct DownloadPlayerView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-            let orientation = UIDevice.current.orientation
-            if orientation.isLandscape {
-                playerManager.enterFullScreen()
-            } else if orientation == .portrait {
-                playerManager.exitFullScreen()
-            }
+            playerManager.followDeviceRotation()
         }
         .onDisappear {
             // Also fires when AVKit presents fullscreen over this view, and PiP
@@ -118,7 +104,7 @@ struct DownloadPlayerView: View {
         }
     }
 
-    /// The caption and rotate buttons, in the same spot as on the streaming player.
+    /// The caption and fullscreen buttons, in the same spot as on the streaming player.
     private var playerButtons: some View {
         HStack(spacing: 16) {
             Spacer()
@@ -134,14 +120,7 @@ struct DownloadPlayerView: View {
                 .accessibilityLabel(playerManager.captionsEnabled ? "Hide captions" : "Show captions")
             }
 
-            Button {
-                playerManager.forceLandscape()
-            } label: {
-                Image(systemName: "rectangle.landscape.rotate")
-                    .font(.title2)
-                    .foregroundColor(Color.adaptiveText)
-            }
-            .accessibilityLabel("Force landscape")
+            PlayerFullScreenButton()
         }
     }
 

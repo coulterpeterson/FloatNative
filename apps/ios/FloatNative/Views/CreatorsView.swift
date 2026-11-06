@@ -17,7 +17,7 @@ struct CreatorsView: View {
             Color.adaptiveBackground
                 .ignoresSafeArea()
 
-            if viewModel.creators.isEmpty && !viewModel.isLoading {
+            if viewModel.creators.isEmpty && !viewModel.isLoading && viewModel.errorMessage == nil {
                 emptyState
             } else {
                 List {
@@ -41,6 +41,8 @@ struct CreatorsView: View {
                 .refreshable {
                     await viewModel.loadCreators()
                 }
+                // This list's rows also reach about 20pt further on the trailing side.
+                .columnsAvoidingFold(leadingIndent: CreatorSection.channelListIndent + 20)
             }
 
             // Loading state
@@ -87,6 +89,9 @@ struct CreatorsView: View {
             VideoPlayerView(post: post)
             #endif
         }
+        .offlineFallback(hasContent: !viewModel.creators.isEmpty) {
+            await viewModel.loadCreators()
+        }
         .globalMenu()
         .task {
             await viewModel.loadCreators()
@@ -110,12 +115,15 @@ struct CreatorsView: View {
                 .multilineTextAlignment(.center)
         }
         .padding()
+        .messageAvoidingFold()
     }
 }
 
 // MARK: - Creator Section
 
 struct CreatorSection: View {
+    static let channelListIndent: CGFloat = 40
+
     let creator: Creator
     @Binding var selectedFilter: FeedFilter?
     @State private var isExpanded = true
@@ -201,7 +209,7 @@ struct CreatorSection: View {
 
             // Channel List (Expandable)
             if isExpanded && !creator.channels.isEmpty {
-                VStack(spacing: 8) {
+                channelList {
                     // "View All" row for creator filter
                     Button {
                         selectedFilter = FeedFilter.creator(id: creator.id, name: creator.title, icon: creator.icon)
@@ -257,10 +265,20 @@ struct CreatorSection: View {
                         ChannelRow(channel: channel, creatorId: creator.id, selectedFilter: $selectedFilter)
                     }
                 }
-                .padding(.leading, 40)
+                .padding(.leading, Self.channelListIndent)
                 .padding(.top, 8)
             }
         }
+    }
+
+    /// One column on a phone screen, and more when there's room.
+    @ViewBuilder
+    private func channelList<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        #if os(tvOS)
+        VStack(spacing: 8, content: content)
+        #else
+        LazyVGrid(columns: AdaptiveGrid.columns, spacing: 8, content: content)
+        #endif
     }
 }
 
@@ -363,7 +381,9 @@ class CreatorsViewModel: ObservableObject {
             creators = loadedCreators
             isLoading = false
         } catch {
-            errorMessage = "Failed to load creators: \(error.localizedDescription)"
+            if !error.isOffline {
+                errorMessage = "Failed to load creators: \(error.localizedDescription)"
+            }
             isLoading = false
         }
     }

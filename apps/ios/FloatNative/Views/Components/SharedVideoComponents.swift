@@ -147,6 +147,8 @@ struct CompactHistoryCard: View {
                                 .frame(width: 168, height: 94)
                         }
                     }
+                } else {
+                    MissingThumbnail()
                 }
 
                 // Duration badge

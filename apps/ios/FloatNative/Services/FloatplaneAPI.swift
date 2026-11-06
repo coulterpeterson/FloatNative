@@ -18,6 +18,7 @@ enum FloatplaneAPIError: LocalizedError {
     case notAuthenticated
     case networkError(Error)
     case malformedData(message: String?)
+    case rateLimited(retryAfter: TimeInterval?)
     case unknown
 
     var errorDescription: String? {
@@ -36,6 +37,8 @@ enum FloatplaneAPIError: LocalizedError {
             return "Network error: \(error.localizedDescription)"
         case .malformedData(let message):
             return "Received unexpected data: \(message ?? "Malformed response")"
+        case .rateLimited:
+            return "Too many requests. Please try again in a few minutes."
         case .unknown:
             return "An unknown error occurred"
         }
@@ -248,13 +251,28 @@ class FloatplaneAPI: ObservableObject {
     // MARK: - Network Request Helpers
 
     /// Request method for endpoints that don't return JSON (plain text responses)
+    /// Whether a failed response means the access token needs refreshing.
+    /// Floatplane reports an expired token as 403 `notLoggedInError`, not 401.
+    /// Going by the error name matters: a 403 on content the user isn't
+    /// subscribed to is not a token problem.
+    nonisolated static func shouldRefreshToken(statusCode: Int, body: Data, allowRefreshOn403: Bool) -> Bool {
+        if statusCode == 401 { return true }
+        guard statusCode == 403 else { return false }
+        if allowRefreshOn403 { return true }
+
+        guard let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+              let errors = json["errors"] as? [[String: Any]] else { return false }
+        return errors.contains { $0["name"] as? String == "notLoggedInError" }
+    }
+
     private func requestWithoutResponse(
         endpoint: String,
         method: String = "GET",
         body: Encodable? = nil,
         requiresAuth: Bool = false,
         retryCount: Int = 0,
-        allowRefreshOn403: Bool = false
+        allowRefreshOn403: Bool = false,
+        didRefresh: Bool = false
     ) async throws {
         guard let url = URL(string: baseURL + endpoint) else {
             throw FloatplaneAPIError.invalidURL
@@ -297,7 +315,7 @@ class FloatplaneAPI: ObservableObject {
         }
 
         // Perform request
-        let (_, response) = try await session.data(for: urlRequest)
+        let (data, response) = try await session.data(for: urlRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw FloatplaneAPIError.invalidResponse
@@ -333,12 +351,14 @@ class FloatplaneAPI: ObservableObject {
                         method: method,
                         body: body,
                         requiresAuth: requiresAuth,
-                        retryCount: retryCount + 1
+                        retryCount: retryCount + 1,
+                        allowRefreshOn403: allowRefreshOn403,
+                        didRefresh: didRefresh
                     )
                 }
 
-                // Try OAuth Refresh for 401 Unauthorized, or for 403 Forbidden if explicitly allowed (e.g., initial API calls)
-                if (httpResponse.statusCode == 401 || (httpResponse.statusCode == 403 && allowRefreshOn403)) && refreshToken != nil {
+                // Try OAuth Refresh when the token is rejected, once per request
+                if Self.shouldRefreshToken(statusCode: httpResponse.statusCode, body: data, allowRefreshOn403: allowRefreshOn403), refreshToken != nil, !didRefresh {
                      do {
                          try await ensureRefreshed()
                          return try await requestWithoutResponse(
@@ -346,12 +366,17 @@ class FloatplaneAPI: ObservableObject {
                              method: method,
                              body: body,
                              requiresAuth: requiresAuth,
-                             allowRefreshOn403: allowRefreshOn403
+                             allowRefreshOn403: allowRefreshOn403,
+                             didRefresh: true
                          )
                      } catch {
                          throw error
                      }
                 }
+            }
+
+            if httpResponse.statusCode == 429 {
+                throw FloatplaneAPIError.rateLimited(retryAfter: headers["retry-after"].flatMap(TimeInterval.init))
             }
 
             throw FloatplaneAPIError.httpError(statusCode: httpResponse.statusCode, message: nil)
@@ -364,7 +389,8 @@ class FloatplaneAPI: ObservableObject {
         body: Encodable? = nil,
         requiresAuth: Bool = false,
         retryCount: Int = 0,
-        allowRefreshOn403: Bool = false
+        allowRefreshOn403: Bool = false,
+        didRefresh: Bool = false
     ) async throws -> T {
         guard let url = URL(string: baseURL + endpoint) else {
             throw FloatplaneAPIError.invalidURL
@@ -454,12 +480,14 @@ class FloatplaneAPI: ObservableObject {
                         method: method,
                         body: body,
                         requiresAuth: requiresAuth,
-                        retryCount: retryCount + 1
+                        retryCount: retryCount + 1,
+                        allowRefreshOn403: allowRefreshOn403,
+                        didRefresh: didRefresh
                     )
                 }
 
-                // Try OAuth Refresh for 401 Unauthorized, or for 403 Forbidden if explicitly allowed (e.g., initial API calls)
-                if (httpResponse.statusCode == 401 || (httpResponse.statusCode == 403 && allowRefreshOn403)) && refreshToken != nil {
+                // Try OAuth Refresh when the token is rejected, once per request
+                if Self.shouldRefreshToken(statusCode: httpResponse.statusCode, body: data, allowRefreshOn403: allowRefreshOn403), refreshToken != nil, !didRefresh {
                      do {
                          try await ensureRefreshed()
                          return try await request(
@@ -467,12 +495,17 @@ class FloatplaneAPI: ObservableObject {
                              method: method,
                              body: body,
                              requiresAuth: requiresAuth,
-                             allowRefreshOn403: allowRefreshOn403
+                             allowRefreshOn403: allowRefreshOn403,
+                             didRefresh: true
                          )
                      } catch {
                          throw error
                      }
                 }
+            }
+
+            if httpResponse.statusCode == 429 {
+                throw FloatplaneAPIError.rateLimited(retryAfter: headers["retry-after"].flatMap(TimeInterval.init))
             }
 
             let errorMessage = try? JSONDecoder().decode(FloatplaneErrorResponse.self, from: data)
@@ -780,6 +813,11 @@ class FloatplaneAPI: ObservableObject {
             // A connection problem says nothing about the token. Signing out here
             // would strand the user mid-reconnect, with progress still queued.
             if error is URLError {
+                throw error
+            }
+            // Likewise a server problem or rate limit: the token may be fine.
+            if case FloatplaneAPIError.httpError(let statusCode, _) = error,
+               statusCode == 429 || (500...599).contains(statusCode) {
                 throw error
             }
 
@@ -1347,10 +1385,12 @@ class FloatplaneAPI: ObservableObject {
 
     /// Get watch history from server
     func getWatchHistory(offset: Int = 0) async throws -> [WatchHistoryResponse] {
-        return try await request(
+        // Skips an entry it can't read, so one can't blank out the whole history.
+        let history: LossyArray<WatchHistoryResponse> = try await request(
             endpoint: "/api/v3/content/history?offset=\(offset)",
             method: "GET",
             requiresAuth: true
         )
+        return history.wrappedValue
     }
 }

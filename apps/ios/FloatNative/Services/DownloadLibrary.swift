@@ -85,6 +85,10 @@ enum DownloadFiles {
         assetsURL.appendingPathComponent("\(videoId).vtt")
     }
 
+    static func resumeDataURL(videoId: String) -> URL {
+        assetsURL.appendingPathComponent("\(videoId).resume")
+    }
+
     static func sidecarURL(for video: URL) -> URL {
         video.deletingPathExtension().appendingPathExtension("json")
     }
@@ -240,7 +244,12 @@ enum DownloadFiles {
 final class DownloadLibrary: ObservableObject {
     static let shared = DownloadLibrary()
 
-    @Published private(set) var videos: [LocalVideo] = []
+    @Published private(set) var videos: [LocalVideo] = [] {
+        didSet { downloadedPostIds = Set(videos.compactMap { $0.metadata?.postId }) }
+    }
+    /// Posts with a video on the device, for the badge on feed cards. A multi-part
+    /// post counts once any of its parts is downloaded.
+    private(set) var downloadedPostIds: Set<String> = []
 
     private var folderWatcher: DispatchSourceFileSystemObject?
     private var foregroundObserver: NSObjectProtocol?
@@ -258,12 +267,14 @@ final class DownloadLibrary: ObservableObject {
     }
 
     func refresh() {
-        Task {
-            let found = await Task.detached(priority: .utility) {
-                DownloadFiles.scan(in: DownloadFiles.folderURL)
-            }.value
-            if found != videos { videos = found }
-        }
+        Task { await refreshAndWait() }
+    }
+
+    func refreshAndWait() async {
+        let found = await Task.detached(priority: .utility) {
+            DownloadFiles.scan(in: DownloadFiles.folderURL)
+        }.value
+        if found != videos { videos = found }
     }
 
     func video(forVideoId videoId: String) -> LocalVideo? {

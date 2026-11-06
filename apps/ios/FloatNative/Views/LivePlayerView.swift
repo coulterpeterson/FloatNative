@@ -15,6 +15,7 @@ struct LivePlayerView: View {
     @StateObject private var playerManager = AVPlayerManager.shared
     @StateObject private var api = FloatplaneAPI.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -27,15 +28,16 @@ struct LivePlayerView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            let isLandscape = geometry.size.width > geometry.size.height
+            // A phone on its side. An open iPhone Duo is also wider than it's tall,
+            // but has room for everything.
+            let isLandscape = geometry.size.width > geometry.size.height && verticalSizeClass == .compact
             
             ZStack {
                 // Background
                 Color.adaptiveBackground
                     .ignoresSafeArea()
                 
-                // Persistent Layout
-                portraitLayout
+                pageLayout
                 
                 // Error state
                 if let error = errorMessage {
@@ -65,6 +67,9 @@ struct LivePlayerView: View {
                     }
                 }
             }
+            .offlineFallback(hasContent: playerManager.player != nil) {
+                await loadLivestream()
+            }
             #if !os(tvOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -75,13 +80,7 @@ struct LivePlayerView: View {
             .toolbar(isLandscape ? .hidden : .visible, for: .tabBar)
             #if !os(tvOS)
             .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-                let orientation = UIDevice.current.orientation
-                
-                if orientation.isLandscape {
-                    AVPlayerManager.shared.enterFullScreen()
-                } else if orientation == .portrait {
-                    AVPlayerManager.shared.exitFullScreen()
-                }
+                AVPlayerManager.shared.followDeviceRotation()
             }
             #endif
         }
@@ -105,112 +104,117 @@ struct LivePlayerView: View {
     
     // MARK: - Layout Views
     
-    private var portraitLayout: some View {
-        VStack(spacing: 0) {
-            // Video Player
-            if let player = playerManager.player {
-                CustomVideoPlayer(player: player, showsPlaybackControls: true)
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(16/9, contentMode: .fit)
-            } else {
-                Rectangle()
-                    .fill(Color.black)
-                    .aspectRatio(16/9, contentMode: .fit)
-                    .overlay {
-                        if isLoading {
-                            ProgressView()
-                                .tint(.white)
-                        }
-                    }
-            }
-            
-            // Video Info
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Title
-                    Text(creator.liveStream?.title ?? "Live Stream")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(Color.adaptiveText)
-                        .multilineTextAlignment(.leading)
-                    
-                    // Metadata
-                    HStack(spacing: 8) {
-                        Text("LIVE")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.red)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                        
-                        Text("Started just now") // Live streams don't always have start time handy in Creator object, simplified
-                            .font(.subheadline)
-                            .foregroundColor(Color.adaptiveSecondaryText)
-                    }
-                    
-                    Divider()
-                        .background(Color.floatplaneGray.opacity(0.3))
-                    
-                    // Creator Info
-                    HStack(spacing: 12) {
-                        if let icon = creator.icon.fullURL {
-                            CachedAsyncImage(url: icon) { image in
-                                image.resizable().aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Circle().fill(Color.floatplaneGray.opacity(0.3))
-                            }
-                            .frame(width: 40, height: 40)
-                            .clipShape(Circle())
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(creator.title)
-                                .font(.body)
-                                .fontWeight(.semibold)
-                                .foregroundColor(Color.adaptiveText)
-                        }
-                        
-                        Spacer()
-                    }
-                    
-                    Divider()
-                        .background(Color.floatplaneGray.opacity(0.3))
-                    
-                    // Description
-                    VStack(alignment: .leading, spacing: 8) {
-                        Button {
-                            withAnimation {
-                                isDescriptionExpanded.toggle()
-                            }
-                        } label: {
-                            HStack {
-                                Text("Description")
-                                    .font(.headline)
-                                    .foregroundColor(Color.adaptiveText)
-                                Spacer()
-                                Image(systemName: isDescriptionExpanded ? "chevron.up" : "chevron.down")
-                                    .foregroundColor(Color.adaptiveSecondaryText)
-                            }
-                        }
-                        
-                        if isDescriptionExpanded {
-                            Text(parsedDescription)
-                                .font(.body)
-                                .foregroundColor(Color.adaptiveText)
-                                #if !os(tvOS)
-                                .textSelection(.enabled)
-                                #endif
-                        } else {
-                            Text(parsedDescription)
-                                .font(.body)
-                                .foregroundColor(Color.adaptiveText)
-                                .lineLimit(2)
-                        }
+    private var pageLayout: some View {
+        PlayerPageLayout {
+            streamPlayer
+        } details: {
+            streamDetails
+        } side: {
+            creatorDetails
+        }
+    }
+
+    @ViewBuilder
+    private var streamPlayer: some View {
+        if let player = playerManager.player {
+            CustomVideoPlayer(player: player, showsPlaybackControls: true)
+                .frame(maxWidth: .infinity)
+                .aspectRatio(16/9, contentMode: .fit)
+        } else {
+            Rectangle()
+                .fill(Color.black)
+                .aspectRatio(16/9, contentMode: .fit)
+                .overlay {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
                     }
                 }
-                .padding()
+        }
+    }
+
+    @ViewBuilder
+    private var streamDetails: some View {
+        // Title
+        Text(creator.liveStream?.title ?? "Live Stream")
+            .font(.title3)
+            .fontWeight(.semibold)
+            .foregroundColor(Color.adaptiveText)
+            .multilineTextAlignment(.leading)
+                    
+        // Metadata
+        HStack(spacing: 8) {
+            Text("LIVE")
+                .font(.caption)
+                .fontWeight(.bold)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.red)
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        
+            Text("Started just now") // Live streams don't always have start time handy in Creator object, simplified
+                .font(.subheadline)
+                .foregroundColor(Color.adaptiveSecondaryText)
+        }
+    }
+
+    @ViewBuilder
+    private var creatorDetails: some View {
+        // Creator Info
+        HStack(spacing: 12) {
+            if let icon = creator.icon.fullURL {
+                CachedAsyncImage(url: icon) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Circle().fill(Color.floatplaneGray.opacity(0.3))
+                }
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+            }
+                        
+            VStack(alignment: .leading, spacing: 2) {
+                Text(creator.title)
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.adaptiveText)
+            }
+                        
+            Spacer()
+        }
+                    
+        Divider()
+            .background(Color.floatplaneGray.opacity(0.3))
+                    
+        // Description
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation {
+                    isDescriptionExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("Description")
+                        .font(.headline)
+                        .foregroundColor(Color.adaptiveText)
+                    Spacer()
+                    Image(systemName: isDescriptionExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundColor(Color.adaptiveSecondaryText)
+                }
+            }
+                        
+            if isDescriptionExpanded {
+                Text(parsedDescription)
+                    .font(.body)
+                    .foregroundColor(Color.adaptiveText)
+                    #if !os(tvOS)
+                    .textSelection(.enabled)
+                    #endif
+            } else {
+                Text(parsedDescription)
+                    .font(.body)
+                    .foregroundColor(Color.adaptiveText)
+                    .lineLimit(2)
             }
         }
     }
@@ -317,7 +321,9 @@ struct LivePlayerView: View {
             isLoading = false
             
         } catch {
-            errorMessage = "Failed to load livestream: \(error.localizedDescription)"
+            if !error.isOffline {
+                errorMessage = "Failed to load livestream: \(error.localizedDescription)"
+            }
             isLoading = false
         }
     }

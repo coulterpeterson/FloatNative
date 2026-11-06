@@ -141,7 +141,8 @@ fun TvHistoryScreen(
                                     post = post,
                                     onClick = {
                                         viewModel.setLastFocusedId(post.id)
-                                        if (!post.videoAttachments.isNullOrEmpty()) {
+                                        // History posts no longer list their attachments.
+                                        if (post.metadata.hasVideo) {
                                             onPlayVideo(post.id)
                                         }
                                     },
@@ -193,7 +194,7 @@ fun TvHistoryScreen(
                     ),
                     actions = SidebarActions(
                         onPlay = { 
-                            if (!currentSidebarState.post.videoAttachments.isNullOrEmpty()) {
+                            if (currentSidebarState.post.metadata.hasVideo) {
                                 onPlayVideo(currentSidebarState.post.id)
                             }
                         },

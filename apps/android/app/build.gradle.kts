@@ -69,6 +69,10 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        // Lets code that logs through android.util.Log run in unit tests.
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {

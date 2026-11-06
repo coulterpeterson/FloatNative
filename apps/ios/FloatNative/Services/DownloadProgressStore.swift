@@ -10,7 +10,6 @@
 #if !os(tvOS)
 import Combine
 import Foundation
-import Network
 import UIKit
 
 @MainActor
@@ -30,24 +29,27 @@ final class DownloadProgressStore: ObservableObject {
         },
         fetchRemote: { videoId in
             try await FloatplaneAPI.shared.getVideoContent(id: videoId).progress
-        }
+        },
+        isOnline: { NetworkMonitor.shared.isOnline }
     )
 
     @Published private(set) var entries: [String: Entry] = [:]
-    @Published private(set) var isOnline = true
 
     private let fileURL: URL
     private let upload: (String, Int) async throws -> Void
     private let fetchRemote: (String) async throws -> Int?
     private var isSyncing = false
-    private var pathMonitor: NWPathMonitor?
+    private var networkObserver: AnyCancellable?
+    private let isOnline: () -> Bool
     private var foregroundObserver: NSObjectProtocol?
 
     init(
         fileURL: URL,
         upload: @escaping (String, Int) async throws -> Void,
-        fetchRemote: @escaping (String) async throws -> Int?
+        fetchRemote: @escaping (String) async throws -> Int?,
+        isOnline: @escaping () -> Bool = { true }
     ) {
+        self.isOnline = isOnline
         self.fileURL = fileURL
         self.upload = upload
         self.fetchRemote = fetchRemote
@@ -59,20 +61,15 @@ final class DownloadProgressStore: ObservableObject {
 
     /// Syncs whenever the app comes to the foreground or the network comes back.
     func startMonitoring() {
-        guard pathMonitor == nil else { return }
+        guard networkObserver == nil else { return }
 
-        let monitor = NWPathMonitor()
-        monitor.pathUpdateHandler = { [weak self] path in
-            let online = path.status == .satisfied
-            Task { @MainActor in
-                guard let self else { return }
-                let cameOnline = online && !self.isOnline
-                self.isOnline = online
-                if cameOnline { await self.syncPending() }
+        networkObserver = NetworkMonitor.shared.$isOnline
+            .removeDuplicates()
+            .dropFirst()
+            .filter { $0 }
+            .sink { [weak self] _ in
+                Task { @MainActor in await self?.syncPending() }
             }
-        }
-        monitor.start(queue: DispatchQueue(label: "com.coulterpeterson.floatnative.network-monitor"))
-        pathMonitor = monitor
 
         foregroundObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification,
@@ -116,7 +113,7 @@ final class DownloadProgressStore: ObservableObject {
         let local = entries[key]
         if local?.needsSync == true, let local { return local.seconds }
 
-        if let videoId, isOnline, let remote = await fetchRemoteWithTimeout(videoId) {
+        if let videoId, isOnline(), let remote = await fetchRemoteWithTimeout(videoId) {
             return remote
         }
         return local?.seconds ?? 0

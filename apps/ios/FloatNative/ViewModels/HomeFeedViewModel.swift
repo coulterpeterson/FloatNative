@@ -108,7 +108,7 @@ class HomeFeedViewModel: ObservableObject {
                               error is CancellationError ||
                               (error as NSError).domain == NSURLErrorDomain && (error as NSError).code == NSURLErrorCancelled
 
-            if !isCancelled {
+            if !isCancelled && !error.isOffline {
                 errorMessage = "Failed to load feed: \(error.localizedDescription)"
             }
             isLoading = false

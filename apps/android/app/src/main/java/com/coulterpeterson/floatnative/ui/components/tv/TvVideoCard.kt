@@ -95,33 +95,6 @@ fun TvVideoCard(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-fun TvVideoCard(
-    post: com.coulterpeterson.floatnative.api.WatchHistoryBlogPost,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    onLongClick: (() -> Unit)? = null,
-    progress: Float = 0f,
-    isBookmarked: Boolean = false
-) {
-    TvVideoCardContent(
-        title = post.title,
-        thumbnail = post.thumbnail,
-        channelTitle = post.channel.title,
-        channelIcon = post.channel.icon,
-        creatorIcon = post.creator.icon,
-        duration = post.metadata.preferredDisplayDuration,
-        partsSuffix = post.metadata.additionalPartsSuffix,
-        releaseDate = post.releaseDate,
-        onClick = onClick,
-        onLongClick = onLongClick,
-        modifier = modifier,
-        progress = progress,
-        isBookmarked = isBookmarked
-    )
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
 private fun TvVideoCardContent(
     title: String,
     thumbnail: ImageModel?,

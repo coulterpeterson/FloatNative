@@ -132,7 +132,7 @@ struct MainTabView: View {
             }
 
             #if !os(tvOS)
-            // iPad gets Downloads as a tab; iPhone has it in the 3-dot menu
+            // iPad gets Downloads as a tab; iPhone has it in the account menu
             if UIDevice.current.userInterfaceIdiom == .pad {
                 Tab("Downloads", systemImage: "arrow.down.circle.fill", value: TabCoordinator.iPadDownloadsTab) {
                     NavigationStack(path: $tabCoordinator.path) {
@@ -215,7 +215,7 @@ struct MainTabView: View {
             }
 
             #if !os(tvOS)
-            // iPad gets Downloads as a tab; iPhone has it in the 3-dot menu
+            // iPad gets Downloads as a tab; iPhone has it in the account menu
             if UIDevice.current.userInterfaceIdiom == .pad {
                 NavigationStack(path: $tabCoordinator.path) {
                     DownloadsView()

@@ -849,6 +849,39 @@ class AVPlayerManager: NSObject, ObservableObject {
     }
 
     #if !os(tvOS)
+    /// Rotating a phone or iPad to landscape goes fullscreen, and back to portrait leaves it.
+    func followDeviceRotation() {
+        guard windowRotatesWithDevice else { return }
+
+        let orientation = UIDevice.current.orientation
+        if orientation.isLandscape {
+            enterFullScreen()
+        } else if orientation == .portrait {
+            // Only exit fullscreen on standard portrait, ignore upside down
+            exitFullScreen()
+        }
+    }
+
+    /// Fresh from the window: the page may be covered by fullscreen and not updating.
+    private var windowRotatesWithDevice: Bool {
+        guard let traits = playerViewController?.viewIfLoaded?.window?.traitCollection else { return true }
+        return Self.rotationControlsFullScreen(
+            idiom: traits.userInterfaceIdiom,
+            horizontal: traits.horizontalSizeClass,
+            vertical: traits.verticalSizeClass
+        )
+    }
+
+    /// An iPhone regular in both directions is an open iPhone Duo. Its inner screen
+    /// doesn't rotate with the device, and the video already has plenty of room.
+    nonisolated static func rotationControlsFullScreen(
+        idiom: UIUserInterfaceIdiom,
+        horizontal: UIUserInterfaceSizeClass,
+        vertical: UIUserInterfaceSizeClass
+    ) -> Bool {
+        idiom == .pad || horizontal != .regular || vertical != .regular
+    }
+
     /// Force the device into landscape orientation and enter native fullscreen,
     /// overriding the system rotation lock. Mirrors what YouTube / the official
     /// Floatplane app do when you tap their rotate-to-landscape button.
@@ -856,13 +889,16 @@ class AVPlayerManager: NSObject, ObservableObject {
     /// Uses iOS 16's `requestGeometryUpdate` API; deployment target is 18.5+
     /// so the availability check is just defensive.
     func forceLandscape() {
-        requestOrientation(.landscape)
+        if windowRotatesWithDevice {
+            requestOrientation(.landscape)
+        }
         enterFullScreen()
     }
 
     /// Mirror of `forceLandscape()` — invoked when the user exits fullscreen
     /// or otherwise wants to return to portrait while rotation lock is on.
     func forcePortrait() {
+        guard windowRotatesWithDevice else { return }
         requestOrientation(.portrait)
     }
 
