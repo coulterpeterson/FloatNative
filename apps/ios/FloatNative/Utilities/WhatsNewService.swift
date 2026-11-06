@@ -9,6 +9,9 @@
 //  Design notes (per #42):
 //  - Fresh installs are suppressed — we set lastSeen = current on first
 //    launch so the popup only ever fires after an *upgrade*.
+//  - The popup shows when the file's `version` differs from lastSeen, so changing
+//    it shows the notes again, even if the title stays the same. 1.9.1 does that
+//    so people who saw the 1.9 notes also see what's new since.
 //  - Skipped versions don't accumulate — we always show only the latest.
 //  - Settings → "What's New in this version" re-opens the sheet on demand
 //    without mutating lastSeen.
@@ -73,14 +76,28 @@ final class WhatsNewService: ObservableObject {
             // installs — useful for the release that *introduces* the
             // What's New feature itself (otherwise nobody would ever see
             // it for that release).
+            //
+            // Someone already signed in has updated from a version older than
+            // this popup, which never set the key above, so they should see it.
             defaults.set(true, forKey: Self.firstLaunchKey)
-            defaults.set(content.firstLaunchSeed ?? content.version, forKey: Self.lastSeenVersionKey)
+            if !Self.isSignedInOnIOS {
+                defaults.set(content.firstLaunchSeed ?? content.version, forKey: Self.lastSeenVersionKey)
+            }
         }
 
         let lastSeen = defaults.string(forKey: Self.lastSeenVersionKey)
         if lastSeen != content.version {
             isPresented = true
         }
+    }
+
+    /// Apple TV's notes can be older than the app, so it stays quiet on a first launch.
+    private static var isSignedInOnIOS: Bool {
+        #if os(tvOS)
+        return false
+        #else
+        return FloatplaneAPI.shared.isAuthenticated
+        #endif
     }
 
     /// Settings-triggered re-open. Doesn't touch lastSeen.
