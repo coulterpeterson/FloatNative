@@ -37,10 +37,9 @@ struct DownloadsView: View {
                 Button {
                     openFolderInFiles()
                 } label: {
-                    Image(systemName: "folder")
-                        .foregroundColor(Color.adaptiveText)
+                    Label("Show in Files", systemImage: "folder")
                 }
-                .accessibilityLabel("Show in Files")
+                .tint(Color.adaptiveText)
             }
         }
         .onAppear {
@@ -119,6 +118,7 @@ struct DownloadsView: View {
                 .multilineTextAlignment(.center)
         }
         .padding()
+        .messageAvoidingFold()
     }
 
     private var folderHint: some View {
@@ -143,11 +143,13 @@ private struct LocalVideoRow: View {
     let video: LocalVideo
     let entry: DownloadProgressStore.Entry?
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var thumbnail: UIImage?
     @State private var duration: Double?
 
     var body: some View {
-        HStack(spacing: 12) {
+        let isWide = horizontalSizeClass == .regular
+        HStack(spacing: isWide ? 16 : 12) {
             ZStack(alignment: .bottom) {
                 Color.adaptiveSecondaryText.opacity(0.15)
 
@@ -169,12 +171,12 @@ private struct LocalVideoRow: View {
                     .frame(height: 3)
                 }
             }
-            .frame(width: 128, height: 72)
+            .frame(width: isWide ? 192 : 128, height: isWide ? 108 : 72)
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(video.title)
-                    .font(.subheadline)
+                    .font(isWide ? .body : .subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(Color.adaptiveText)
                     .lineLimit(2)
@@ -231,6 +233,7 @@ private struct ActiveDownloadRow: View {
     let download: ActiveDownload
 
     @ObservedObject private var manager = DownloadManager.shared
+    @ObservedObject private var network = NetworkMonitor.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -264,6 +267,18 @@ private struct ActiveDownloadRow: View {
             }
 
             switch download.state {
+            case .queued:
+                if network.isOnline, let waitingUntil = manager.waitingUntil, manager.nextQueued?.id == download.id {
+                    // The system timer text counts down on its own.
+                    (Text("Floatplane limits downloads. Starts in ") + Text(waitingUntil, style: .timer)
+                        + Text(" while FloatNative is open."))
+                        .font(.caption)
+                        .foregroundStyle(Color.adaptiveSecondaryText)
+                } else {
+                    Text(network.isOnline ? "Queued" : "Queued. Waiting for a connection.")
+                        .font(.caption)
+                        .foregroundStyle(Color.adaptiveSecondaryText)
+                }
             case .preparing:
                 ProgressView()
                     .progressViewStyle(.linear)
@@ -328,6 +343,8 @@ struct DownloadStatusButton: View {
             .padding(1.5)
         } else if case .preparing? = activeDownload?.state {
             ProgressView()
+        } else if case .queued? = activeDownload?.state {
+            Image(systemName: "clock")
         } else if hasFailed {
             Image(systemName: "exclamationmark.arrow.circlepath")
         } else {

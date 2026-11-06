@@ -5,7 +5,12 @@
     {
       "icon": "arrow.down.circle",
       "title": "Offline Downloads",
-      "body": "Downloads now save straight to the app and keep going in the background. Watch them anytime, even with no connection, from Downloads in the ••• menu on iPhone or the Downloads tab on iPad."
+      "body": "Downloads now save straight to the app and keep going in the background. Watch them anytime, even with no connection, from Downloads in the account menu on iPhone or the Downloads tab on iPad."
+    },
+    {
+      "icon": "iphone",
+      "title": "iPhone Duo Support",
+      "body": "FloatNative now fits both iPhone Duo screens. Open it for a side-by-side player, with videos and text kept clear of the fold when it's partly closed."
     },
     {
       "icon": "arrow.triangle.2.circlepath",

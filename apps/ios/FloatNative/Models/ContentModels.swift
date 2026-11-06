@@ -206,38 +206,11 @@ struct UpdateProgressRequest: Codable {
 
 // MARK: - Watch History
 
-/// BlogPost format returned by watch history API - has string attachment arrays instead of objects
-struct WatchHistoryBlogPost: Codable {
-    let id: String
-    let guid: String
-    let title: String
-    let text: String
-    let type: String
-    let channel: ChannelModel
-    let tags: [String]
-    let attachmentOrder: [String]
-    let metadata: PostMetadataModel
-    let releaseDate: Date
-    let likes: Int
-    let dislikes: Int
-    let score: Int
-    let comments: Int
-    let creator: CreatorModelV2
-    let wasReleasedSilently: Bool
-    let thumbnail: ImageModel?
-    let isAccessible: Bool
-    // Attachments are string IDs in watch history response (not objects)
-    let videoAttachments: [String]?
-    let audioAttachments: [String]?
-    let pictureAttachments: [String]?
-    let galleryAttachments: [String]?
-}
-
 struct WatchHistoryResponse: Codable {
     let userId: String
     let contentId: String
     let contentType: String
     let progress: Int
     let updatedAt: Date
-    let blogPost: WatchHistoryBlogPost
+    let blogPost: BlogPost
 }

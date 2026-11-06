@@ -44,7 +44,7 @@ extension View {
 // MARK: - Global Menu Modifier
 
 extension View {
-    /// Adds the global 3-dot menu to the navigation bar
+    /// Adds the global account menu to the navigation bar
     func globalMenu() -> some View {
         self.modifier(GlobalMenuModifier())
     }
@@ -64,10 +64,10 @@ struct GlobalMenuModifier: ViewModifier {
                         Button {
                             showSearch = true
                         } label: {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(Color.adaptiveText)
+                            Label("Search", systemImage: "magnifyingglass")
                                 .font(.title3)
                         }
+                        .tint(Color.adaptiveText)
                     }
 
                     Menu {
@@ -92,10 +92,12 @@ struct GlobalMenuModifier: ViewModifier {
                             Label("Settings", systemImage: "gearshape.fill")
                         }
                     } label: {
-                        Image(systemName: "ellipsis")
-                            .foregroundColor(Color.adaptiveText)
+                        // Not an ellipsis: the system uses that for toolbar overflow,
+                        // and on iPhone Duo this menu can sit right beside it.
+                        Label("Account", systemImage: "person.crop.circle")
                             .font(.title3)
                     }
+                    .tint(Color.adaptiveText)
                 }
             }
             .sheet(isPresented: $showSearch) {

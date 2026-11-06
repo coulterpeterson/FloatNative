@@ -31,7 +31,7 @@ struct SaveToPlaylistSheet: View {
                         Image(systemName: "tray")
                             .font(.system(size: 50))
                             .foregroundStyle(Color.adaptiveSecondaryText)
-                        Text("No playlists found")
+                        Text(NetworkMonitor.shared.isOnline ? "No playlists found" : "You're offline. Connect to save to a playlist.")
                             .font(.subheadline)
                             .foregroundStyle(Color.adaptiveSecondaryText)
                     }
@@ -75,7 +75,7 @@ struct SaveToPlaylistSheet: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button("Done", systemImage: "checkmark") {
                         dismiss()
                     }
                 }

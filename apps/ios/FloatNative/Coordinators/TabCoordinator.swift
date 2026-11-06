@@ -21,14 +21,35 @@ class TabCoordinator: ObservableObject {
 
     #if !os(tvOS)
     /// Tab index of Downloads on iPad, where it has a tab of its own. iPhone has
-    /// Search in that slot and reaches Downloads through the 3-dot menu.
+    /// Search in that slot and reaches Downloads through the account menu.
     static let iPadDownloadsTab = 3
+    private static let iPhoneSearchTab = 3
 
     func showDownloads() {
         if UIDevice.current.userInterfaceIdiom == .pad {
             selectedTab = Self.iPadDownloadsTab
         } else {
-            path.append(NavigationDestination.downloads)
+            push(.downloads)
+        }
+    }
+
+    func play(_ video: LocalVideo, replacingCurrent: Bool = false) {
+        if replacingCurrent, !path.isEmpty {
+            path.removeLast()
+        }
+        push(.downloadPlayer(video))
+    }
+
+    /// Search has its own navigation stack, so on that tab this goes through Home.
+    private func push(_ destination: NavigationDestination) {
+        guard selectedTab == Self.iPhoneSearchTab, UIDevice.current.userInterfaceIdiom != .pad else {
+            path.append(destination)
+            return
+        }
+        selectedTab = 0
+        // Switching tabs clears the path, so wait for that to happen.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.path.append(destination)
         }
     }
     #endif

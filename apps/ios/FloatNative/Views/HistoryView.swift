@@ -17,14 +17,16 @@ struct HistoryView: View {
             Color.adaptiveBackground
                 .ignoresSafeArea()
 
-            if viewModel.groupedHistory.isEmpty && !viewModel.isLoading {
+            if viewModel.loadFailed {
+                loadFailedState
+            } else if viewModel.groupedHistory.isEmpty && !viewModel.isLoading {
                 emptyState
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(viewModel.groupedHistory.keys.sorted(by: >), id: \.self) { date in
                             Section {
-                                LazyVStack(spacing: 8) {
+                                LazyVGrid(columns: AdaptiveGrid.rowColumns, spacing: 8) {
                                     ForEach(viewModel.groupedHistory[date] ?? []) { item in
                                         PostPlayerLink(post: item.post, presented: $playerPost) {
                                             CompactHistoryCard(
@@ -57,6 +59,7 @@ struct HistoryView: View {
                 .refreshable {
                     await viewModel.loadHistory()
                 }
+                .columnsAvoidingFold()
             }
 
             // Loading state
@@ -72,6 +75,9 @@ struct HistoryView: View {
         .navigationTitle("Watch History")
         #endif
         .toolbarBackground(.visible, for: .navigationBar)
+        .offlineFallback(hasContent: !viewModel.groupedHistory.isEmpty) {
+            await viewModel.loadHistory()
+        }
         .globalMenu()
         .task {
             await viewModel.loadHistory()
@@ -83,6 +89,29 @@ struct HistoryView: View {
             VideoPlayerView(post: post)
         }
         #endif
+    }
+
+    private var loadFailedState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 50))
+                .foregroundStyle(Color.floatplaneGray)
+
+            Text("Couldn't load your watch history")
+                .font(.title3)
+                .fontWeight(.medium)
+                .foregroundStyle(Color.adaptiveText)
+                .multilineTextAlignment(.center)
+
+            Button("Retry") {
+                Task {
+                    await viewModel.loadHistory()
+                }
+            }
+            .buttonStyle(LiquidGlassButtonStyle(tint: .floatplaneBlue))
+        }
+        .padding()
+        .messageAvoidingFold()
     }
 
     private var emptyState: some View {
@@ -102,6 +131,7 @@ struct HistoryView: View {
                 .multilineTextAlignment(.center)
         }
         .padding()
+        .messageAvoidingFold()
     }
 
     private func formatSectionDate(_ date: Date) -> String {
@@ -135,89 +165,32 @@ class HistoryViewModel: ObservableObject {
     @Published var historyItems: [HistoryItem] = []
     @Published var groupedHistory: [Date: [HistoryItem]] = [:]
     @Published var isLoading = false
+    /// So a failed load doesn't look like having watched nothing.
+    @Published var loadFailed = false
 
     private let api = FloatplaneAPI.shared
 
     func loadHistory() async {
         isLoading = true
+        loadFailed = false
 
         do {
-            // Fetch watch history from server
             let watchHistory = try await api.getWatchHistory(offset: 0)
 
-            guard !watchHistory.isEmpty else {
-                historyItems = []
-                groupedHistory = [:]
-                isLoading = false
-                return
-            }
-
-            // Convert server response to HistoryItems
-            var items: [HistoryItem] = []
-            for historyResponse in watchHistory {
-                // Convert WatchHistoryBlogPost to BlogPost format
-                let blogPost = BlogPost(
-                    id: historyResponse.blogPost.id,
-                    guid: historyResponse.blogPost.guid,
-                    title: historyResponse.blogPost.title,
-                    text: historyResponse.blogPost.text,
-                    type: .blogpost,
-                    channel: .typeChannelModel(historyResponse.blogPost.channel),
-                    tags: historyResponse.blogPost.tags,
-                    attachmentOrder: historyResponse.blogPost.attachmentOrder,
-                    metadata: historyResponse.blogPost.metadata,
-                    releaseDate: historyResponse.blogPost.releaseDate,
-                    likes: historyResponse.blogPost.likes,
-                    dislikes: historyResponse.blogPost.dislikes,
-                    score: historyResponse.blogPost.score,
-                    comments: historyResponse.blogPost.comments,
-                    creator: BlogPostModelV3Creator(
-                        id: historyResponse.blogPost.creator.id,
-                        // owner/category are absent from Floatplane's slim post creator
-                        owner: historyResponse.blogPost.creator.owner.map {
-                            BlogPostModelV3CreatorOwner(id: $0, username: $0)
-                        },
-                        title: historyResponse.blogPost.creator.title,
-                        urlname: historyResponse.blogPost.creator.urlname,
-                        description: historyResponse.blogPost.creator.description,
-                        about: historyResponse.blogPost.creator.about,
-                        category: CreatorModelV3Category(
-                            id: historyResponse.blogPost.creator.category ?? "",
-                            title: historyResponse.blogPost.creator.category ?? ""
-                        ),
-                        cover: historyResponse.blogPost.creator.cover,
-                        icon: historyResponse.blogPost.creator.icon,
-                        liveStream: historyResponse.blogPost.creator.liveStream,
-                        subscriptionPlans: historyResponse.blogPost.creator.subscriptionPlans ?? [],
-                        discoverable: historyResponse.blogPost.creator.discoverable,
-                        subscriberCountDisplay: historyResponse.blogPost.creator.subscriberCountDisplay,
-                        incomeDisplay: historyResponse.blogPost.creator.incomeDisplay,
-                        defaultChannel: historyResponse.blogPost.creator.defaultChannel,
-                        channels: nil
-                    ),
-                    wasReleasedSilently: historyResponse.blogPost.wasReleasedSilently,
-                    thumbnail: historyResponse.blogPost.thumbnail,
-                    isAccessible: historyResponse.blogPost.isAccessible,
-                    videoAttachments: historyResponse.blogPost.videoAttachments, // Already strings
-                    audioAttachments: historyResponse.blogPost.audioAttachments, // Already strings
-                    pictureAttachments: historyResponse.blogPost.pictureAttachments, // Already strings
-                    galleryAttachments: historyResponse.blogPost.galleryAttachments ?? []
+            historyItems = watchHistory.map { entry in
+                HistoryItem(
+                    id: entry.contentId,
+                    post: entry.blogPost,
+                    watchedAt: entry.updatedAt,
+                    progress: Double(entry.progress) / 100.0 // Convert 0-100 to 0.0-1.0
                 )
-
-                items.append(HistoryItem(
-                    id: historyResponse.contentId,
-                    post: blogPost,
-                    watchedAt: historyResponse.updatedAt,
-                    progress: Double(historyResponse.progress) / 100.0 // Convert 0-100 to 0.0-1.0
-                ))
             }
-
-            historyItems = items
             groupHistory()
 
         } catch {
             historyItems = []
             groupedHistory = [:]
+            loadFailed = true
         }
 
         isLoading = false

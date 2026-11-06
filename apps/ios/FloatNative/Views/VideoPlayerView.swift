@@ -16,6 +16,7 @@ struct VideoPlayerView: View {
     @StateObject private var playerManager = AVPlayerManager.shared
     @StateObject private var api = FloatplaneAPI.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -73,16 +74,17 @@ struct VideoPlayerView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let isLandscape = geometry.size.width > geometry.size.height
+            // A phone on its side. An open iPhone Duo is also wider than it's tall,
+            // but has room for everything.
+            let isLandscape = geometry.size.width > geometry.size.height && verticalSizeClass == .compact
 
             ZStack {
                 // Background
                 Color.adaptiveBackground
                     .ignoresSafeArea()
 
-                // Persistent Layout (Always use portrait layout structure)
-                // When rotating to landscape, we trigger native fullscreen instead of swapping views
-                portraitLayout
+                // When a phone rotates to landscape, we trigger native fullscreen instead of swapping views
+                pageLayout(showsCommentInput: !isLandscape && !isLivestream && !commentsLoadError)
 
                 // Error state
                 if let error = errorMessage {
@@ -111,14 +113,9 @@ struct VideoPlayerView: View {
                         dismiss()
                     }
                 }
-
-                // Bottom comment input overlay (only in portrait, not for livestreams, and when comments loaded successfully)
-                if !isLandscape && !isLivestream && !commentsLoadError {
-                    VStack {
-                        Spacer()
-                        bottomCommentInput
-                    }
-                }
+            }
+            .offlineFallback(hasContent: playerManager.player != nil || (!post.metadata.hasVideo && !isLivestream), postId: post.id) {
+                await loadVideo()
             }
             #if !os(tvOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -133,14 +130,7 @@ struct VideoPlayerView: View {
             // reliably when the native player is in fullscreen mode (covering this view).
             #if !os(tvOS)
             .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-                let orientation = UIDevice.current.orientation
-                
-                if orientation.isLandscape {
-                    AVPlayerManager.shared.enterFullScreen()
-                } else if orientation == .portrait {
-                    // Only exit fullscreen on standard portrait, ignore upside down
-                    AVPlayerManager.shared.exitFullScreen()
-                }
+                AVPlayerManager.shared.followDeviceRotation()
             }
             #endif
         }
@@ -179,6 +169,10 @@ struct VideoPlayerView: View {
             duration: 3.0
         )
         .onDisappear {
+            // A downloaded video opened from this screen now has the shared player,
+            // and this fires after it has loaded.
+            if playerManager.localProgressKey != nil { return }
+
             // Save progress when leaving the view (skip for livestreams)
             if !isLivestream {
                 Task {
@@ -211,147 +205,162 @@ struct VideoPlayerView: View {
         }
     }
 
+    /// Reports a failed action. Offline, a passing note is enough: the error screen
+    /// would cover a video that may well still be playing.
+    private func showError(_ message: String, for error: Error) {
+        #if !os(tvOS)
+        if error.isOffline {
+            showDownloadMessage("You're offline. Try again when you're connected.", icon: "wifi.slash")
+            return
+        }
+        #endif
+        errorMessage = message
+    }
+
     // MARK: - Layout Views
 
-    private var portraitLayout: some View {
-        VStack(spacing: 0) {
-            // Video Player or Image
-            if post.metadata.hasVideo {
-                // Video post - show player
-                if let player = playerManager.player {
-                    CustomVideoPlayer(player: player, showsPlaybackControls: true)
-                        .frame(maxWidth: .infinity)
-                        .aspectRatio(16/9, contentMode: .fit)
-                } else {
-                    Rectangle()
-                        .fill(Color.black)
-                        .aspectRatio(16/9, contentMode: .fit)
-                        .overlay {
-                            if isLoading {
-                                ProgressView()
-                                    .tint(.white)
-                            }
-                        }
-                }
-            } else {
-                // Image or text post - show image if available
-                if post.metadata.hasPicture, let imageURL = post.thumbnail?.fullURL {
-                    CachedAsyncImage(url: imageURL) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Rectangle()
-                            .fill(Color.floatplaneGray.opacity(0.3))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(16/9, contentMode: .fit)
-                    .clipped()
-                } else {
-                    // Text-only post - no image
-                    // Show a placeholder or nothing
-                    EmptyView()
-                }
-            }
-
-            // Video Info
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Title
-                    Text(post.title)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(Color.adaptiveText)
-                        .multilineTextAlignment(.leading)
-
-                    // Metadata
-                    HStack(spacing: 8) {
-                        Text(formatDate(post.releaseDate))
-                    }
-                    .font(.subheadline)
-                    .foregroundColor(Color.adaptiveSecondaryText)
-
-                    // Action Buttons (Like/Dislike)
-                    actionButtons
-
-                    Divider()
-                        .background(Color.floatplaneGray.opacity(0.3))
-
-                    // Channel/Creator Info
-                    HStack(spacing: 12) {
-                        // Channel or Creator avatar
-                        if let channel = post.channel.channelObject, let channelIcon = channel.icon.fullURL {
-                            // Show channel icon if available
-                            CachedAsyncImage(url: channelIcon) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Circle()
-                                    .fill(Color.floatplaneGray.opacity(0.3))
-                            }
-                            .frame(width: 40, height: 40)
-                            .clipShape(Circle())
-                        } else if let creatorIcon = post.creator.icon.fullURL {
-                            // Fall back to creator icon
-                            CachedAsyncImage(url: creatorIcon) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Circle()
-                                    .fill(Color.floatplaneGray.opacity(0.3))
-                            }
-                            .frame(width: 40, height: 40)
-                            .clipShape(Circle())
-                        }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            // Show channel name if available, otherwise creator name
-                            if let channel = post.channel.channelObject {
-                                Text(channel.title)
-                                    .font(.body)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(Color.adaptiveText)
-
-                                Text("Channel")
-                                    .font(.caption)
-                                    .foregroundColor(Color.adaptiveSecondaryText)
-                            } else {
-                                Text(post.creator.title)
-                                    .font(.body)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(Color.adaptiveText)
-
-                                Text("Creator")
-                                    .font(.caption)
-                                    .foregroundColor(Color.adaptiveSecondaryText)
-                            }
-                        }
-
-                        Spacer()
-                    }
-
-                    Divider()
-                        .background(Color.floatplaneGray.opacity(0.3))
-
-                    // Multi-video picker (GH #23) — only shows when the
-                    // post has more than one video attachment.
-                    multiVideoPicker
-
-                    // Description
-                    descriptionSection
-
-                    Divider()
-                        .background(Color.floatplaneGray.opacity(0.3))
-
-                    // Comments Section
-                    commentsSection
-                }
-                .padding()
-                .padding(.bottom, 100) // Space for floating comment input
+    private func pageLayout(showsCommentInput: Bool) -> some View {
+        PlayerPageLayout(sideBottomPadding: 100) { // Space for floating comment input
+            mediaArea
+        } details: {
+            postDetails
+        } side: {
+            commentsSection
+        } footer: {
+            if showsCommentInput {
+                bottomCommentInput
             }
         }
+    }
+
+    /// The video, or the image of a post without one.
+    @ViewBuilder
+    private var mediaArea: some View {
+        if post.metadata.hasVideo {
+            // Video post - show player
+            if let player = playerManager.player {
+                CustomVideoPlayer(player: player, showsPlaybackControls: true)
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(16/9, contentMode: .fit)
+            } else {
+                Rectangle()
+                    .fill(Color.black)
+                    .aspectRatio(16/9, contentMode: .fit)
+                    .overlay {
+                        if isLoading {
+                            ProgressView()
+                                .tint(.white)
+                        }
+                    }
+            }
+        } else {
+            // Image or text post - show image if available
+            if post.metadata.hasPicture, let imageURL = post.thumbnail?.fullURL {
+                CachedAsyncImage(url: imageURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.floatplaneGray.opacity(0.3))
+                }
+                .frame(maxWidth: .infinity)
+                .aspectRatio(16/9, contentMode: .fit)
+                .clipped()
+            } else {
+                // Text-only post - no image
+                // Show a placeholder or nothing
+                EmptyView()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var postDetails: some View {
+        // Title
+        Text(post.title)
+            .font(.title3)
+            .fontWeight(.semibold)
+            .foregroundColor(Color.adaptiveText)
+            .multilineTextAlignment(.leading)
+
+        // Metadata
+        HStack(spacing: 8) {
+            Text(formatDate(post.releaseDate))
+        }
+        .font(.subheadline)
+        .foregroundColor(Color.adaptiveSecondaryText)
+
+        // Action Buttons (Like/Dislike)
+        actionButtons
+
+        Divider()
+            .background(Color.floatplaneGray.opacity(0.3))
+
+        // Channel/Creator Info
+        HStack(spacing: 12) {
+            // Channel or Creator avatar
+            if let channel = post.channel.channelObject, let channelIcon = channel.icon.fullURL {
+                // Show channel icon if available
+                CachedAsyncImage(url: channelIcon) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Circle()
+                        .fill(Color.floatplaneGray.opacity(0.3))
+                }
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+            } else if let creatorIcon = post.creator.icon.fullURL {
+                // Fall back to creator icon
+                CachedAsyncImage(url: creatorIcon) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Circle()
+                        .fill(Color.floatplaneGray.opacity(0.3))
+                }
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                // Show channel name if available, otherwise creator name
+                if let channel = post.channel.channelObject {
+                    Text(channel.title)
+                        .font(.body)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color.adaptiveText)
+
+                    Text("Channel")
+                        .font(.caption)
+                        .foregroundColor(Color.adaptiveSecondaryText)
+                } else {
+                    Text(post.creator.title)
+                        .font(.body)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color.adaptiveText)
+
+                    Text("Creator")
+                        .font(.caption)
+                        .foregroundColor(Color.adaptiveSecondaryText)
+                }
+            }
+
+            Spacer()
+        }
+
+        Divider()
+            .background(Color.floatplaneGray.opacity(0.3))
+
+        // Multi-video picker (GH #23) — only shows when the
+        // post has more than one video attachment.
+        multiVideoPicker
+
+        // Description
+        descriptionSection
     }
 
     // MARK: - Load Video
@@ -421,7 +430,9 @@ struct VideoPlayerView: View {
         guard let videoId = resolvedVideoId else {
             if let postLoadError {
                 print("📱 [VideoPlayerView.loadVideo] Couldn't load post: \(postLoadError)")
-                errorMessage = "Couldn't load this post: \(postLoadError.localizedDescription)"
+                if !postLoadError.isOffline {
+                    errorMessage = "Couldn't load this post: \(postLoadError.localizedDescription)"
+                }
             } else {
                 print("📱 [VideoPlayerView.loadVideo] No video attachment found!")
                 errorMessage = "No video available for this post"
@@ -491,7 +502,9 @@ struct VideoPlayerView: View {
 
             isLoading = false
         } catch {
-            errorMessage = "Failed to load video: \(error.localizedDescription)"
+            if !error.isOffline {
+                errorMessage = "Failed to load video: \(error.localizedDescription)"
+            }
             isLoading = false
         }
     }
@@ -544,7 +557,9 @@ struct VideoPlayerView: View {
             // Monitor player.status and player.error to set isStreamOffline = true
             // when the stream goes offline or encounters a fatal error
         } catch {
-            errorMessage = "Failed to load livestream: \(error.localizedDescription)"
+            if !error.isOffline {
+                errorMessage = "Failed to load livestream: \(error.localizedDescription)"
+            }
             isLoading = false
         }
     }
@@ -585,7 +600,7 @@ struct VideoPlayerView: View {
                 currentLikes = previousLikes
                 currentDislikes = previousDislikes
                 userInteraction = previousInteraction
-                errorMessage = "Failed to update like: \(error.localizedDescription)"
+                showError("Failed to update like: \(error.localizedDescription)", for: error)
             }
         }
     }
@@ -624,7 +639,7 @@ struct VideoPlayerView: View {
                 currentLikes = previousLikes
                 currentDislikes = previousDislikes
                 userInteraction = previousInteraction
-                errorMessage = "Failed to update dislike: \(error.localizedDescription)"
+                showError("Failed to update dislike: \(error.localizedDescription)", for: error)
             }
         }
     }
@@ -652,7 +667,7 @@ struct VideoPlayerView: View {
             duration: attachment?.duration ?? post.metadata.videoDuration,
             preferredHeight: playerManager.currentQuality?.height
         )
-        showDownloadMessage("Downloading. Find it in Downloads.", icon: "arrow.down.circle.fill")
+        showDownloadMessage("Added to Downloads", icon: "arrow.down.circle.fill")
     }
 
     private func showDownloadMessage(_ message: String, icon: String) {
@@ -682,7 +697,7 @@ struct VideoPlayerView: View {
             // Handle error
             await MainActor.run {
                 isChangingQuality = false
-                errorMessage = "Failed to change quality: \(error.localizedDescription)"
+                showError("Failed to change quality: \(error.localizedDescription)", for: error)
             }
         }
     }
@@ -932,7 +947,7 @@ struct VideoPlayerView: View {
                 // Remove optimistic comment on failure — also from nested replies
                 comments = removeComment(from: comments, matching: optimisticId)
 
-                errorMessage = "Failed to post \(replyTarget == nil ? "comment" : "reply"): \(error.localizedDescription)"
+                showError("Failed to post \(replyTarget == nil ? "comment" : "reply"): \(error.localizedDescription)", for: error)
                 isPostingComment = false
             }
         }
@@ -983,9 +998,36 @@ struct VideoPlayerView: View {
     private var actionButtons: some View {
         Group {
             if !isLivestream {
-                HStack(spacing: 12) {
-                    // Like button
-                    Button {
+                // A row that doesn't fit would make the whole page wider than the screen.
+                ViewThatFits(in: .horizontal) {
+                    actionRow(spacing: 12, pillPadding: 16)
+                    actionRow(spacing: 8, pillPadding: 10)
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 12) {
+                            reactionButtons(pillPadding: 16)
+                        }
+                        HStack(spacing: 12) {
+                            toolButtons
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func actionRow(spacing: CGFloat, pillPadding: CGFloat) -> some View {
+        HStack(spacing: spacing) {
+            reactionButtons(pillPadding: pillPadding)
+            Spacer(minLength: 0)
+            toolButtons
+        }
+    }
+
+    @ViewBuilder
+    private func reactionButtons(pillPadding: CGFloat) -> some View {
+            // Like button
+            Button {
                 Task {
                     await likeContent()
                 }
@@ -998,7 +1040,7 @@ struct VideoPlayerView: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .foregroundColor(hasLiked ? .floatplaneBlue : Color.adaptiveText)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, pillPadding)
                 .padding(.vertical, 8)
                 // Grow the pill to fit 4-digit counts; without this the
                 // parent HStack squeezed "1234" into two lines.
@@ -1020,14 +1062,15 @@ struct VideoPlayerView: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .foregroundColor(hasDisliked ? .red : Color.adaptiveText)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, pillPadding)
                 .padding(.vertical, 8)
                 .fixedSize(horizontal: true, vertical: false)
             }
             .liquidGlass(tint: hasDisliked ? .red : .gray, opacity: hasDisliked ? 0.8 : 0.6)
+    }
 
-            Spacer()
-
+    @ViewBuilder
+    private var toolButtons: some View {
             // Save to playlist, then download (video posts only)
             #if !os(tvOS)
             SaveToPlaylistButton(post: post)
@@ -1041,7 +1084,7 @@ struct VideoPlayerView: View {
                 } onAlreadyDownloaded: {
                     showDownloadMessage("Already in Downloads", icon: "checkmark.circle.fill")
                 } onInProgress: {
-                    showDownloadMessage("Downloading. Find it in Downloads.", icon: "arrow.down.circle.fill")
+                    showDownloadMessage("Already in your Downloads queue", icon: "arrow.down.circle.fill")
                 }
             }
             #endif
@@ -1111,19 +1154,9 @@ struct VideoPlayerView: View {
             // chrome's own AirPlay / PiP buttons.
             #if !os(tvOS)
             if post.metadata.hasVideo {
-                Button {
-                    playerManager.forceLandscape()
-                } label: {
-                    Image(systemName: "rectangle.landscape.rotate")
-                        .font(.title2)
-                        .foregroundColor(Color.adaptiveText)
-                }
-                .accessibilityLabel("Force landscape")
+                PlayerFullScreenButton()
             }
             #endif
-                }
-            }
-        }
     }
 
     // MARK: - Comments Section
@@ -1360,7 +1393,7 @@ struct VideoPlayerView: View {
             // Rollback on failure
             await MainActor.run {
                 comments = previousComments
-                errorMessage = "Failed to update like: \(error.localizedDescription)"
+                showError("Failed to update like: \(error.localizedDescription)", for: error)
             }
         }
     }
@@ -1408,7 +1441,7 @@ struct VideoPlayerView: View {
             // Rollback on failure
             await MainActor.run {
                 comments = previousComments
-                errorMessage = "Failed to update dislike: \(error.localizedDescription)"
+                showError("Failed to update dislike: \(error.localizedDescription)", for: error)
             }
         }
     }
@@ -1496,6 +1529,17 @@ struct VideoPlayerView: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
         .shadow(color: .black.opacity(0.2), radius: 12, y: -4)
+        // Fades out what's scrolling behind, so text doesn't stick out either side.
+        .background {
+            LinearGradient(
+                colors: [Color.adaptiveBackground.opacity(0), Color.adaptiveBackground],
+                startPoint: .top,
+                endPoint: .center
+            )
+            .padding(.top, -24)
+            .ignoresSafeArea(edges: .bottom)
+            .allowsHitTesting(false)
+        }
     }
 
     // MARK: - Multi-Video Picker
